@@ -1176,6 +1176,13 @@ export const LEVELS = [
     hazards: [
       // Kill plane.
       { kind: 'lava', x: 0, y: -5, w: 36, h: 1.4, dps: 50 },
+      // Icicles (pointDown spikes) hanging under each wood platform.
+      // Light-blue color to read as crystal-frosted, not torch-orange.
+      { kind: 'spike', x: -8.5, y: 5.5,  w: 2.4, pointDown: true, color: 0xa8c8d8 },  // under y=6 wood left
+      { kind: 'spike', x:  8.5, y: 5.5,  w: 2.4, pointDown: true, color: 0xa8c8d8 },  // under y=6 wood right
+      { kind: 'spike', x:  9,   y: 9.5,  w: 2.6, pointDown: true, color: 0xa8c8d8 },  // under y=10 wood right
+      { kind: 'spike', x:  9,   y: 13.5, w: 2.6, pointDown: true, color: 0xa8c8d8 },  // under y=14 wood right
+      { kind: 'spike', x:  9,   y: 16.5, w: 2.6, pointDown: true, color: 0xa8c8d8 },  // under y=17 chain wood right
     ],
     spawns: [
       // Lower floor.
