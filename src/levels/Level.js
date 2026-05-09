@@ -760,6 +760,17 @@ export class Level {
   randomWeaponSpawn() { return this.weaponSpawns[Math.floor(Math.random() * this.weaponSpawns.length)]; }
 
   update(dt, players) {
+    if (this.killBound) {
+      const bx = this.killBound.x, by = this.killBound.y;
+      for (const p of players) {
+        if (!p || !p.alive) continue;
+        const x = p.body.position.x, y = p.body.position.y;
+        if (Math.abs(x) > bx || Math.abs(y) > by) {
+          p.takeDamage(p.maxHealth + 1, { attacker: null, weapon: 'void' });
+        }
+      }
+    }
+
     // Drive sustained hazards (pendulum sinusoidal force, etc.) before the
     // physics step happens — the Game loop calls level.update AFTER physics
     // step, so apply forces once here for the *next* step. Acceptable lag.
