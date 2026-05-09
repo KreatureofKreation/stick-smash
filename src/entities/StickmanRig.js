@@ -407,7 +407,7 @@ export class StickmanRig {
       // 0.30 leaves 0.67m diff = 96° knee bend = visible knee drive.
       // Sprint peak 0.42 gives a tight athletic tuck.
       const liftAmp = 0.12 + stepAmp * 0.30;
-      const maxDrag = 0.55;
+      const maxDrag = stride * 0.8;
 
       if (this._plantLX < hipX - maxDrag) this._plantLX = hipX - maxDrag;
       if (this._plantLX > hipX + maxDrag) this._plantLX = hipX + maxDrag;
@@ -425,7 +425,7 @@ export class StickmanRig {
         footLX = this._plantLX;
         footLY = baseFootY;
       } else {
-        const target = hipLX + this.facing * stride;
+        const target = hipLX + this.facing * stride * 0.5;
         footLX = lerp(this._plantLX, target, xArc(tL));
         footLY = baseFootY + yArc(tL) * liftAmp;
         if (tL > 0.98) this._plantLX = target;
@@ -436,7 +436,7 @@ export class StickmanRig {
         footRX = this._plantRX;
         footRY = baseFootY;
       } else {
-        const target = hipRX + this.facing * stride;
+        const target = hipRX + this.facing * stride * 0.5;
         footRX = lerp(this._plantRX, target, xArc(tR));
         footRY = baseFootY + yArc(tR) * liftAmp;
         if (tR > 0.98) this._plantRX = target;
