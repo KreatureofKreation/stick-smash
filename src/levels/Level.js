@@ -536,6 +536,16 @@ export class Level {
     // sustain force) registered by hazards at build time.
     this._chainSegs = new Set();
     this._hazardDrivers = new Set();
+    // Space-level mode flags. When `curvedGravity` is true, players + projectiles
+    // get planet-source gravity instead of the global world gravity. Camera, kill
+    // bound, and meteor shower are also planet-level features.
+    this.curvedGravity = !!def.curvedGravity;
+    this.planetConfigs = def.planets ?? [];
+    this.planets = [];
+    this.cameraClamp = def.cameraClamp ?? null;
+    this.killBound = def.killBound ?? null;
+    this.meteorShowerCfg = def.meteorShower ?? null;
+    this.meteorShower = null;
     this.spawnPoints = def.spawns ?? [{ x: 0, y: 5 }];
     this.weaponSpawns = def.weaponSpawns ?? [{ x: 0, y: 4 }];
     this.bgColor = def.bgColor ?? 0x10101a;

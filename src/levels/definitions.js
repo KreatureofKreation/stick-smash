@@ -648,73 +648,42 @@ export const LEVELS = [
   // SPACE STATION — orbital ring with low gravity. Asteroids serve as
   // platforms; planet/nebula in deep BG.
   // ---------------------------------------------------------------------
+  // ---------------------------------------------------------------------
+  // SPACE — 6-planet gravity system. Walk-around surfaces, projectile arcs,
+  // meteor showers gated to 30s. See docs/superpowers/specs/2026-05-10-space-planet-redesign-design.md
+  // ---------------------------------------------------------------------
   {
     id: 'space',
-    name: 'Space Station',
-    bgColor: 0x000010,
-    gravity: -5.0,
-    tiles: [
-      ...row(0, -10, 10, { material: 'metal', hp: 100, color: 0x707888 }),
-      ...row(-1, -8, 8, { material: 'metal', hp: 100, color: 0x4a5060 }),
-      ...tough(-2, -6, 6, { color: 0x202830 }),
-      // Side asteroid floats.
-      ...row(3, -12, -9, { material: 'stone', hp: 30, color: 0x6a605a }),
-      ...row(3,  9, 12, { material: 'stone', hp: 30, color: 0x6a605a }),
-      // Mid station deck.
-      ...row(6, -3, 3, { material: 'metal', hp: 50, color: 0x808898 }),
-      // Upper asteroid floats — staggered.
-      ...row(9, -8, -5, { material: 'stone', hp: 25, color: 0x6a605a }),
-      ...row(9,  5,  8, { material: 'stone', hp: 25, color: 0x6a605a }),
-      // Top dock.
-      ...row(12, -2, 2, { material: 'metal', hp: 60, color: 0x90a0b0 }),
-      // Solar-panel pillars.
-      { x: -6, y: 1.5, shape: 'box', w: 0.4, h: 2.2, material: 'metal', hp: 80, color: 0x305080 },
-      { x:  6, y: 1.5, shape: 'box', w: 0.4, h: 2.2, material: 'metal', hp: 80, color: 0x305080 },
-      // Crystal asteroid mid prop.
-      { x: 0, y: 4, shape: 'sphere', radius: 0.7, material: 'stone', hp: 50, color: 0x88aaff },
+    name: 'Space',
+    bgColor: 0x000008,
+    gravity: 0,                  // world gravity off — planets supply their own
+    curvedGravity: true,         // Stickman + Camera switch to planet-aware mode
+    cameraClamp: { x: [-50, 50], y: [-35, 35], zoom: [14, 50] },
+    meteorShower: { activateAfter: 30, interval: [8, 14], perShower: [1, 3] },
+    killBound: { x: 50, y: 35 }, // |x|>50 or |y|>35 → instant KO
+    planets: [
+      { id: 'p1', cx: -14, cy:  4, radius: 6.0, mantleRadius: 4.0, coreRadius: 2.0, mass: 240 },
+      { id: 'p2', cx:  12, cy: -4, radius: 5.0, mantleRadius: 3.3, coreRadius: 1.6, mass: 180 },
+      { id: 'p3', cx:  -2, cy: -7, radius: 2.4, mantleRadius: 1.6, coreRadius: 0.8, mass:  60 },
+      { id: 'p4', cx:   1, cy:  6, radius: 2.8, mantleRadius: 1.9, coreRadius: 1.0, mass:  80 },
+      { id: 'p5', cx:  19, cy:  7, radius: 2.4, mantleRadius: 1.6, coreRadius: 0.8, mass:  60 },
+      { id: 'p6', cx: -22, cy: -7, radius: 2.0, mantleRadius: 1.4, coreRadius: 0.7, mass:  50 },
     ],
-    hazards: [
-      { kind: 'lava', x: 0, y: -6, w: 50, h: 1.4, dps: 999 },
-      { kind: 'pendulum', x: 0, y: 16, length: 5, amplitude: Math.PI / 2.8, speed: 0.8 },
-      { kind: 'spike', x: -7, y: 10.0, w: 1.6 },
-      { kind: 'spike', x:  7, y: 10.0, w: 1.6 },
-    ],
+    tiles: [],                   // no integer-grid tiles on this level
+    hazards: [],                 // no flat hazards either — planets carry their own
     spawns: [
-      { x: -10, y: 1 }, { x: 10, y: 1 },
-      { x: -10, y: 4 }, { x: 10, y: 4 },
-      { x: 0, y: 7 },
-      { x: 0, y: 13 },
+      { x: -14, y: -2.5 },       // top of planet 1
+      { x:  12, y:  1   },       // top of planet 2
+      { x:  -2, y: -4.5 },       // top of planet 3
+      { x:   1, y:  9   },       // top of planet 4
+      { x:  19, y:  9.5 },       // top of planet 5
+      { x: -22, y: -5   },       // top of planet 6
     ],
     weaponSpawns: [
-      { x: 0, y: 13 },                        // top dock prize
-      { x: 0, y: 7 },
-      { x: -10, y: 4 }, { x: 10, y: 4 },
-      { x: -6, y: 10 }, { x: 6, y: 10 },
-      { x: 0, y: 1 },
+      { x: -14, y: -2.5 }, { x: 12, y: 1 }, { x: -2, y: -4.5 },
+      { x: 1, y: 9 }, { x: 19, y: 9.5 }, { x: -22, y: -5 },
     ],
-    background: [
-      bgSphere(-18, 6, 7, 0x2a4a8a, -16, { emissive: 0x102040, emissiveIntensity: 0.3 }),
-      bgDisc(-18, 6, 8, 0x4070cc, -16.2, { emissiveIntensity: 0.2 }),
-      bgSphere(15, 18, 1.6, 0xa0a0a0, -15),
-      bgGlow(-2, 22, 30, 1.5, 0x4d4080, -15),
-      bgGlow(8,  19, 18, 1.0, 0x803060, -15),
-      bgGlow(-6, 12, 22, 0.8, 0x5050a0, -15),
-      ...(() => {
-        const stars = [];
-        const seeds = [
-          [-22, 8], [-19, 16], [-15, 22], [-11, 9], [-7, 14], [-3, 21], [1, 11],
-          [5, 18], [9, 23], [13, 9], [17, 14], [20, 20], [22, 11], [-25, 12],
-          [-2, 7], [3, 25], [11, 7], [-13, 4], [16, 5], [-21, 25], [21, 4],
-        ];
-        for (const [x, y] of seeds) {
-          stars.push(bgGlow(x, y, 0.18, 0.18, 0xffffff, -16));
-        }
-        return stars;
-      })(),
-      bg(12, 14, 1.4, 0.4, 0x808898, -14),
-      bg(12, 14.6, 0.2, 0.8, 0x808898, -14),
-      bgGlow(11.5, 14, 0.2, 0.2, 0xff4444, -13.9),
-    ],
+    background: [],              // background art added in Task 11
   },
 
   // ---------------------------------------------------------------------
