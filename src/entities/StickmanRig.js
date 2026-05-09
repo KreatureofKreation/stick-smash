@@ -678,7 +678,7 @@ export class StickmanRig {
       const f = maxReach / d;
       chx = sx + dx * f; chy = sy + dy * f;
     }
-    solveIK(this._tmpKnee, sx, sy, chx, chy, upperLen, lowerLen, isRight ? 1 : -1);
+    solveIK(this._tmpKnee, sx, sy, chx, chy, upperLen, lowerLen, this.facing >= 0 ? 1 : -1);
     const ex = this._tmpKnee.x, ey = this._tmpKnee.y;
     elbowJoint.position.set(ex, ey, z);
     orientLimb(upper, sx, sy, z, ex, ey, z);
