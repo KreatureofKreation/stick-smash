@@ -363,13 +363,28 @@ export class StickmanRig {
 
     let footLX, footLY, footRX, footRY;
     if (!params.grounded) {
-      // Airborne: tuck on rise, reach on fall. Slight L/R offset reads as legs.
-      const rising = vy > 0;
-      const tuck = rising ? 0.30 : -0.02;
-      footLX = hipX - 0.16 + this.facing * (rising ? 0.05 : -0.10);
-      footRX = hipX + 0.16 + this.facing * (rising ? 0.10 : -0.05);
-      footLY = baseFootY + 0.18 + tuck;
-      footRY = baseFootY + 0.18 + tuck * 0.5;
+      // Three phases driven by vy:
+      //   takeoff vy > 3      : legs trail under hip (extending push)
+      //   apex    vy in [-1,3]: knees tucked up
+      //   fall    vy < -1     : legs reach forward to brace landing
+      let liftN, footFwd;
+      if (vy > 3) {
+        const t = clamp((vy - 3) / 4, 0, 1);
+        liftN = lerp(0.40, 0.05, t);
+        footFwd = 0;
+      } else if (vy >= -1) {
+        const t = clamp((vy + 1) / 4, 0, 1);
+        liftN = lerp(0.40, 0.55, t);
+        footFwd = 0;
+      } else {
+        const t = clamp((-vy - 1) / 6, 0, 1);
+        liftN = lerp(0.55, 0.18, t);
+        footFwd = lerp(0, 0.10, t);
+      }
+      footLX = hipX - 0.16 + this.facing * footFwd;
+      footRX = hipX + 0.16 + this.facing * footFwd;
+      footLY = baseFootY + liftN;
+      footRY = baseFootY + liftN;
     } else if ((this._realSpeed ?? 0) < 0.5) {
       // Standing: feet snap to rest under hips. No phantom shuffle.
       const restL = hipX - 0.16;
@@ -522,6 +537,24 @@ export class StickmanRig {
         handRX = gripX;
         handRY = gripY;
       }
+    } else if (!params.grounded) {
+      // Airborne arms — phase by vy.
+      let armUpAir, armFwdAir;
+      if (vy > 3) {
+        const t = clamp((vy - 3) / 4, 0, 1);
+        armUpAir = lerp(0.20, 0.55, t);
+        armFwdAir = 0.20;
+      } else if (vy >= -1) {
+        const t = clamp((vy + 1) / 4, 0, 1);
+        armUpAir = lerp(0.10, 0.20, t);
+        armFwdAir = 0.35;
+      } else {
+        const t = clamp((-vy - 1) / 6, 0, 1);
+        armUpAir = lerp(0.20, -0.10, t);
+        armFwdAir = lerp(0.35, 0.45, t);
+      }
+      handRX = sRX + this.facing * armFwdAir;
+      handRY = sRY + armUpAir;
     } else if (this.crouchAmount > 0.5 && params.armPoseR !== 'aim') {
       handRX = sRX + this.facing * 0.18;
       handRY = sRY - 0.25;
@@ -556,6 +589,23 @@ export class StickmanRig {
     } else if (params.armPoseL === 'aim') {
       handLX = sLX + Math.cos(aimAng) * aimDist * 0.7;
       handLY = sLY + Math.sin(aimAng) * aimDist * 0.7;
+    } else if (!params.grounded) {
+      let armUpAir, armFwdAir;
+      if (vy > 3) {
+        const t = clamp((vy - 3) / 4, 0, 1);
+        armUpAir = lerp(0.20, 0.55, t);
+        armFwdAir = 0.20;
+      } else if (vy >= -1) {
+        const t = clamp((vy + 1) / 4, 0, 1);
+        armUpAir = lerp(0.10, 0.20, t);
+        armFwdAir = 0.35;
+      } else {
+        const t = clamp((-vy - 1) / 6, 0, 1);
+        armUpAir = lerp(0.20, -0.10, t);
+        armFwdAir = lerp(0.35, 0.45, t);
+      }
+      handLX = sLX + this.facing * armFwdAir;
+      handLY = sLY + armUpAir;
     } else if (this.crouchAmount > 0.5 && params.armPoseL !== 'aim') {
       handLX = sLX + this.facing * 0.18;
       handLY = sLY - 0.25;
