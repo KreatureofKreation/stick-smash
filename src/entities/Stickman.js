@@ -347,7 +347,7 @@ export class Stickman {
     this.body.angularVelocity.setZero();
     this.body.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 0, 1), 0);
     this.body.collisionFilterMask = COL_GROUPS.WORLD | COL_GROUPS.PROP | COL_GROUPS.WEAPON | COL_GROUPS.HAZARD | COL_GROUPS.PLAYER | COL_GROUPS.PROJECTILE;
-    this.body.fixedRotation = true;
+    this.body.fixedRotation = !(this.game?.level?.curvedGravity);
     this.body.linearDamping = 0.12;
     this.body.angularDamping = 0.99;
     this.body.updateMassProperties();
