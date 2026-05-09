@@ -127,9 +127,14 @@ export class Planet {
         if (this.mesh?.parent) this.mesh.parent.remove(this.mesh);
         this.mesh?.geometry?.dispose();
         this.mesh?.material?.dispose();
+        this.mesh = null;
+        // Capture body world position BEFORE removing — debris spawns there.
+        const px = this.body?.position?.x ?? this.planet.cx;
+        const py = this.body?.position?.y ?? this.planet.cy;
         if (this.body) this.planet.level.physics.remove(this.body);
+        this.body = null;
         this.planet.level.tiles.delete(this._key);
-        this.planet.level.fx.particles.debris(this.body.position.x, this.body.position.y, 0, this.color, 12);
+        this.planet.level.fx.particles.debris(px, py, 0, this.color, 12);
       },
     };
     body.userData = { kind: 'tile', tile: wedge };

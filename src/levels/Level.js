@@ -912,5 +912,6 @@ export class Level {
     this._dynamicTiles.clear();
     this._chainSegs.clear();
     this._hazardDrivers.clear();
+    this.planets.length = 0;
   }
 }
