@@ -65,12 +65,14 @@ Six destructible custom box tiles centered on x=0, base at y=0. Each rendered wi
 
 | Shard | center x | y range | size (w × h) | rotation | hp | role |
 |---|---|---|---|---|---|---|
-| Back magenta | -1.4 | 0..5.0 | 1.0 × 5.0 | -6° | 80 | back-tilted, durable |
-| Main cyan | 0.0 | 0..6.5 | 1.4 × 6.5 | 0° | 80 | central tallest, climbable |
-| Right magenta | 1.6 | 0..4.0 | 0.9 × 4.0 | +8° | 80 | front-tilted, durable |
-| Front cyan small | -0.6 | 0..2.5 | 0.7 × 2.5 | +4° | 25 | brittle |
-| Tip cyan | 0.0 | 5.5..7.5 | 0.6 × 2.0 | 0° | 25 | brittle, breaks early |
-| Yellow accent nub | 1.0 | 0..1.0 | 0.5 × 1.0 | 0° | 25 | brittle |
+| Back magenta | -2 | 0..5.0 | 1.0 × 5.0 | -6° | 80 | back-tilted, durable |
+| Main cyan | 0 | 0..6.5 | 1.4 × 6.5 | 0° | 80 | central tallest, climbable |
+| Right magenta | 2 | 0..4.0 | 0.9 × 4.0 | +8° | 80 | front-tilted, durable |
+| Front cyan small | -1 | 0..2.5 | 0.7 × 2.5 | +4° | 25 | brittle |
+| Tip cyan | 0 | 5.5..7.5 | 0.6 × 2.0 | 0° | 25 | brittle, breaks early |
+| Yellow accent nub | 1 | 0..1.0 | 0.5 × 1.0 | 0° | 25 | brittle |
+
+**X-coordinate constraint:** all shards use integer x positions. Reason: `Tile`'s grid-keyed `damageArea` (AOE) lookup uses integer x/y; fractional positions miss splash hits. Single-target damage (bullets, melee, throws) hits any shard via Cannon collision callbacks regardless of x. **Known limitation:** because shard `y` is always `h/2` (so the base sits on the floor at y=0), only the right magenta shard (h=4 → y=2.0) has both integer x AND integer y, so AOE only reaches it. The other 5 shards take damage from direct attacks but ignore explosion splash. Acceptable: spire reads thematically as splash-resistant crystal.
 
 **Behavior:** static stone tiles (NOT chain-reaction). Each shard has its own HP and breaks independently. On break: spawn cyan/magenta crystal-shard particles (reuse existing particle system, new color palette). Unbroken shards are climbable cover and partially block sightlines.
 
