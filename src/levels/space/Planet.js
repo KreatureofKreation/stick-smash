@@ -32,7 +32,71 @@ export class Planet {
 
   build(scene, world) {
     this._buildCrust(scene, world);
-    // mantle + core added in later tasks
+    this._buildMantle(scene, world);
+    this._buildCore(scene, world);
+  }
+
+  _buildMantle(scene, world) {
+    const N = this.mantleWedges;
+    const rOut = this.mantleRadius;
+    const rIn = this.coreRadius;
+    for (let i = 0; i < N; i++) {
+      const theta0 = (i / N) * Math.PI * 2 - Math.PI / 2;
+      const theta1 = ((i + 1) / N) * Math.PI * 2 - Math.PI / 2;
+      const wedge = this._buildWedge({
+        kind: 'mantle', idx: i, rIn, rOut, theta0, theta1,
+        color: this.mantleColor, hp: this.mantleHp,
+      });
+      scene.add(wedge.mesh);
+      world.add(wedge.body);
+      this.wedges.push(wedge);
+      const key = `planet${this.id}_mantle_${i}`;
+      wedge._key = key;
+      this.level.tiles.set(key, wedge);
+    }
+  }
+
+  _buildCore(scene, world) {
+    const r = this.coreRadius;
+    const geo = new THREE.SphereGeometry(r, 24, 18);
+    const mat = new THREE.MeshStandardMaterial({
+      color: this.coreColor,
+      emissive: this.coreColor,
+      emissiveIntensity: 1.4,
+      roughness: 0.4,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(this.cx, this.cy, 0);
+    mesh.updateMatrix();
+    mesh.matrixAutoUpdate = false;
+    scene.add(mesh);
+    this.coreMesh = mesh;
+
+    // Static trigger body — handled like a lava hazard (continuous DoT on touch).
+    const body = new CANNON.Body({
+      mass: 0, isTrigger: true,
+      collisionFilterGroup: COL_GROUPS.HAZARD,
+    });
+    body.addShape(new CANNON.Sphere(r));
+    body.position.set(this.cx, this.cy, 0);
+    // Reuse the existing Hazard contactPlayer pattern via a minimal stub.
+    const hazard = {
+      kind: 'lava', x: this.cx, y: this.cy, w: r * 2, h: r * 2,
+      dps: 60, body, mesh,
+      kb: { x: 0, y: 0 },
+      contactPlayer(player, dt) {
+        if (player.invuln > 0 || !player.alive) return;
+        player.takeDamage(this.dps * dt, { attacker: null, weapon: 'lava' });
+      },
+      update() { /* no-op */ },
+      destroy() {
+        if (this.mesh?.parent) this.mesh.parent.remove(this.mesh);
+      },
+    };
+    body.userData = { kind: 'hazard', hazard };
+    world.add(body);
+    this.coreBody = body;
+    this.level.hazards.push(hazard);
   }
 
   _buildCrust(scene, world) {
