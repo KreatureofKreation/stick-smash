@@ -74,6 +74,9 @@ export class Tile {
       body.addShape(new CANNON.Box(new CANNON.Vec3(w / 2, h / 2, d / 2)));
     }
     body.position.set(x, y, 0);
+    // fixedRotation prevents the solver from spinning the body but the
+    // initial quaternion (set before world.add) is used to orient the
+    // collision shape — so static tiles with rotZ are physically rotated.
     if (this.rotZ) body.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 0, 1), this.rotZ);
     body.userData = { kind: 'tile', tile: this };
     world.add(body);
