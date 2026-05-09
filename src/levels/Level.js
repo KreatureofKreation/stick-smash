@@ -5,6 +5,7 @@ import { audio } from '../audio/Audio.js';
 import { rand } from '../util/math.js';
 import { Planet } from './space/Planet.js';
 import { makePlanetGravity } from './space/PlanetGravity.js';
+import { MeteorShower } from './space/MeteorShower.js';
 
 // Level = grid of destructible tiles + static walls + hazards + spawn points + sky.
 
@@ -586,6 +587,8 @@ export class Level {
       this.physics.addPreStep(this._planetGravityFn);
     }
 
+    if (this.meteorShowerCfg) this.meteorShower = new MeteorShower(this, this.meteorShowerCfg);
+
     // hazards
     for (const h of (this.def.hazards ?? [])) {
       const haz = new Hazard(this, h);
@@ -776,6 +779,8 @@ export class Level {
     // step, so apply forces once here for the *next* step. Acceptable lag.
     for (const drive of this._hazardDrivers) drive(dt);
 
+    if (this.meteorShower) this.meteorShower.update(dt);
+
     for (const h of this.hazards) {
       h.update(dt);
       for (const p of players) {
@@ -923,6 +928,7 @@ export class Level {
       this.physics.removePreStep(this._planetGravityFn);
       this._planetGravityFn = null;
     }
+    if (this.meteorShower) { this.meteorShower.destroy(); this.meteorShower = null; }
     for (const t of this.tiles.values()) t.destroy();
     for (const h of this.hazards) h.destroy();
     // Sweep any chain segs not already released by a hazard or tile destroy
