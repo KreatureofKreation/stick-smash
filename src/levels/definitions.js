@@ -663,11 +663,11 @@ export const LEVELS = [
     killBound: { x: 50, y: 35 }, // |x|>50 or |y|>35 → instant KO
     planets: [
       { id: 'p1', cx: -14, cy:  4, radius: 6.0, mantleRadius: 4.0, coreRadius: 2.0, mass: 240 },
-      { id: 'p2', cx:  12, cy: -4, radius: 5.0, mantleRadius: 3.3, coreRadius: 1.6, mass: 180 },
-      { id: 'p3', cx:  -2, cy: -7, radius: 2.4, mantleRadius: 1.6, coreRadius: 0.8, mass:  60 },
-      { id: 'p4', cx:   1, cy:  6, radius: 2.8, mantleRadius: 1.9, coreRadius: 1.0, mass:  80 },
-      { id: 'p5', cx:  19, cy:  7, radius: 2.4, mantleRadius: 1.6, coreRadius: 0.8, mass:  60 },
-      { id: 'p6', cx: -22, cy: -7, radius: 2.0, mantleRadius: 1.4, coreRadius: 0.7, mass:  50 },
+      { id: 'p2', cx:  12, cy: -4, radius: 5.0, mantleRadius: 3.3, coreRadius: 1.6, mass: 167 },
+      { id: 'p3', cx:  -2, cy: -7, radius: 2.4, mantleRadius: 1.6, coreRadius: 0.8, mass:  38 },
+      { id: 'p4', cx:   1, cy:  6, radius: 2.8, mantleRadius: 1.9, coreRadius: 1.0, mass:  52 },
+      { id: 'p5', cx:  19, cy:  7, radius: 2.4, mantleRadius: 1.6, coreRadius: 0.8, mass:  38 },
+      { id: 'p6', cx: -22, cy: -7, radius: 2.0, mantleRadius: 1.4, coreRadius: 0.7, mass:  27 },
     ],
     tiles: [],                   // no integer-grid tiles on this level
     hazards: [],                 // no flat hazards either — planets carry their own

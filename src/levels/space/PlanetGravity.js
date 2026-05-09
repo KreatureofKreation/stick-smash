@@ -27,6 +27,16 @@ export function makePlanetGravity(level, game) {
         ax += (dx / r) * a;
         ay += (dy / r) * a;
       }
+      // Clamp summed acceleration so overlapping halos / near-singularity
+      // pulls can't yeet a body across the map. ~25 m/s² is roughly 2.5G —
+      // strong enough to feel weighty, gentle enough to keep play in frame.
+      const aMag = Math.hypot(ax, ay);
+      const aMax = 25;
+      if (aMag > aMax) {
+        const k = aMax / aMag;
+        ax *= k;
+        ay *= k;
+      }
       body.force.x += body.mass * ax;
       body.force.y += body.mass * ay;
     };
