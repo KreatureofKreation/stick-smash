@@ -79,14 +79,14 @@ export class StickmanRig {
       const m = new THREE.Mesh(new THREE.SphereGeometry(r, 8, 6), mat);
       return m;
     };
-    this.shoulderL = joint(0.115);
-    this.shoulderR = joint(0.115);
-    this.elbowL = joint(0.10);
-    this.elbowR = joint(0.10);
+    this.shoulderL = joint(0.10);
+    this.shoulderR = joint(0.10);
+    this.elbowL = joint(0.09);
+    this.elbowR = joint(0.09);
     this.hipL = joint(0.13);
     this.hipR = joint(0.13);
-    this.kneeL = joint(0.12);
-    this.kneeR = joint(0.12);
+    this.kneeL = joint(0.11);
+    this.kneeR = joint(0.11);
 
     // Hands & feet — bigger end-caps.
     this.handL = joint(0.13);
