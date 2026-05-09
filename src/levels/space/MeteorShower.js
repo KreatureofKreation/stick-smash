@@ -109,10 +109,15 @@ export class MeteorShower {
     if (m.mesh?.parent) m.mesh.parent.remove(m.mesh);
     m.mesh?.geometry?.dispose();
     m.mesh?.material?.dispose();
+    // Capture body position BEFORE physics.remove invalidates the wrapper.
+    const px = m.body?.position?.x ?? 0;
+    const py = m.body?.position?.y ?? 0;
     if (m.body) this.level.physics.remove(m.body);
     if (this.level.fx?.particles?.burst) {
-      this.level.fx.particles.burst(m.body.position.x, m.body.position.y, 0, { count: 10, speed: 6, color: 0xff7733 });
+      this.level.fx.particles.burst(px, py, 0, { count: 10, speed: 6, color: 0xff7733 });
     }
+    m.body = null;
+    m.mesh = null;
   }
   destroy() {
     for (const m of this.meteors) this._destroyMeteor(m);
