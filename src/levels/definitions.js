@@ -1178,17 +1178,21 @@ export const LEVELS = [
       // Top sanctum y=20 (durable prize platform).
       ...row(20, -5, 5, { material: 'stone', hp: 80, color: 0x6a7a68 }),
       // ---- Crystal spire centerpiece. Tilted shards form a faceted
-      // cluster silhouette. Each shard is its own tile with HP. INTEGER
-      // x positions so AOE damage (damageArea grid lookup) hits them. ----
+      // cluster silhouette. Each shard is its own tile with HP.
       // Tile y is the CENTER of the box; spec heights are full shard heights
       // with base at floor y=0, so y_center = h/2.
+      // KNOWN LIMITATION: shards with fractional y bypass the integer-grid
+      // damageArea lookup, so explosion splash (grenade/RPG) only reaches
+      // the right-magenta shard (y=2.0). Single-target attacks (bullets,
+      // melee, throws) hit every shard via Cannon collision callbacks.
+      // Acceptable: spire reads thematically as splash-resistant crystal.
       // Back magenta — durable, tilted -6°.
       { x: -2, y: 2.5, shape: 'box', w: 1.0, h: 5.0, d: 1.0,
         material: 'stone', hp: 80, rotZ: -0.105,
         color: 0xb060d0, emissive: 0xb060d0, emissiveIntensity: 0.7 },
       // Main cyan — durable, vertical, tallest.
       { x: 0, y: 3.25, shape: 'box', w: 1.4, h: 6.5, d: 1.2,
-        material: 'stone', hp: 80, rotZ: 0,
+        material: 'stone', hp: 80,
         color: 0x5ec8e8, emissive: 0x5ec8e8, emissiveIntensity: 0.8 },
       // Right magenta — durable, tilted +8°.
       { x: 2, y: 2.0, shape: 'box', w: 0.9, h: 4.0, d: 0.9,
@@ -1200,11 +1204,11 @@ export const LEVELS = [
         color: 0x80c8e0, emissive: 0x80c8e0, emissiveIntensity: 0.6 },
       // Tip cyan — brittle, glows brightest, sits atop main cyan.
       { x: 0, y: 6.5, shape: 'box', w: 0.6, h: 2.0, d: 0.6,
-        material: 'stone', hp: 25, rotZ: 0,
+        material: 'stone', hp: 25,
         color: 0xc8f4ff, emissive: 0xc8f4ff, emissiveIntensity: 1.0 },
       // Yellow accent nub — short, brittle, breaks for spectacle.
       { x: 1, y: 0.5, shape: 'box', w: 0.5, h: 1.0, d: 0.5,
-        material: 'stone', hp: 25, rotZ: 0,
+        material: 'stone', hp: 25,
         color: 0xe8c440, emissive: 0xe8c440, emissiveIntensity: 0.8 },
     ],
     hazards: [
