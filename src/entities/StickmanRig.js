@@ -575,24 +575,34 @@ export class StickmanRig {
     const idleLoose = (params.armPoseR === 'walk' && params.armPoseL === 'walk') ? 0.10 : 0;
     const totalRag = Math.max(idleLoose, this.ragdollAmount);
     if (totalRag > 0.02) {
-      const r = totalRag;
-      // Limbs whip with body angular velocity — gives the dead body's flailing
-      // limbs that trail-behind-rotation feel of a real ragdoll.
-      const av = (params.angVz || 0) * 0.04;
-      const sag = -0.55 - Math.sin(this.t * 4) * 0.05;
-      // Hands swing perpendicular to spin direction.
-      handLX = lerp(handLX, sLX + av,        r);
-      handLY = lerp(handLY, sLY + sag,       r);
-      handRX = lerp(handRX, sRX + av,        r);
-      handRY = lerp(handRY, sRY + sag,       r);
-      // Feet hang and trail too — only when fully ragdoll, otherwise the
-      // run plant logic still drives them. Avoid breaking idle/walk.
       if (this.ragdollAmount > 0.5) {
-        const footSag = -0.65 - Math.sin(this.t * 3.5) * 0.05;
-        footLX = lerp(footLX, hipLX + av * 0.7, this.ragdollAmount);
-        footLY = lerp(footLY, hipLY + footSag,  this.ragdollAmount);
-        footRX = lerp(footRX, hipRX + av * 0.7, this.ragdollAmount);
-        footRY = lerp(footRY, hipRY + footSag,  this.ragdollAmount);
+        // Full collapse: throw limbs OUT perpendicular to torso axis (in
+        // local rig frame). The rig.group quaternion already follows the
+        // physics body's rotation when ragdolling (Stickman.js:1232-1233),
+        // so local-frame splay rotates with the tumbling body in world.
+        const ragAmt = this.ragdollAmount;
+        // Local-frame perpendicular to torso direction (sin(tilt), cos(tilt)).
+        const perpX =  Math.cos(this.bodyTilt);
+        const perpY = -Math.sin(this.bodyTilt);
+        const avSplay = (params.angVz || 0) * 0.08; // amplified from 0.04
+        handLX = lerp(handLX, sLX - perpX * 0.6 + avSplay,        ragAmt);
+        handLY = lerp(handLY, sLY - perpY * 0.6 - 0.10,           ragAmt);
+        handRX = lerp(handRX, sRX + perpX * 0.6 + avSplay,        ragAmt);
+        handRY = lerp(handRY, sRY + perpY * 0.6 - 0.10,           ragAmt);
+        footLX = lerp(footLX, hipLX - perpX * 0.7 + avSplay * 0.7, ragAmt);
+        footLY = lerp(footLY, hipLY - perpY * 0.7,                 ragAmt);
+        footRX = lerp(footRX, hipRX + perpX * 0.7 + avSplay * 0.7, ragAmt);
+        footRY = lerp(footRY, hipRY - perpY * 0.7,                 ragAmt);
+      } else {
+        // Partial droop — idle dazed flail (totalRag in (0.02, 0.5]).
+        // Limbs whip with body angular velocity for trail-behind-rotation feel.
+        const r = totalRag;
+        const av = (params.angVz || 0) * 0.04;
+        const sag = -0.55 - Math.sin(this.t * 4) * 0.05;
+        handLX = lerp(handLX, sLX + av,  r);
+        handLY = lerp(handLY, sLY + sag, r);
+        handRX = lerp(handRX, sRX + av,  r);
+        handRY = lerp(handRY, sRY + sag, r);
       }
     }
 
