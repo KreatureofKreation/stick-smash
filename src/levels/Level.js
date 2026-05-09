@@ -735,6 +735,20 @@ export class Level {
       const f = 1 - d / radius;
       seg.damage(amount * 0.6 * f, by);
     }
+    // Planet wedges (space level). Their composite keys (`planet${id}_crust_${i}`)
+    // don't show up in the integer-grid scan above, so iterate the planet array
+    // directly and use each wedge's static body position.
+    for (const planet of this.planets) {
+      for (const w of planet.wedges) {
+        if (!w || !w.body || w.hp <= 0) continue;
+        const dx = w.body.position.x - x, dy = w.body.position.y - y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 > r2) continue;
+        const d = Math.sqrt(d2);
+        const f = 1 - d / radius;
+        w.damage(amount * f, by);
+      }
+    }
   }
   randomSpawn() { return this.spawnPoints[Math.floor(Math.random() * this.spawnPoints.length)]; }
   randomWeaponSpawn() { return this.weaponSpawns[Math.floor(Math.random() * this.weaponSpawns.length)]; }
