@@ -6,6 +6,7 @@ import { lerp, damp, clamp } from '../util/math.js';
 
 const _v = new THREE.Vector3();
 const _yAxis = new THREE.Vector3(0, 1, 0);
+const Z_STAGGER = 0.08;
 
 function makeLimb(radius, length, mat) {
   const g = new THREE.CylinderGeometry(radius, radius, length, 8, 1, false);
@@ -79,14 +80,14 @@ export class StickmanRig {
       const m = new THREE.Mesh(new THREE.SphereGeometry(r, 8, 6), mat);
       return m;
     };
-    this.shoulderL = joint(0.115);
-    this.shoulderR = joint(0.115);
-    this.elbowL = joint(0.10);
-    this.elbowR = joint(0.10);
+    this.shoulderL = joint(0.10);
+    this.shoulderR = joint(0.10);
+    this.elbowL = joint(0.09);
+    this.elbowR = joint(0.09);
     this.hipL = joint(0.13);
     this.hipR = joint(0.13);
-    this.kneeL = joint(0.12);
-    this.kneeR = joint(0.12);
+    this.kneeL = joint(0.11);
+    this.kneeR = joint(0.11);
 
     // Hands & feet — bigger end-caps.
     this.handL = joint(0.13);
@@ -274,13 +275,10 @@ export class StickmanRig {
     const landDrop = this._landImpact * 0.18;
     const hipX = pos.x;
     // Hip-foot reach budget: feet sit at pos.y - 0.75 (capsule bottom).
-    // Legs are 1.00m total. Hip at pos.y + 0.22 → diff 0.97m → 14° knee
-    // bend when standing (athletic, almost-straight). Bob/crouch/land drop
-    // hip from there to flex knees on impact and during stride. Prior value
-    // (+0.10) gave diff 0.85 = 64° permanent squat — feet rendered fine
-    // but visible silhouette read as crouched and stride was invisible
-    // because there was no straight-leg reference frame to swing from.
-    const hipY = pos.y + 0.22 - bob - crouchDrop - landDrop + breathBob;
+    // Legs are 1.00m total. Hip at pos.y + 0.25 → diff 1.00m → legs read
+    // essentially straight at idle (IK clamps to maxReach 0.99). Bob/crouch
+    // /land drop hip from there to flex knees on impact and during stride.
+    const hipY = pos.y + 0.25 - bob - crouchDrop - landDrop + breathBob;
     const hipZ = pos.z;
     this._hip.set(hipX, hipY, hipZ);
 
@@ -365,13 +363,28 @@ export class StickmanRig {
 
     let footLX, footLY, footRX, footRY;
     if (!params.grounded) {
-      // Airborne: tuck on rise, reach on fall. Slight L/R offset reads as legs.
-      const rising = vy > 0;
-      const tuck = rising ? 0.30 : -0.02;
-      footLX = hipX - 0.16 + this.facing * (rising ? 0.05 : -0.10);
-      footRX = hipX + 0.16 + this.facing * (rising ? 0.10 : -0.05);
-      footLY = baseFootY + 0.18 + tuck;
-      footRY = baseFootY + 0.18 + tuck * 0.5;
+      // Three phases driven by vy:
+      //   takeoff vy > 3      : legs trail under hip (extending push)
+      //   apex    vy in [-1,3]: knees tucked up
+      //   fall    vy < -1     : legs reach forward to brace landing
+      let liftN, footFwd;
+      if (vy > 3) {
+        const t = clamp((vy - 3) / 4, 0, 1);
+        liftN = lerp(0.40, 0.05, t);
+        footFwd = 0;
+      } else if (vy >= -1) {
+        const t = clamp((vy + 1) / 4, 0, 1);
+        liftN = lerp(0.40, 0.55, t);
+        footFwd = 0;
+      } else {
+        const t = clamp((-vy - 1) / 6, 0, 1);
+        liftN = lerp(0.55, 0.18, t);
+        footFwd = lerp(0, 0.10, t);
+      }
+      footLX = hipX - 0.16 + this.facing * footFwd;
+      footRX = hipX + 0.16 + this.facing * footFwd;
+      footLY = baseFootY + liftN;
+      footRY = baseFootY + liftN;
     } else if ((this._realSpeed ?? 0) < 0.5) {
       // Standing: feet snap to rest under hips. No phantom shuffle.
       const restL = hipX - 0.16;
@@ -410,7 +423,7 @@ export class StickmanRig {
       // 0.30 leaves 0.67m diff = 96° knee bend = visible knee drive.
       // Sprint peak 0.42 gives a tight athletic tuck.
       const liftAmp = 0.12 + stepAmp * 0.30;
-      const maxDrag = 0.55;
+      const maxDrag = stride * 0.8;
 
       if (this._plantLX < hipX - maxDrag) this._plantLX = hipX - maxDrag;
       if (this._plantLX > hipX + maxDrag) this._plantLX = hipX + maxDrag;
@@ -428,7 +441,7 @@ export class StickmanRig {
         footLX = this._plantLX;
         footLY = baseFootY;
       } else {
-        const target = hipLX + this.facing * stride;
+        const target = hipLX + this.facing * stride * 0.5;
         footLX = lerp(this._plantLX, target, xArc(tL));
         footLY = baseFootY + yArc(tL) * liftAmp;
         if (tL > 0.98) this._plantLX = target;
@@ -439,7 +452,7 @@ export class StickmanRig {
         footRX = this._plantRX;
         footRY = baseFootY;
       } else {
-        const target = hipRX + this.facing * stride;
+        const target = hipRX + this.facing * stride * 0.5;
         footRX = lerp(this._plantRX, target, xArc(tR));
         footRY = baseFootY + yArc(tR) * liftAmp;
         if (tR > 0.98) this._plantRX = target;
@@ -524,6 +537,24 @@ export class StickmanRig {
         handRX = gripX;
         handRY = gripY;
       }
+    } else if (!params.grounded) {
+      // Airborne arms — phase by vy.
+      let armUpAir, armFwdAir;
+      if (vy > 3) {
+        const t = clamp((vy - 3) / 4, 0, 1);
+        armUpAir = lerp(0.20, 0.55, t);
+        armFwdAir = 0.20;
+      } else if (vy >= -1) {
+        const t = clamp((vy + 1) / 4, 0, 1);
+        armUpAir = lerp(0.10, 0.20, t);
+        armFwdAir = 0.35;
+      } else {
+        const t = clamp((-vy - 1) / 6, 0, 1);
+        armUpAir = lerp(0.20, -0.10, t);
+        armFwdAir = lerp(0.35, 0.45, t);
+      }
+      handRX = sRX + this.facing * armFwdAir;
+      handRY = sRY + armUpAir;
     } else if (this.crouchAmount > 0.5 && params.armPoseR !== 'aim') {
       handRX = sRX + this.facing * 0.18;
       handRY = sRY - 0.25;
@@ -531,12 +562,15 @@ export class StickmanRig {
       // Run arm — bent-elbow pump. Hand traces a forward+up arc on the
       // forward stroke (chin level) and a back+down arc on the back
       // stroke (hand drops past hip behind). Baseline blends to relaxed
-      // hang at standstill so idle isn't a stiff brace.
+      // hang at standstill: at runBlend=0, hand drops directly below
+      // shoulder with no forward push so idle reads as relaxed-at-sides
+      // instead of stiff-braced-forward.
       const armSw = Math.sin(phase + Math.PI) * stepAmp * swingDir;
       const fwdBoost = Math.max(0, armSw);
       const runBlend = clamp(stepAmp * 1.6, 0, 1);
-      const baseUp = lerp(-0.45, -0.18, runBlend);
-      const armForward = 0.06 + armSw * 0.34 + fwdBoost * 0.10;
+      const baseUp = lerp(-0.55, -0.18, runBlend);
+      const idleForward = lerp(0, 0.06, runBlend);
+      const armForward = idleForward + armSw * 0.34 + fwdBoost * 0.10;
       const armUp = baseUp + armSw * 0.08 + fwdBoost * 0.34;
       handRX = sRX + this.facing * armForward;
       handRY = sRY + armUp;
@@ -555,6 +589,23 @@ export class StickmanRig {
     } else if (params.armPoseL === 'aim') {
       handLX = sLX + Math.cos(aimAng) * aimDist * 0.7;
       handLY = sLY + Math.sin(aimAng) * aimDist * 0.7;
+    } else if (!params.grounded) {
+      let armUpAir, armFwdAir;
+      if (vy > 3) {
+        const t = clamp((vy - 3) / 4, 0, 1);
+        armUpAir = lerp(0.20, 0.55, t);
+        armFwdAir = 0.20;
+      } else if (vy >= -1) {
+        const t = clamp((vy + 1) / 4, 0, 1);
+        armUpAir = lerp(0.10, 0.20, t);
+        armFwdAir = 0.35;
+      } else {
+        const t = clamp((-vy - 1) / 6, 0, 1);
+        armUpAir = lerp(0.20, -0.10, t);
+        armFwdAir = lerp(0.35, 0.45, t);
+      }
+      handLX = sLX + this.facing * armFwdAir;
+      handLY = sLY + armUpAir;
     } else if (this.crouchAmount > 0.5 && params.armPoseL !== 'aim') {
       handLX = sLX + this.facing * 0.18;
       handLY = sLY - 0.25;
@@ -562,8 +613,9 @@ export class StickmanRig {
       const armSw = Math.sin(phase) * stepAmp * swingDir;
       const fwdBoost = Math.max(0, armSw);
       const runBlend = clamp(stepAmp * 1.6, 0, 1);
-      const baseUp = lerp(-0.45, -0.18, runBlend);
-      const armForward = 0.06 + armSw * 0.34 + fwdBoost * 0.10;
+      const baseUp = lerp(-0.55, -0.18, runBlend);
+      const idleForward = lerp(0, 0.06, runBlend);
+      const armForward = idleForward + armSw * 0.34 + fwdBoost * 0.10;
       const armUp = baseUp + armSw * 0.08 + fwdBoost * 0.34;
       handLX = sLX + this.facing * armForward;
       handLY = sLY + armUp;
@@ -573,24 +625,34 @@ export class StickmanRig {
     const idleLoose = (params.armPoseR === 'walk' && params.armPoseL === 'walk') ? 0.10 : 0;
     const totalRag = Math.max(idleLoose, this.ragdollAmount);
     if (totalRag > 0.02) {
-      const r = totalRag;
-      // Limbs whip with body angular velocity — gives the dead body's flailing
-      // limbs that trail-behind-rotation feel of a real ragdoll.
-      const av = (params.angVz || 0) * 0.04;
-      const sag = -0.55 - Math.sin(this.t * 4) * 0.05;
-      // Hands swing perpendicular to spin direction.
-      handLX = lerp(handLX, sLX + av,        r);
-      handLY = lerp(handLY, sLY + sag,       r);
-      handRX = lerp(handRX, sRX + av,        r);
-      handRY = lerp(handRY, sRY + sag,       r);
-      // Feet hang and trail too — only when fully ragdoll, otherwise the
-      // run plant logic still drives them. Avoid breaking idle/walk.
       if (this.ragdollAmount > 0.5) {
-        const footSag = -0.65 - Math.sin(this.t * 3.5) * 0.05;
-        footLX = lerp(footLX, hipLX + av * 0.7, this.ragdollAmount);
-        footLY = lerp(footLY, hipLY + footSag,  this.ragdollAmount);
-        footRX = lerp(footRX, hipRX + av * 0.7, this.ragdollAmount);
-        footRY = lerp(footRY, hipRY + footSag,  this.ragdollAmount);
+        // Full collapse: throw limbs OUT perpendicular to torso axis (in
+        // local rig frame). The rig.group quaternion already follows the
+        // physics body's rotation when ragdolling (Stickman.js:1232-1233),
+        // so local-frame splay rotates with the tumbling body in world.
+        const ragAmt = this.ragdollAmount;
+        // Local-frame perpendicular to torso direction (sin(tilt), cos(tilt)).
+        const perpX =  Math.cos(this.bodyTilt);
+        const perpY = -Math.sin(this.bodyTilt);
+        const avSplay = (params.angVz || 0) * 0.08; // amplified from 0.04
+        handLX = lerp(handLX, sLX - perpX * 0.6 + avSplay,        ragAmt);
+        handLY = lerp(handLY, sLY - perpY * 0.6 - 0.10,           ragAmt);
+        handRX = lerp(handRX, sRX + perpX * 0.6 + avSplay,        ragAmt);
+        handRY = lerp(handRY, sRY + perpY * 0.6 - 0.10,           ragAmt);
+        footLX = lerp(footLX, hipLX - perpX * 0.7 + avSplay * 0.7, ragAmt);
+        footLY = lerp(footLY, hipLY - perpY * 0.7,                 ragAmt);
+        footRX = lerp(footRX, hipRX + perpX * 0.7 + avSplay * 0.7, ragAmt);
+        footRY = lerp(footRY, hipRY - perpY * 0.7,                 ragAmt);
+      } else {
+        // Partial droop — idle dazed flail (totalRag in (0.02, 0.5]).
+        // Limbs whip with body angular velocity for trail-behind-rotation feel.
+        const r = totalRag;
+        const av = (params.angVz || 0) * 0.04;
+        const sag = -0.55 - Math.sin(this.t * 4) * 0.05;
+        handLX = lerp(handLX, sLX + av,  r);
+        handLY = lerp(handLY, sLY + sag, r);
+        handRX = lerp(handRX, sRX + av,  r);
+        handRY = lerp(handRY, sRY + sag, r);
       }
     }
 
@@ -647,10 +709,12 @@ export class StickmanRig {
     }
 
     // Render limbs via IK using the spring-chased extremity positions.
-    this._drawArm(sLX, sLY, this._handLPos.x, this._handLPos.y, hipZ, this.upperArmL, this.lowerArmL, this.handL, this.shoulderL, this.elbowL, false, false);
-    this._drawArm(sRX, sRY, this._handRPos.x, this._handRPos.y, hipZ, this.upperArmR, this.lowerArmR, this.handR, this.shoulderR, this.elbowR, true, !!params.gumGumPunch);
-    this._drawLeg(hipLX, hipLY, this._footLPos.x, this._footLPos.y, hipZ, this.upperLegL, this.lowerLegL, this.footL, this.hipL, this.kneeL, false);
-    this._drawLeg(hipRX, hipRY, this._footRPos.x, this._footRPos.y, hipZ, this.upperLegR, this.lowerLegR, this.footR, this.hipR, this.kneeR, true);
+    const zL = hipZ - Z_STAGGER;
+    const zR = hipZ + Z_STAGGER;
+    this._drawArm(sLX, sLY, this._handLPos.x, this._handLPos.y, zL, this.upperArmL, this.lowerArmL, this.handL, this.shoulderL, this.elbowL, false, false);
+    this._drawArm(sRX, sRY, this._handRPos.x, this._handRPos.y, zR, this.upperArmR, this.lowerArmR, this.handR, this.shoulderR, this.elbowR, true, !!params.gumGumPunch);
+    this._drawLeg(hipLX, hipLY, this._footLPos.x, this._footLPos.y, zL, this.upperLegL, this.lowerLegL, this.footL, this.hipL, this.kneeL, false);
+    this._drawLeg(hipRX, hipRY, this._footRPos.x, this._footRPos.y, zR, this.upperLegR, this.lowerLegR, this.footR, this.hipR, this.kneeR, true);
 
     // Hand orientation for aim
     if (params.armPoseR === 'aim' || params.armPoseR === 'attack') {
@@ -681,7 +745,7 @@ export class StickmanRig {
       const f = maxReach / d;
       chx = sx + dx * f; chy = sy + dy * f;
     }
-    solveIK(this._tmpKnee, sx, sy, chx, chy, upperLen, lowerLen, isRight ? 1 : -1);
+    solveIK(this._tmpKnee, sx, sy, chx, chy, upperLen, lowerLen, this.facing >= 0 ? 1 : -1);
     const ex = this._tmpKnee.x, ey = this._tmpKnee.y;
     elbowJoint.position.set(ex, ey, z);
     orientLimb(upper, sx, sy, z, ex, ey, z);

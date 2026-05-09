@@ -292,10 +292,15 @@ export class Stickman {
       this.lastDamager.killStreak++;
     }
     this.body.collisionFilterMask = COL_GROUPS.WORLD; // ragdoll only collides with world
-    this.body.linearDamping = 0.05;
+    this.body.linearDamping = 1.2;
     this.body.angularDamping = 0.5;
     this.body.fixedRotation = false;
     this.body.updateMassProperties();
+    // Tumble spin proportional to direction of last damager so the corpse
+    // pinwheels away from attacker instead of slumping straight down.
+    const lastDmg = this.lastDamager;
+    const hitDx = lastDmg ? Math.sign(this.body.position.x - lastDmg.body.position.x) : (Math.random() < 0.5 ? -1 : 1);
+    this.body.angularVelocity.z = hitDx * (8 + Math.random() * 4);
     // pop limbs
     if (this.weapon) {
       this.weapon.detach();
