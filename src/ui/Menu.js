@@ -20,6 +20,35 @@ export class Menu {
     this.show(params.get('room') ? 'online' : 'main');
     this._applyMobileSettings();
     setHapticsEnabled(localStorage.getItem('mc_haptics') !== '0');
+    this._buildFullscreenBtn();
+  }
+
+  // One-shot: append a fixed top-right ⛶ toggle. Visible only while a menu
+  // screen is up (CSS gates on body.menu-open). iOS Safari throws on
+  // requestFullscreen — try/catch swallows. Icon syncs to native fullscreen
+  // state via fullscreenchange so F11 / Esc keep the icon honest.
+  _buildFullscreenBtn() {
+    if (this._fsBtn) return;
+    const b = document.createElement('button');
+    b.className = 'fs-btn';
+    b.type = 'button';
+    b.setAttribute('aria-label', 'Toggle fullscreen');
+    const sync = () => {
+      const on = !!document.fullscreenElement;
+      document.body.classList.toggle('fullscreen', on);
+      b.textContent = on ? '⛶' : '⛶';
+      b.title = on ? 'Exit fullscreen' : 'Enter fullscreen';
+    };
+    sync();
+    b.onclick = async () => {
+      try {
+        if (document.fullscreenElement) await document.exitFullscreen();
+        else await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+      } catch (_) { /* iOS Safari + permissions edge — non-critical */ }
+    };
+    document.addEventListener('fullscreenchange', sync);
+    document.body.appendChild(b);
+    this._fsBtn = b;
   }
 
   show(screen, ...args) {

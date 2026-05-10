@@ -318,3 +318,27 @@ body.local-mp .fps { display: none; }
 /* Suppress all touch input while tutorial is showing. */
 body.touch.tutorial-active #touch-root { pointer-events: none !important; }
 
+/* Fullscreen toggle — fixed top-right, only visible while a menu is open. */
+.fs-btn {
+  position: fixed;
+  top: max(8px, var(--safe-t));
+  right: max(8px, var(--safe-r));
+  z-index: 1200;
+  width: 36px; height: 36px;
+  display: none;
+  align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  color: var(--fg);
+  font-size: 20px; line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, border-color 0.15s, transform 0.08s;
+}
+body.menu-open .fs-btn { display: flex; }
+.fs-btn:hover { background: rgba(255,204,51,0.2); border-color: var(--accent); }
+.fs-btn:active { transform: scale(0.94); }
+body.fullscreen .fs-btn { color: var(--accent); border-color: var(--accent); }
+
