@@ -316,7 +316,7 @@ export class Stickman {
       if (this === game.localPlayer && game.hud) game.hud.damageFlash?.(amount);
       // Haptics: hit-taken on local player (stronger), hit-landed when
       // the local player did the damage (weaker).
-      if (this === game.localPlayer && this.isLocal) vibrate(25);
+      if (this === game.localPlayer) vibrate(25);
       else if (opts.attacker && opts.attacker === game.localPlayer) vibrate(15);
     }
 
@@ -1303,17 +1303,19 @@ export class Stickman {
 
       // Special / weapon alt fire / force powers.
       if (now.specialPressed) {
-        if (this === this.game?.localPlayer) vibrate(40);
         const tNow = performance.now();
+        let didFire = false;
         if (this._forceCooldown <= 0) {
-          if (tNow < this.forcePushUntil) { this._forcePush(); this._forceCooldown = 0.7; }
-          else if (tNow < this.forcePullUntil) { this._forcePull(); this._forceCooldown = 0.7; }
-          else if (tNow < this.forceLightningUntil) { this._forceLightning(); this._forceCooldown = 0.4; }
-          else if (tNow < this.forceChokeUntil) { this._forceChoke(); this._forceCooldown = 1.0; }
-          else if (this.weapon?.altFire) this.weapon.altFire(this);
+          if (tNow < this.forcePushUntil) { this._forcePush(); this._forceCooldown = 0.7; didFire = true; }
+          else if (tNow < this.forcePullUntil) { this._forcePull(); this._forceCooldown = 0.7; didFire = true; }
+          else if (tNow < this.forceLightningUntil) { this._forceLightning(); this._forceCooldown = 0.4; didFire = true; }
+          else if (tNow < this.forceChokeUntil) { this._forceChoke(); this._forceCooldown = 1.0; didFire = true; }
+          else if (this.weapon?.altFire) { this.weapon.altFire(this); didFire = true; }
         } else if (this.weapon?.altFire && performance.now() >= this.forcePushUntil && performance.now() >= this.forcePullUntil) {
           this.weapon.altFire(this);
+          didFire = true;
         }
+        if (didFire && this === this.game?.localPlayer) vibrate(40);
       }
       if (this._forceCooldown > 0) this._forceCooldown -= dt;
 
