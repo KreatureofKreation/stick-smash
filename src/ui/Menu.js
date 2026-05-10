@@ -23,6 +23,7 @@ export class Menu {
     audio.click();
     this._stopPadPolling();
     this.root.innerHTML = '';
+    document.body.classList.add('menu-open');
     if (screen === 'main') return this._main();
     if (screen === 'play') return this._play();
     if (screen === 'local') return this._local();
@@ -32,7 +33,11 @@ export class Menu {
     if (screen === 'over') return this._over(...args);
   }
 
-  hide() { this._stopPadPolling(); this.root.innerHTML = ''; }
+  hide() {
+    this._stopPadPolling();
+    this.root.innerHTML = '';
+    document.body.classList.remove('menu-open');
+  }
 
   _stopPadPolling() {
     if (this._padPollId) { clearInterval(this._padPollId); this._padPollId = null; }

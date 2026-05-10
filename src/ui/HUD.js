@@ -45,6 +45,19 @@ export class HUD {
     }));
   }
 
+  // Wipe per-match transient DOM. CSS hides #hud-root via body.in-game, but
+  // we still clear so the next match doesn't briefly flash the prior match's
+  // scoreboard + kill-feed during the 3-2-1 countdown.
+  clear() {
+    if (this.scoreEl) this.scoreEl.innerHTML = '';
+    if (this.feedEl) this.feedEl.innerHTML = '';
+    if (this.buffsEl) this.buffsEl.innerHTML = '';
+    if (this.centerEl) { this.centerEl.style.display = 'none'; this.centerEl.innerHTML = ''; }
+    if (this.dmgFlashEl) this.dmgFlashEl.style.opacity = 0;
+    if (this.vignetteEl) this.vignetteEl.style.opacity = 0;
+    for (const slot of this.localStrips) slot.root.style.display = 'none';
+  }
+
   toast(text, ms = 1200) {
     const el = document.createElement('div');
     el.className = 'toast';
@@ -79,26 +92,31 @@ export class HUD {
   }
 
   update() {
-    // Scoreboard
-    let html = '';
-    for (const p of this.game.players) {
-      if (!p) continue;
-      const hex = (p.character.primary ?? 0xffffff).toString(16).padStart(6, '0');
-      const dead = p.state === 'dead' ? 'dead' : '';
-      html += `<div class="score-pill ${dead}" style="--c:#${hex}">
-        <span class="dot"></span>
-        <span>${p.name}</span>
-        <span style="opacity:0.7">${p.score}</span>
-        <span class="deaths">×${p.lives}</span>
-      </div>`;
-    }
-    this.scoreEl.innerHTML = html;
-
     // Per-local HP + weapon strips. Slot 0 = P1 (top-left), 1 = P2 (top-right),
     // 2 = P3 (bottom-left), 3 = P4 (bottom-right).
     const locals = this.game.localPlayers?.length
       ? this.game.localPlayers
       : (this.game.localPlayer ? [this.game.localPlayer] : []);
+    const localSet = new Set(locals);
+
+    // Scoreboard. The name is omitted for local players because their name
+    // already lives on their corner strip — showing it twice was the visible
+    // "double-up" and on narrow viewports caused the strip + scoreboard pills
+    // to overlap. Bots / remote players still show their name (no strip).
+    let html = '';
+    for (const p of this.game.players) {
+      if (!p) continue;
+      const hex = (p.character.primary ?? 0xffffff).toString(16).padStart(6, '0');
+      const dead = p.state === 'dead' ? 'dead' : '';
+      const nameSpan = localSet.has(p) ? '' : `<span>${p.name}</span>`;
+      html += `<div class="score-pill ${dead}" style="--c:#${hex}">
+        <span class="dot"></span>
+        ${nameSpan}
+        <span style="opacity:0.7">${p.score}</span>
+        <span class="deaths">×${p.lives}</span>
+      </div>`;
+    }
+    this.scoreEl.innerHTML = html;
     document.body.classList.toggle('local-mp', locals.length > 1);
     for (let i = 0; i < this.localStrips.length; i++) {
       const slot = this.localStrips[i];

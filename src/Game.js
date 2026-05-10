@@ -280,6 +280,9 @@ export class Game {
 
     // 3-2-1-FIGHT countdown — freeze all players until it ends.
     if (!asClient) this._startCountdown();
+
+    // Mark match as live so styles.css un-hides #hud-root / #touch-root.
+    document.body.classList.add('in-game');
   }
 
   _startCountdown() {
@@ -311,10 +314,17 @@ export class Game {
     for (const p of this.projectiles) p.destroy?.();
     this.players = []; this.weapons = []; this.pickups = []; this.projectiles = [];
     this.localPlayers = [];
+    this.localPlayer = null;
     // Clear scene of static lights and bg props
     while (this.scene.children.length > 0) this.scene.remove(this.scene.children[0]);
     // Re-add particles
     this.fx.particles = new Particles(this.scene);
+
+    // Match no longer live — hide HUD + touch controls + clear stale DOM so
+    // they don't peek through behind the menu after game over.
+    document.body.classList.remove('in-game');
+    document.body.classList.remove('local-mp');
+    if (this.hud) this.hud.clear();
   }
 
   endMatch() {

@@ -99,8 +99,18 @@ export class TouchControls {
       return false;
     };
 
+    // Only claim touches when a match is actually live AND no menu is open.
+    // Without this gate the floating-joystick handler called preventDefault()
+    // on every left-half touch — which silently swallowed every menu tap on
+    // mobile, making the menu unusable.
+    const isMenuActive = () => {
+      const cl = document.body.classList;
+      return cl.contains('menu-open') || !cl.contains('in-game');
+    };
+
     const onDocStart = (ev) => {
       if (joyId !== null) return;
+      if (isMenuActive()) return;
       const t = ev.changedTouches?.[0];
       if (!t) return;
       if (isOverButton(t.target)) return;
@@ -112,6 +122,7 @@ export class TouchControls {
 
     const onDocMove = (ev) => {
       if (joyId === null) return;
+      if (isMenuActive()) { joyId = null; hideJoy(); return; }
       for (const t of ev.changedTouches) {
         if (t.identifier !== joyId) continue;
         const dx = t.clientX - joyCx;
