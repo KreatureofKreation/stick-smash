@@ -18,7 +18,7 @@ const STEPS = [
   { caption: 'drag to move',                  side: 'left',  anim: 'tut-arc' },
   { caption: 'tap to attack',                 side: 'right', anim: 'tut-tap', target: '.tbtn.attack' },
   { caption: 'hold + drag to aim',            side: 'right', anim: 'tut-drag', target: '.tbtn.attack' },
-  { caption: 'release grab + push = throw',   side: 'split', anim: 'tut-grab-throw' },
+  { caption: 'release grab + push = throw',   side: 'split' },
   { caption: 'swipe grab to throw weapon',    side: 'right', anim: 'tut-swipe', target: '.tbtn.grab' },
 ];
 
@@ -50,6 +50,8 @@ export class TutorialOverlay {
     el.querySelector('#tut-skip').onclick = () => this.dismiss();
     this.idx = 0;
     this._showStep(0);
+    this._onResize = () => this._showStep(this.idx);
+    addEventListener('resize', this._onResize);
   }
 
   _showStep(i) {
@@ -99,6 +101,7 @@ export class TutorialOverlay {
 
   dismiss() {
     if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+    if (this._onResize) { removeEventListener('resize', this._onResize); this._onResize = null; }
     if (this.root && this.root.parentNode) this.root.parentNode.removeChild(this.root);
     this.root = null;
     document.body.classList.remove('tutorial-active');

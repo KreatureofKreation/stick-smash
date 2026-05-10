@@ -316,5 +316,5 @@ body.local-mp .fps { display: none; }
 .tut-skip:hover { background: rgba(255,204,51,0.2); border-color: var(--accent); }
 
 /* Suppress all touch input while tutorial is showing. */
-body.tutorial-active #touch-root { pointer-events: none !important; }
+body.touch.tutorial-active #touch-root { pointer-events: none !important; }
 
