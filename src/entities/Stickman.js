@@ -4,6 +4,7 @@ import { COL_GROUPS } from '../physics/PhysicsWorld.js';
 import { StickmanRig } from './StickmanRig.js';
 import { clamp, damp, lerp, sign, rand } from '../util/math.js';
 import { audio } from '../audio/Audio.js';
+import { vibrate } from '../util/haptics.js';
 
 // Stickman = capsule body + procedural rig + state machine.
 // Designed to be controlled either by local input, AI, or network state.
@@ -313,6 +314,10 @@ export class Stickman {
       // Red flash overlay — P1 only. Single full-screen overlay, can't represent
       // four locals, so couch-MP P2/P3/P4 hits don't trigger it.
       if (this === game.localPlayer && game.hud) game.hud.damageFlash?.(amount);
+      // Haptics: hit-taken on local player (stronger), hit-landed when
+      // the local player did the damage (weaker).
+      if (this === game.localPlayer && this.isLocal) vibrate(25);
+      else if (opts.attacker && opts.attacker === game.localPlayer) vibrate(15);
     }
 
     if (this.health <= 0) {
@@ -1019,6 +1024,7 @@ export class Stickman {
         this._jumpLockUntil = tNowSlide + 120;
         this._jumpInputCooldown = tNowSlide + 90;
         audio.jump();
+        if (this === this.game?.localPlayer) vibrate(12);
       }
       // Skip the standard accel/friction block.
       if (!this.input.jump && this.body.velocity.y > 4) this.body.velocity.y = 4 + (this.body.velocity.y - 4) * Math.pow(0.05, dt);
@@ -1080,6 +1086,7 @@ export class Stickman {
             this._jumpLockUntil = performance.now() + 80;
             this._jumpInputCooldown = performance.now() + 120;
             audio.jump?.();
+            if (this === this.game?.localPlayer) vibrate(12);
             this.grounded = false;
           } else if (this.airJumpsLeft > 0) {
             this.airJumpsLeft--;
@@ -1143,6 +1150,7 @@ export class Stickman {
       this._jumpLockUntil = tNowJump + 120;
       this._jumpInputCooldown = tNowJump + 90;
       audio.jump();
+      if (this === this.game?.localPlayer) vibrate(12);
     } else if (this.input.jumpPressed && !inJumpCD && this.airJumpsLeft > 0 && !this.grounded) {
       this.body.velocity.y = 10;
       this.airJumpsLeft--;
@@ -1295,6 +1303,7 @@ export class Stickman {
 
       // Special / weapon alt fire / force powers.
       if (now.specialPressed) {
+        if (this === this.game?.localPlayer) vibrate(40);
         const tNow = performance.now();
         if (this._forceCooldown <= 0) {
           if (tNow < this.forcePushUntil) { this._forcePush(); this._forceCooldown = 0.7; }
