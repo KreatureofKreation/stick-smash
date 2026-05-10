@@ -19,6 +19,7 @@ export class Menu {
     const params = new URLSearchParams(location.search);
     this.show(params.get('room') ? 'online' : 'main');
     this._applyMobileSettings();
+    setHapticsEnabled(localStorage.getItem('mc_haptics') !== '0');
   }
 
   show(screen, ...args) {
@@ -52,10 +53,8 @@ export class Menu {
     const sens   = parseFloat(localStorage.getItem('mc_aimSens') || '1') || 1;
     const scale  = localStorage.getItem('mc_btnScale') || 'M';
     const lefty  = localStorage.getItem('mc_lefty') === '1';
-    const haptic = localStorage.getItem('mc_haptics') !== '0';
     document.documentElement.style.setProperty('--btn-scale', scale === 'S' ? '0.85' : scale === 'L' ? '1.15' : '1');
     document.body.classList.toggle('left-handed', lefty);
-    setHapticsEnabled(haptic);
     if (this.game?.input?.touch?.applySettings) {
       this.game.input.touch.applySettings({ aimSensitivity: sens });
     }
@@ -419,16 +418,17 @@ export class Menu {
         </div>
       </div>
     `);
+    const weaponBoxes = () => [...el.querySelectorAll('.weapon-toggle input[type=checkbox]')];
     const save = () => {
-      const ids = [...el.querySelectorAll('input[type=checkbox]')]
+      const ids = weaponBoxes()
         .filter(cb => !cb.checked)
         .map(cb => cb.dataset.id);
       setDisabledWeapons(ids);
       localStorage.setItem('disabledWeapons', JSON.stringify(ids));
     };
-    el.querySelectorAll('input[type=checkbox]').forEach(cb => cb.addEventListener('change', save));
+    weaponBoxes().forEach(cb => cb.addEventListener('change', save));
     const setAll = (predicate) => {
-      el.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      weaponBoxes().forEach(cb => {
         const entry = SPAWN_TABLE.find(e => e.id === cb.dataset.id);
         cb.checked = predicate(entry);
       });
@@ -457,7 +457,7 @@ export class Menu {
       this._applyMobileSettings();
     };
     el.querySelector('#mc-haptics').onchange = (e) => {
-      localStorage.setItem('mc_haptics', e.target.checked ? '1' : '0');
+      setHapticsEnabled(e.target.checked);  // writes localStorage + updates cache
       this._applyMobileSettings();
     };
     el.querySelector('[data-act="replay-tut"]').onclick = () => {
