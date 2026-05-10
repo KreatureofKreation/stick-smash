@@ -62,6 +62,38 @@ export class Stickman {
     world.add(body);
     this.body = body;
 
+    // Velocity-based impact damage: when a player slams into a destructible
+    // tile fast enough (knocked into a wall, ground-pound landing, big fall),
+    // the tile takes damage proportional to the relative speed. Per-tile
+    // throttle prevents the same body from chewing a tile every physics tick.
+    this._impactHitCooldown = new Map();
+    this._onImpactHit = (e) => {
+      const other = e.body;
+      const ud = other?.userData;
+      if (!ud) return;
+      // Damage destructible tiles directly. Players + props could cascade
+      // here too, but for now the tile case is the visible one and avoids
+      // double-counting damage that other systems already handle.
+      if (ud.kind !== 'tile' || !ud.tile || ud.tile.indestructible) return;
+      const now = performance.now();
+      const last = this._impactHitCooldown.get(other) ?? 0;
+      if (now - last < 200) return;
+      const v = this.body.velocity;
+      const speed = Math.hypot(v.x, v.y);
+      const threshold = 8;
+      if (speed < threshold) return;
+      this._impactHitCooldown.set(other, now);
+      const dmg = (speed - threshold) * 2.5;
+      if (dmg <= 0) return;
+      this.game?.level?.damageTile?.(ud.tile, dmg, this);
+      if (this.game?.fx?.particles) {
+        this.game.fx.particles.burst(this.position.x, this.position.y, 0, { count: 6, speed: 4, color: 0xddc890 });
+      }
+      // Light camera punch only on heavy slams.
+      if (speed > 14) this.game?.fx?.camera?.punch?.(0.10);
+    };
+    body.addEventListener('collide', this._onImpactHit);
+
     // Visual rig
     this.rig = new StickmanRig(opts.character || {});
     scene.add(this.rig.group);
