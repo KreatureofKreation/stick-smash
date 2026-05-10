@@ -990,14 +990,22 @@ export class Stickman {
         const tx = -uy, ty = ux;            // CCW perpendicular
         const vT = this.body.velocity.x * tx + this.body.velocity.y * ty;
         const vR = this.body.velocity.x * ux + this.body.velocity.y * uy;
-        const speedMaxC = this.crouching ? 2.5 : (boosted ? 9 : (flying ? 7 : 6.5));
+        // Walk speed cap is below the orbital-velocity threshold (sqrt(g*r))
+        // so tangential motion can never out-run gravity and lift the
+        // capsule off the surface. For r=5 with g≈8: orbital v ≈ 6.3, so
+        // capping ground walk to 4 leaves a comfortable margin.
+        const speedMaxC = this.crouching ? 2.0 : (boosted ? 6 : (flying ? 7 : 4.0));
         const accelC = this.grounded ? (boosted ? 65 : 45) : (flying ? 36 : 18);
         const targetT = moveX * speedMaxC;
+        // Stick-to-ground: when grounded, kill any outward radial velocity so
+        // microbumps from collider edges don't accumulate into a launch. Lets
+        // gravity hold the capsule.
+        const vRGrounded = this.grounded ? Math.min(vR, 0) : vR;
         const dvT = targetT - vT;
         const stepT = clamp(dvT, -accelC * dt, accelC * dt);
         const newVT = vT + stepT;
-        this.body.velocity.x = newVT * tx + vR * ux;
-        this.body.velocity.y = newVT * ty + vR * uy;
+        this.body.velocity.x = newVT * tx + vRGrounded * ux;
+        this.body.velocity.y = newVT * ty + vRGrounded * uy;
         if (this.grounded && Math.abs(moveX) < 0.05) {
           const k = Math.pow(0.001, dt);
           this.body.velocity.x *= k;
