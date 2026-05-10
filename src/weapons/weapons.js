@@ -1169,8 +1169,8 @@ export class HulkHands extends Weapon {
     }
     // During a pound, trail green particles from the active fist.
     if (this._poundActive && Math.random() < 0.7 && this.game?.fx?.particles?.spark) {
-      const sx = (handR?.x ?? player.position.x) + rand(-0.1, 0.1);
-      const sy = (handR?.y ?? player.position.y) + 0.0;
+      const sx = (hasR ? tmpR.x : player.position.x) + rand(-0.1, 0.1);
+      const sy = (hasR ? tmpR.y : player.position.y) + 0.0;
       this.game.fx.particles.spark.spawn({
         x: sx, y: sy, z: 0, vx: rand(-1, 1), vy: rand(2, 5),
         life: 0.35, size: 0.18, color: 0x88ee77, gravity: -2, drag: 0.5, shrink: 1,
