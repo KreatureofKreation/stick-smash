@@ -186,25 +186,33 @@ export class Game {
     this.weaponSpawnTimer = 1.5;
 
     if (!asClient) {
-      // Local hero (P1) — keyboard + mouse.
+      // Detect connected gamepads first so we know whether P1 must avoid
+      // pad input (kb-only) or can fall back to any-pad (kb-mouse combined).
+      const gpsAtStart = navigator.getGamepads?.() || [];
+      const padIndices = [];
+      for (let i = 0; i < gpsAtStart.length && padIndices.length < 3; i++) {
+        if (gpsAtStart[i] && gpsAtStart[i].connected) padIndices.push(i);
+      }
+      // Pads bound to P2/P3/P4 must NOT bleed into P1, so P1 reads
+      // keyboard+mouse+touch only when extras exist.
+      const heroSource = padIndices.length > 0
+        ? { kind: 'kb-only' }
+        : { kind: 'kb-mouse' };
+
+      // Local hero (P1).
       const hero = this._spawnPlayer({
         name: name || 'P1',
         character: rosterById(character || 'bolt'),
         isLocal: true,
-        inputSource: { kind: 'kb-mouse' },
+        inputSource: heroSource,
       });
       this.localPlayer = hero;
       this.localPlayers = [hero];
       this.character = hero.character;
 
-      // Detect connected gamepads — each becomes one extra local player.
-      // Cap at 3 extras (P1 + 3 = 4 total humans).
+      // Each detected gamepad becomes one extra local player. Cap at 3 extras
+      // (P1 + 3 = 4 total humans).
       const used = new Set([hero.character.id]);
-      const gps = navigator.getGamepads?.() || [];
-      const padIndices = [];
-      for (let i = 0; i < gps.length && padIndices.length < 3; i++) {
-        if (gps[i] && gps[i].connected) padIndices.push(i);
-      }
       for (let i = 0; i < padIndices.length; i++) {
         const pool = ROSTER.filter(c => !used.has(c.id));
         const pick = pool[Math.floor(Math.random() * pool.length)] || ROSTER[(i + 1) % ROSTER.length];
@@ -513,8 +521,8 @@ export class Game {
         if (!lp || !lp.isLocal || !lp.inputSource) continue;
         const snap = this.input.getSnapshotFor(lp.inputSource);
         if (!snap) continue;
-        // Mouse aim only for the kb+mouse player. Project NDC onto z=0 plane.
-        if (lp.inputSource.kind === 'kb-mouse' && ndc && !snap.aimActive) {
+        // Mouse aim only for the kb-driven player. Project NDC onto z=0 plane.
+        if ((lp.inputSource.kind === 'kb-mouse' || lp.inputSource.kind === 'kb-only') && ndc && !snap.aimActive) {
           this._aimNDC.set(ndc.x, ndc.y, 0.5).unproject(this.camera);
           const dir = this._aimDir.copy(this._aimNDC).sub(this.camera.position).normalize();
           if (Math.abs(dir.z) > 1e-4) {

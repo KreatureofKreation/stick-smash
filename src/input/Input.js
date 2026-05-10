@@ -136,7 +136,7 @@ export class InputManager {
 
   // Strict-by-index gamepad poll. Used by local MP where P2/P3/P4 must each
   // bind to one specific pad. Unlike getGamepadSnapshot(), this returns an
-  // empty snapshot if that exact slot is null/disconnected � never bleeds
+  // empty snapshot if that exact slot is null/disconnected � never bleeds
   // input from another pad into a different player.
   getGamepadSnapshotByIndex(idx) {
     const out = { moveX: 0, moveY: 0, jump: false, attack: false, grab: false, special: false, throw: false, aimX: 1, aimY: 0, aimActive: false };
@@ -172,11 +172,36 @@ export class InputManager {
 
   // Returns an input snapshot for any local source descriptor.
   // Used by the per-local-player input loop.
+  //   'kb-mouse' → keyboard + mouse + touch + any-gamepad merged. For solo
+  //                play where the user might be on any device.
+  //   'kb-only'  → keyboard + mouse + touch ONLY, no gamepad merge. Used by
+  //                P1 in local-MP so a pad bound to P2/P3 can't bleed input
+  //                into P1 via getCombined's any-pad fallback.
+  //   'gamepad'  → strict-by-index pad poll for P2/P3/P4.
   getSnapshotFor(source) {
     if (!source) return null;
     if (source.kind === 'kb-mouse') return this.getCombined();
+    if (source.kind === 'kb-only') return this.getKbMouseTouch();
     if (source.kind === 'gamepad') return this.getGamepadSnapshotByIndex(source.gamepadIdx);
     return null;
+  }
+
+  // Combined keyboard + mouse + touch, no gamepad. P1 in local-MP uses this
+  // so external pads only drive their assigned slot.
+  getKbMouseTouch() {
+    const a = this.getKbSnapshot();
+    const t = this.touch.active ? this.getTouchSnapshot() : null;
+    const o = { ...a };
+    o.moveX = a.moveX || (t?.moveX ?? 0);
+    o.moveY = a.moveY || (t?.moveY ?? 0);
+    o.jump = a.jump || (t?.jump ?? false);
+    o.attack = a.attack || (t?.attack ?? false);
+    o.grab = a.grab || (t?.grab ?? false);
+    o.special = a.special || (t?.special ?? false);
+    o.throw = a.throw || (t?.throw ?? false);
+    if (t?.aimActive) { o.aimX = t.aimX; o.aimY = t.aimY; o.aimActive = true; }
+    else { o.aimX = a.aimX; o.aimY = a.aimY; o.aimActive = false; }
+    return o;
   }
 
   // True for one frame on Start/Back press from ANY connected gamepad.
