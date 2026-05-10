@@ -2,14 +2,14 @@
 <html>
 <head>
 <meta charset="utf-8" />
-<title>Hulk Hands — model preview</title>
+<title>Hulk Hands — Stone variant</title>
 <style>
   body { margin: 0; background: #0a0a14; color: #ddd; font-family: system-ui, sans-serif; }
-  .row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 8px; }
+  .row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 8px; }
   .cell { background: #11131a; border: 1px solid #222; border-radius: 6px; }
   .cell h3 { margin: 8px 12px 0; font-size: 14px; }
   .cell p  { margin: 4px 12px 8px; font-size: 12px; color: #999; }
-  canvas { display: block; width: 100%; height: 360px; }
+  canvas { display: block; width: 100%; height: 480px; }
   .legend { padding: 6px 12px 12px; font-size: 12px; color: #aaa; }
 </style>
 <script type="importmap">
@@ -18,307 +18,235 @@
 </head>
 <body>
 <div class="row">
-  <div class="cell"><h3>A — Anatomical Hulk Fist (flesh)</h3><p>clenched fist w/ finger segments, knuckles, thumb wrap, vein glow, forearm</p><canvas id="a"></canvas></div>
-  <div class="cell"><h3>B — Stone-Skin Hulk Fist</h3><p>same anatomy, rocky cracked skin, glowing fissures</p><canvas id="b"></canvas></div>
-  <div class="cell"><h3>C — Realistic Gauntlet</h3><p>plate-armor knuckles, segmented fingers, leather grip, glowing core</p><canvas id="c"></canvas></div>
+  <div class="cell"><h3>In-game scale (on stickman rig)</h3><p>fist sized to actually fit a stickman wrist — not oversized for the canvas</p><canvas id="ig"></canvas></div>
+  <div class="cell"><h3>Detail view</h3><p>same fist, camera close on right hand for anatomy review</p><canvas id="dt"></canvas></div>
 </div>
 <div class="legend">
-  Drag to spin; idle auto-rotate. Stickman behind each shows in-game scale.
+  Drag to spin; idle auto-rotate. Stickman behind for scale. Knuckles arc (middle highest, pinky lowest+back). Thumb wraps over index/middle. Forearm shroud trimmed — won't clip the rig's upper arm.
 </div>
 <script type="module">
 import * as THREE from 'three';
 
-function buildScene() {
+function buildScene(includeStick = true) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x12131a);
   const key = new THREE.DirectionalLight(0xffe9c2, 1.4); key.position.set(2, 4, 3); scene.add(key);
   const fill = new THREE.DirectionalLight(0x6688ff, 0.5); fill.position.set(-3, 2, 2); scene.add(fill);
   const rim = new THREE.DirectionalLight(0xffffff, 0.6); rim.position.set(0, 2, -4); scene.add(rim);
   scene.add(new THREE.AmbientLight(0xffffff, 0.22));
-  // Stickman behind for scale.
-  const stickMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee });
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 12), stickMat); head.position.set(0, 1.0, 0); scene.add(head);
-  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.6, 8), stickMat); torso.position.set(0, 0.5, 0); scene.add(torso);
-  const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.5, 8), stickMat); armL.position.set(-0.32, 0.7, 0); armL.rotation.z = 0.5; scene.add(armL);
-  const armR = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.5, 8), stickMat); armR.position.set( 0.32, 0.7, 0); armR.rotation.z = -0.5; scene.add(armR);
+  if (includeStick) {
+    const stickMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee });
+    // Stickman scaled to game (head r=0.18, body height ~1.6 from feet to head)
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 12), stickMat); head.position.set(0, 1.0, 0); scene.add(head);
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.6, 8), stickMat); torso.position.set(0, 0.5, 0); scene.add(torso);
+    const upperArmL = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.34, 8), stickMat); upperArmL.position.set(-0.22, 0.78, 0); upperArmL.rotation.z = 0.45; scene.add(upperArmL);
+    const upperArmR = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.34, 8), stickMat); upperArmR.position.set( 0.22, 0.78, 0); upperArmR.rotation.z = -0.45; scene.add(upperArmR);
+    const lowerArmL = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.34, 8), stickMat); lowerArmL.position.set(-0.43, 0.55, 0); lowerArmL.rotation.z = 0.7; scene.add(lowerArmL);
+    const lowerArmR = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.34, 8), stickMat); lowerArmR.position.set( 0.43, 0.55, 0); lowerArmR.rotation.z = -0.7; scene.add(lowerArmR);
+    // Wrist joint sphere (the rig's handR target — game radius 0.13).
+    const wristL = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), stickMat); wristL.position.set(-0.55, 0.40, 0); scene.add(wristL);
+    const wristR = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), stickMat); wristR.position.set( 0.55, 0.40, 0); scene.add(wristR);
+  }
   return scene;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Common: anatomical clenched-fist geometry. Returns a Group oriented so
-// the knuckle plane faces +X (the "punching" direction). Caller mirrors
-// for left hand by negating scale.x.
+// Anatomically correct clenched fist, sized for stickman rig.
+//
+// Real fist references (mapped to in-game units, 1 unit ≈ 1 m, stickman ~1.7 m):
+//   width across knuckles  ≈ 0.10
+//   height (index knuckle to pinky knuckle row) ≈ 0.085
+//   depth (palm to back-of-hand)  ≈ 0.075
+//   thumb extension over fingers  ≈ 0.05
+//   forearm shroud diameter       ≈ 0.10  (matches lower-arm bone width)
+//   forearm shroud length         ≈ 0.18  (sleeve, NOT a full bicep)
+//
+// Fingers curl with the four knuckles forming an arc:
+//   middle knuckle highest + most forward, ring slightly back, index a hair
+//   below middle, pinky lowest and farthest back. Approximated below.
+//
+// Group origin sits at the wrist; +X = punch direction.
 // ─────────────────────────────────────────────────────────────────────────
-function buildAnatomicalFist({ skinMat, knuckMat, veinMat, includeVeins = true, includeForearm = true, forearmMat, bicepMat }) {
+function buildAnatomicalStoneFist({ skinMat, knuckMat, veinMat, shardMat, crackMat, includeForearm = true, scale = 1.0 }) {
   const grp = new THREE.Group();
 
-  // === FOREARM + BICEP =====================================================
+  // ===== FOREARM SHROUD (sleeve / wrist guard) ============================
   if (includeForearm) {
-    const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.13, 0.55, 18), forearmMat ?? skinMat);
-    forearm.rotation.z = Math.PI / 2;
-    forearm.position.set(-0.45, 0, 0);
-    grp.add(forearm);
-    // Subtle bicep swell at the elbow end.
-    const bicep = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 12), bicepMat ?? skinMat);
-    bicep.position.set(-0.70, 0.02, 0);
-    bicep.scale.set(1.1, 0.9, 0.95);
-    grp.add(bicep);
-    // Tendons / veins on forearm
-    if (includeVeins) {
-      for (let i = 0; i < 3; i++) {
-        const v = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.38, 6), veinMat);
-        v.rotation.z = Math.PI / 2;
-        v.position.set(-0.4, 0.10 - i * 0.05, 0.13 + Math.sin(i) * 0.02);
-        v.rotation.y = Math.sin(i * 1.3) * 0.3;
-        grp.add(v);
-      }
-      // One on top of forearm
-      const vT = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.42, 6), veinMat);
-      vT.rotation.z = Math.PI / 2;
-      vT.position.set(-0.42, 0.16, 0);
-      grp.add(vT);
+    // Short sleeve from wrist back toward the elbow — does NOT extend full
+    // forearm, so it won't clip with the player's lower-arm rig segment.
+    const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.062, 0.052, 0.16, 16), skinMat);
+    sleeve.rotation.z = Math.PI / 2;
+    sleeve.position.set(-0.10, 0, 0);
+    grp.add(sleeve);
+    // Two emissive crack rings around sleeve.
+    for (let i = 0; i < 2; i++) {
+      const c = new THREE.Mesh(new THREE.TorusGeometry(0.058, 0.005, 6, 14), crackMat);
+      c.rotation.y = Math.PI / 2;
+      c.position.set(-0.05 - i * 0.06, 0, 0);
+      grp.add(c);
     }
   }
 
-  // === WRIST ===============================================================
-  const wrist = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 0.10, 16), skinMat);
+  // ===== WRIST ============================================================
+  const wrist = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.058, 0.04, 14), skinMat);
   wrist.rotation.z = Math.PI / 2;
-  wrist.position.set(-0.18, 0, 0);
+  wrist.position.set(-0.018, 0, 0);
   grp.add(wrist);
 
-  // === PALM (back of hand facing camera-ish, knuckles facing +X) ==========
-  // Slightly tapered cuboid — wider at knuckles, narrower at wrist.
-  const palmGeo = new THREE.BoxGeometry(0.22, 0.36, 0.30);
-  const palm = new THREE.Mesh(palmGeo, skinMat);
-  palm.position.set(0.0, 0, 0);
+  // ===== PALM block =======================================================
+  // Real fist: palm cuboid is wider (Y) than deep (Z) and narrow side-to-side
+  // (X) when viewed knuckles-forward. We want X = punch direction, so the
+  // palm faces -X (back of hand) ↔ +X (knuckles).
+  const palm = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.10, 0.085), skinMat);
+  palm.position.set(0.04, 0, 0);
   grp.add(palm);
-  // Add a soft rounded back-of-hand bump
-  const backBump = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 12), skinMat);
-  backBump.scale.set(0.7, 1.0, 0.55);
-  backBump.position.set(0.0, 0.05, -0.13);
-  grp.add(backBump);
-  // Heel of palm (under thumb side)
-  const heel = new THREE.Mesh(new THREE.SphereGeometry(0.13, 14, 10), skinMat);
-  heel.scale.set(0.9, 0.9, 0.8);
-  heel.position.set(-0.05, -0.18, 0.05);
-  grp.add(heel);
-
-  // === FINGERS (curled, 4 fingers, each 2 visible segments) ===============
-  // Knuckle (proximal) row faces +X; distal segments curl under back toward palm.
-  const fingerNames = ['index', 'middle', 'ring', 'pinky'];
-  const fingerLengths = [0.16, 0.18, 0.16, 0.13];
-  const fingerWidths  = [0.075, 0.08, 0.075, 0.065];
-  for (let i = 0; i < 4; i++) {
-    const w = fingerWidths[i];
-    const len = fingerLengths[i];
-    const yOff = 0.13 - i * 0.085; // top to bottom along the knuckle ridge
-    // Proximal knuckle bump (the punching surface)
-    const kn = new THREE.Mesh(new THREE.SphereGeometry(w * 1.35, 14, 10), knuckMat);
-    kn.position.set(0.13, yOff, 0.0);
-    kn.scale.set(0.85, 1.0, 1.05);
-    grp.add(kn);
-    // Proximal phalanx — short cylinder pointing forward then curling back
-    const prox = new THREE.Mesh(new THREE.CylinderGeometry(w, w * 0.9, len * 0.55, 10), skinMat);
-    prox.rotation.z = Math.PI / 2;
-    prox.position.set(0.18, yOff, 0.05);
-    grp.add(prox);
-    // Distal phalanx — curls back into palm so fingertip is on palm side (+Z negative-ish)
-    const dist = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.85, w * 0.7, len * 0.55, 10), skinMat);
-    dist.position.set(0.13, yOff, 0.16);
-    dist.rotation.x = -Math.PI / 2 + 0.3;
-    grp.add(dist);
-    // Distal knuckle bump (mid-finger fold)
-    const midKn = new THREE.Mesh(new THREE.SphereGeometry(w, 12, 10), skinMat);
-    midKn.position.set(0.21, yOff, 0.10);
-    grp.add(midKn);
-    // Fingernail crease (small dark line) — using vein mat as proxy
-    if (i < 4) {
-      const crease = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.012, 0.002), veinMat);
-      crease.position.set(0.13, yOff, 0.21);
-      crease.rotation.x = -0.3;
-      grp.add(crease);
-    }
-  }
-
-  // === THUMB (wraps diagonally across front of fingers) ===================
-  const thumbBase = new THREE.Mesh(new THREE.SphereGeometry(0.085, 12, 10), skinMat);
-  thumbBase.position.set(-0.02, -0.13, 0.13);
-  grp.add(thumbBase);
-  const thumbProx = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.07, 0.16, 10), skinMat);
-  thumbProx.position.set(0.06, -0.10, 0.18);
-  thumbProx.rotation.z = -0.6;
-  thumbProx.rotation.y = -0.3;
-  grp.add(thumbProx);
-  const thumbDist = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.13, 10), skinMat);
-  thumbDist.position.set(0.16, -0.05, 0.16);
-  thumbDist.rotation.z = -0.2;
-  thumbDist.rotation.y = -0.5;
-  grp.add(thumbDist);
-  const thumbTip = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), skinMat);
-  thumbTip.position.set(0.21, -0.02, 0.12);
-  grp.add(thumbTip);
-
-  // === HAND-BACK VEINS ====================================================
-  if (includeVeins) {
-    for (let i = 0; i < 4; i++) {
-      const v = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.18 + Math.random() * 0.08, 6), veinMat);
-      v.position.set(0.0, 0.10 - i * 0.06, -0.13);
-      v.rotation.z = Math.PI / 2 + Math.sin(i * 1.7) * 0.5;
-      v.rotation.y = i * 0.4;
-      grp.add(v);
-    }
-  }
-
-  return grp;
-}
-
-// === A: Flesh Hulk Fist =====================================================
-function buildHandA(isRight) {
-  const skinMat = new THREE.MeshStandardMaterial({ color: 0x3aa83e, roughness: 0.55, metalness: 0.0 });
-  const knuckMat = new THREE.MeshStandardMaterial({ color: 0x4ed24f, roughness: 0.45, emissive: 0x0a3508, emissiveIntensity: 0.2 });
-  const veinMat = new THREE.MeshBasicMaterial({ color: 0x224422 });
-  const bicepMat = new THREE.MeshStandardMaterial({ color: 0x2f8a32, roughness: 0.6 });
-  const grp = buildAnatomicalFist({ skinMat, knuckMat, veinMat, bicepMat, includeForearm: true, includeVeins: true });
-  if (!isRight) grp.scale.x = -1;
-  return grp;
-}
-
-// === B: Stone-Skin Hulk Fist ================================================
-function buildHandB(isRight) {
-  // Same anatomy, but skin material is rocky and emissive cracks added.
-  const stoneMat = new THREE.MeshStandardMaterial({
-    color: 0x4a6845, roughness: 0.95, metalness: 0.05, emissive: 0x081008, emissiveIntensity: 0.12,
-  });
-  const knuckMat = new THREE.MeshStandardMaterial({
-    color: 0x5a7b54, roughness: 0.85, emissive: 0x33ff66, emissiveIntensity: 0.45,
-  });
-  const veinMat = new THREE.MeshBasicMaterial({ color: 0x77ff66 });
-  const bicepMat = new THREE.MeshStandardMaterial({ color: 0x3e5a3a, roughness: 1.0 });
-  const grp = buildAnatomicalFist({ skinMat: stoneMat, knuckMat, veinMat, bicepMat });
-  // Add jagged stone shards along the back of the hand & forearm.
-  const shardMat = new THREE.MeshStandardMaterial({ color: 0x556a4e, roughness: 1.0 });
-  for (let i = 0; i < 6; i++) {
-    const s = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.10, 4), shardMat);
-    s.position.set(-0.1 + i * 0.06, 0.21, -0.05 - Math.random() * 0.12);
-    s.rotation.set(Math.PI / 2 - 0.4, Math.random() * 0.6, 0);
-    grp.add(s);
-  }
-  for (let i = 0; i < 4; i++) {
-    const s = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.12, 4), shardMat);
-    s.position.set(-0.55 + i * 0.08, 0.18 - i * 0.02, 0);
-    s.rotation.set(Math.PI / 2, Math.random() * 0.5, 0);
-    grp.add(s);
-  }
-  // Glowing fissures along forearm (extra pulse cracks).
-  const crackMat = new THREE.MeshBasicMaterial({ color: 0xaaff77 });
-  for (let i = 0; i < 5; i++) {
-    const c = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.014, 0.014), crackMat);
-    c.position.set(-0.55 + i * 0.12, -0.05 + Math.sin(i) * 0.07, 0.10 + Math.cos(i) * 0.06);
-    c.rotation.z = Math.PI / 2 + Math.sin(i * 2) * 0.3;
-    c.rotation.y = i * 0.5;
+  // Soften corners: small spheres at the four palm corners.
+  const cornerR = 0.025;
+  for (const sgn of [[-1,-1],[-1,1],[1,-1],[1,1]]) {
+    const c = new THREE.Mesh(new THREE.SphereGeometry(cornerR, 8, 6), skinMat);
+    c.position.set(0.04, sgn[0] * 0.05, sgn[1] * 0.04);
     grp.add(c);
   }
-  if (!isRight) grp.scale.x = -1;
+
+  // ===== FINGERS (four, curled into palm) =================================
+  // Knuckles arc — Y position descends, X position varies for the arc:
+  // middle highest+forward, index next, ring slightly back, pinky low+back.
+  const fingers = [
+    { name: 'index',  yK:  0.040, xK: 0.075, depth: 0.085, w: 0.020, len: 0.07 },
+    { name: 'middle', yK:  0.014, xK: 0.082, depth: 0.085, w: 0.022, len: 0.075 },
+    { name: 'ring',   yK: -0.012, xK: 0.077, depth: 0.085, w: 0.020, len: 0.07 },
+    { name: 'pinky',  yK: -0.038, xK: 0.067, depth: 0.082, w: 0.017, len: 0.06 },
+  ];
+  for (const f of fingers) {
+    // Proximal knuckle (the impact bump)
+    const kn = new THREE.Mesh(new THREE.SphereGeometry(f.w * 1.25, 12, 10), knuckMat);
+    kn.position.set(f.xK, f.yK, 0);
+    kn.scale.set(0.9, 1.0, 1.05);
+    grp.add(kn);
+    // Proximal phalanx — extends forward from knuckle a short distance
+    const prox = new THREE.Mesh(new THREE.CylinderGeometry(f.w, f.w * 0.95, f.len * 0.55, 10), skinMat);
+    prox.rotation.z = Math.PI / 2;
+    prox.position.set(f.xK + 0.018, f.yK, 0.022);
+    grp.add(prox);
+    // Mid-finger fold (pip joint)
+    const midKn = new THREE.Mesh(new THREE.SphereGeometry(f.w * 1.0, 10, 8), skinMat);
+    midKn.position.set(f.xK + 0.030, f.yK, 0.045);
+    grp.add(midKn);
+    // Distal phalanx — curls back toward palm (fingertip rests on palm)
+    const dist = new THREE.Mesh(new THREE.CylinderGeometry(f.w * 0.85, f.w * 0.7, f.len * 0.55, 10), skinMat);
+    dist.position.set(f.xK + 0.013, f.yK, 0.063);
+    dist.rotation.x = -Math.PI / 2 + 0.3;
+    grp.add(dist);
+    // Fingernail crease — tiny dark line on the curl
+    const crease = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.004, 0.001), veinMat);
+    crease.position.set(f.xK + 0.005, f.yK, 0.078);
+    crease.rotation.x = -0.4;
+    grp.add(crease);
+  }
+
+  // ===== THUMB (wraps over front of fingers, diagonally) ==================
+  // Anatomy: thumb base sits on the index side of the palm, then folds across
+  // the front of the curled index/middle fingers.
+  const thumbBase = new THREE.Mesh(new THREE.SphereGeometry(0.026, 10, 8), skinMat);
+  thumbBase.position.set(0.020, 0.038, 0.040);
+  grp.add(thumbBase);
+  const thumbProx = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.020, 0.058, 10), skinMat);
+  thumbProx.position.set(0.050, 0.030, 0.060);
+  thumbProx.rotation.z = -0.7;
+  thumbProx.rotation.y = -0.4;
+  grp.add(thumbProx);
+  const thumbDist = new THREE.Mesh(new THREE.CylinderGeometry(0.020, 0.017, 0.046, 10), skinMat);
+  thumbDist.position.set(0.078, 0.020, 0.054);
+  thumbDist.rotation.z = -0.3;
+  thumbDist.rotation.y = -0.6;
+  grp.add(thumbDist);
+  const thumbTip = new THREE.Mesh(new THREE.SphereGeometry(0.018, 10, 8), skinMat);
+  thumbTip.position.set(0.094, 0.012, 0.040);
+  grp.add(thumbTip);
+  // Thumb knuckle bump (visible from outside)
+  const thumbKn = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 8), knuckMat);
+  thumbKn.position.set(0.068, 0.026, 0.062);
+  grp.add(thumbKn);
+
+  // ===== STONE DETAILING (back of hand + forearm shards) ==================
+  if (shardMat) {
+    // A couple of subtle jagged rock plates riding the back of the hand.
+    for (let i = 0; i < 3; i++) {
+      const s = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.034, 4), shardMat);
+      s.position.set(0.015 + i * 0.018, 0.038 - i * 0.026, -0.045);
+      s.rotation.set(Math.PI / 2 - 0.5, Math.random() * 0.5, 0);
+      grp.add(s);
+    }
+    // Forearm shroud shards — small spike nubs.
+    for (let i = 0; i < 3; i++) {
+      const s = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.030, 4), shardMat);
+      s.position.set(-0.05 - i * 0.04, 0.06, 0);
+      s.rotation.set(Math.PI / 2, 0, 0);
+      grp.add(s);
+    }
+  }
+
+  // ===== GLOWING FISSURES =================================================
+  // Subtle, not the loud version from before. Tracks across back of hand + sleeve.
+  const fiss = (x, y, z, len, ang) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(len, 0.005, 0.005), crackMat);
+    m.position.set(x, y, z);
+    m.rotation.z = ang;
+    grp.add(m);
+  };
+  fiss(0.040, 0.020, -0.050, 0.060, 0.4);
+  fiss(0.025, -0.010, -0.050, 0.045, -0.3);
+  fiss(-0.060, 0.045, 0.0, 0.080, 0.0);
+  fiss(-0.140, -0.040, 0.0, 0.060, 0.2);
+
+  // Apply uniform scale (callers can shrink the whole fist for thumbnail/scale).
+  grp.scale.setScalar(scale);
   return grp;
 }
 
-// === C: Realistic Plate-Armor Gauntlet ======================================
-function buildHandC(isRight) {
-  const plateMat = new THREE.MeshStandardMaterial({ color: 0x2d6f3e, metalness: 0.85, roughness: 0.28 });
-  const trimMat = new THREE.MeshStandardMaterial({ color: 0xd0b860, metalness: 0.9, roughness: 0.2 });
-  const leatherMat = new THREE.MeshStandardMaterial({ color: 0x3a2a1e, roughness: 0.9 });
-  const coreMat = new THREE.MeshBasicMaterial({ color: 0x66ffaa });
-  const grp = new THREE.Group();
-
-  // Forearm: tapered cuirass style with overlapping plates.
-  const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.13, 0.55, 18), plateMat);
-  forearm.rotation.z = Math.PI / 2; forearm.position.set(-0.45, 0, 0);
-  grp.add(forearm);
-  // Overlapping segmented plates (3 bands)
-  for (let i = 0; i < 3; i++) {
-    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.14, 18, 1, true), plateMat);
-    band.rotation.z = Math.PI / 2;
-    band.position.set(-0.65 + i * 0.18, 0, 0);
-    grp.add(band);
-  }
-  // Trim rings between bands
-  for (let i = 0; i < 3; i++) {
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.012, 8, 22), trimMat);
-    ring.rotation.y = Math.PI / 2;
-    ring.position.set(-0.55 + i * 0.18, 0, 0);
-    grp.add(ring);
-  }
-  // Leather grip on inside of forearm
-  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.50, 0.10, 0.04), leatherMat);
-  grip.position.set(-0.45, -0.13, 0);
-  grp.add(grip);
-  // Glowing core line along forearm top
-  const core = new THREE.Mesh(new THREE.BoxGeometry(0.50, 0.020, 0.020), coreMat);
-  core.position.set(-0.45, 0.13, 0);
-  grp.add(core);
-  // Knuckle articulation: separate plates per finger
-  const knucks = new THREE.Group();
-  for (let i = 0; i < 4; i++) {
-    const yOff = 0.13 - i * 0.085;
-    // Articulated knuckle plate
-    const plate = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.075, 0.16), plateMat);
-    plate.position.set(0.16, yOff, 0);
-    knucks.add(plate);
-    // Spike on each
-    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.10, 4), trimMat);
-    spike.rotation.z = -Math.PI / 2;
-    spike.position.set(0.26, yOff, 0);
-    knucks.add(spike);
-    // Finger plate (curls back)
-    const fingerPlate = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.07, 0.14), plateMat);
-    fingerPlate.position.set(0.14, yOff, 0.13);
-    fingerPlate.rotation.x = -0.6;
-    knucks.add(fingerPlate);
-    // Tip plate
-    const tipPlate = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.06), plateMat);
-    tipPlate.position.set(0.05, yOff, 0.18);
-    knucks.add(tipPlate);
-  }
-  grp.add(knucks);
-  // Thumb plate
-  const thumbPlate = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.10, 0.18), plateMat);
-  thumbPlate.position.set(0.10, -0.10, 0.14);
-  thumbPlate.rotation.z = -0.4;
-  thumbPlate.rotation.y = -0.5;
-  grp.add(thumbPlate);
-  // Palm plate
-  const palmPlate = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.32, 0.06), plateMat);
-  palmPlate.position.set(0.0, 0, 0.15);
-  grp.add(palmPlate);
-  // Wrist torus accent
-  const wristRing = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.022, 10, 22), trimMat);
-  wristRing.rotation.y = Math.PI / 2;
-  wristRing.position.set(-0.18, 0, 0);
-  grp.add(wristRing);
-
-  if (!isRight) grp.scale.x = -1;
-  return grp;
+function makeStoneMaterials() {
+  return {
+    skinMat: new THREE.MeshStandardMaterial({
+      color: 0x4a6845, roughness: 0.98, metalness: 0.05,
+      emissive: 0x081008, emissiveIntensity: 0.10,
+    }),
+    knuckMat: new THREE.MeshStandardMaterial({
+      color: 0x5a7b54, roughness: 0.85, metalness: 0.02,
+      emissive: 0x33ff66, emissiveIntensity: 0.35,
+    }),
+    veinMat: new THREE.MeshBasicMaterial({ color: 0x223322 }),
+    shardMat: new THREE.MeshStandardMaterial({ color: 0x4a5a44, roughness: 1.0 }),
+    crackMat: new THREE.MeshBasicMaterial({ color: 0x88ee77 }),
+  };
 }
 
-function mountFists(scene, factory) {
-  const left  = factory(false); left.position.set(-0.55, 0.45, 0);  scene.add(left);
-  const right = factory(true);  right.position.set( 0.55, 0.45, 0); scene.add(right);
+function buildPair(scene, posY, includeForearm) {
+  const matsR = makeStoneMaterials();
+  const matsL = makeStoneMaterials();
+  const right = buildAnatomicalStoneFist({ ...matsR, includeForearm });
+  right.position.set(0.55, posY, 0);
+  scene.add(right);
+  const left = buildAnatomicalStoneFist({ ...matsL, includeForearm });
+  left.position.set(-0.55, posY, 0);
+  left.scale.x *= -1;
+  scene.add(left);
+  return { right, left };
 }
 
-function setupCanvas(id, factory) {
+function setupCanvas(id, opts) {
   const canvas = document.getElementById(id);
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(2, devicePixelRatio));
-  const cam = new THREE.PerspectiveCamera(36, 1, 0.05, 50);
-  cam.position.set(0, 0.6, 3.4);
-  cam.lookAt(0, 0.55, 0);
+  const cam = new THREE.PerspectiveCamera(opts.fov ?? 36, 1, 0.05, 50);
+  cam.position.copy(opts.camPos);
+  cam.lookAt(opts.camLook);
   const fit = () => {
     const w = canvas.clientWidth, h = canvas.clientHeight;
     renderer.setSize(w, h, false);
     cam.aspect = w / h; cam.updateProjectionMatrix();
   };
-  const scene = buildScene();
-  mountFists(scene, factory);
+  const scene = buildScene(opts.includeStick);
+  buildPair(scene, opts.handY ?? 0.40, true);
   fit();
   window.addEventListener('resize', fit);
   let drag = false, lastX = 0, lastY = 0, yaw = 0, pitch = 0;
@@ -332,22 +260,38 @@ function setupCanvas(id, factory) {
     lastX = e.clientX; lastY = e.clientY;
   });
   let t = 0;
+  const center = opts.camLook;
+  const r = opts.camPos.length() * 0.95;
   function tick() {
     t += 0.005;
-    const auto = drag ? 0 : t * 0.5;
-    const r = 3.4;
+    const auto = drag ? 0 : t * 0.45;
     const ang = yaw + auto;
-    cam.position.set(Math.sin(ang) * r * Math.cos(pitch), 0.6 + Math.sin(pitch) * r, Math.cos(ang) * r * Math.cos(pitch));
-    cam.lookAt(0, 0.55, 0);
+    cam.position.set(
+      center.x + Math.sin(ang) * r * Math.cos(pitch),
+      center.y + Math.sin(pitch) * r,
+      center.z + Math.cos(ang) * r * Math.cos(pitch),
+    );
+    cam.lookAt(center);
     renderer.render(scene, cam);
     requestAnimationFrame(tick);
   }
   tick();
 }
 
-setupCanvas('a', buildHandA);
-setupCanvas('b', buildHandB);
-setupCanvas('c', buildHandC);
+setupCanvas('ig', {
+  includeStick: true,
+  handY: 0.40,
+  camPos: new THREE.Vector3(0, 0.6, 2.4),
+  camLook: new THREE.Vector3(0, 0.55, 0),
+  fov: 38,
+});
+setupCanvas('dt', {
+  includeStick: false,
+  handY: 0,
+  camPos: new THREE.Vector3(0.55, 0.05, 0.55),
+  camLook: new THREE.Vector3(0.55, 0.0, 0),
+  fov: 30,
+});
 </script>
 </body>
 </html>
