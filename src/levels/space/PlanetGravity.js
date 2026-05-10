@@ -17,7 +17,7 @@ import * as CANNON from 'cannon-es';
 
 export function makePlanetGravity(level, game) {
   const G = 1.0;             // global tuning constant
-  const STICK_BONUS = 1.3;   // grounded multiplier (magnet effect)
+  const STICK_BONUS = 1.0;   // grounded multiplier (1.0 = off; raise once solver is stable)
   return function applyPlanetGravity() {
     const planets = level.planets;
     if (!planets.length) return;

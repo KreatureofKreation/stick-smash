@@ -1322,10 +1322,16 @@ export class Stickman {
     let delta = targetAngle - curAngle;
     while (delta > Math.PI) delta -= Math.PI * 2;
     while (delta < -Math.PI) delta += Math.PI * 2;
-    const rate = 12;          // rad/s — tunable feel
+    const rate = 8;           // rad/s — gentler so capsule doesn't whip the sphere collider
     const step = clamp(delta, -rate * dt, rate * dt);
     const newAngle = curAngle + step;
     this.body.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 0, 1), newAngle);
+    // Kill any angular velocity Rapier integrated. We own rotation explicitly
+    // via the slerp; if Rapier picks up spin from solver contacts we'd fight
+    // it, causing rig + capsule jitter that reads as "squishing."
+    this.body.angularVelocity.x = 0;
+    this.body.angularVelocity.y = 0;
+    this.body.angularVelocity.z = 0;
   }
 
   _syncRig(dt, ragdoll) {

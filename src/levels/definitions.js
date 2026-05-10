@@ -1094,7 +1094,7 @@ export const LEVELS = [
     cameraClamp: { x: [-30, 30], y: [-25, 25], zoom: [12, 30] },
     killBound: { x: 30, y: 25 },
     planets: [
-      { id: 'p1', cx: 0, cy: 0, radius: 5.0, mantleRadius: 3.5, coreRadius: 1.6, mass: 60 },
+      { id: 'p1', cx: 0, cy: 0, radius: 5.0, mantleRadius: 3.5, coreRadius: 1.6, mass: 40 },
     ],
     tiles: [],
     hazards: [],
