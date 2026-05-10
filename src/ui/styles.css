@@ -178,3 +178,33 @@ body.portrait::after {
 }
 @keyframes spin { 0%, 100% { transform: translate(-50%, 0) rotate(0); } 50% { transform: translate(-50%, 0) rotate(-90deg); } }
 
+/* Local-MP per-player strip — one slot per screen corner. P1=top-left,
+   P2=top-right, P3=bottom-left, P4=bottom-right. Slots without a player
+   stay display:none and don't affect layout. */
+.local-strips { position: absolute; inset: 0; pointer-events: none; }
+.local-strip {
+  position: absolute;
+  display: flex; flex-direction: column; gap: 6px;
+  background: rgba(0,0,0,0.42);
+  border: 1px solid var(--c, var(--panel-border));
+  border-radius: 12px;
+  padding: 8px 12px;
+  backdrop-filter: blur(6px);
+  min-width: 180px;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.3), 0 0 20px -8px var(--c, transparent);
+}
+.local-strip .ls-name { font-weight: 800; letter-spacing: 1px; font-size: 12px; color: var(--c, #fff); text-shadow: 0 1px 2px rgba(0,0,0,0.7); }
+.local-strip .ls-hp-bar { position: relative; height: 16px; background: rgba(0,0,0,0.6); border-radius: 8px; overflow: hidden; border: 1px solid var(--panel-border); }
+.local-strip .ls-hp-fill { position: absolute; inset: 0; width: 100%; transition: width 0.18s ease-out, background 0.3s; }
+.local-strip .ls-armor-fill { position: absolute; inset: 0; width: 0%; background: linear-gradient(180deg, #c0c8d8, #707888); opacity: 0.85; transition: width 0.18s ease-out; }
+.local-strip .ls-hp-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 11px; letter-spacing: 1px; text-shadow: 0 1px 2px rgba(0,0,0,0.8); font-variant-numeric: tabular-nums; z-index: 1; }
+.local-strip .ls-weapon { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.local-strip .ls-weapon .ls-ico { font-size: 16px; }
+.local-strip .ls-weapon .ls-name-w { font-weight: 700; }
+.local-strip .ls-weapon .ls-ammo { opacity: 0.7; font-variant-numeric: tabular-nums; }
+
+.local-strip.slot-0 { top: max(12px, var(--safe-t)); left: max(12px, var(--safe-l)); }
+.local-strip.slot-1 { top: max(12px, var(--safe-t)); right: max(12px, var(--safe-r)); }
+.local-strip.slot-2 { bottom: max(12px, var(--safe-b)); left: max(12px, var(--safe-l)); }
+.local-strip.slot-3 { bottom: max(12px, var(--safe-b)); right: max(12px, var(--safe-r)); }
+
