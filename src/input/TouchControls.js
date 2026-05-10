@@ -225,13 +225,13 @@ export class TouchControls {
       const rawDx = x - startX;
       const rawDy = y - startY;
       const rawMag = Math.hypot(rawDx, rawDy);
-      if (!dragged && rawMag > ATTACK_DRAG_PX) dragged = true;
+      // Sensitivity scales the drag threshold inversely. Higher sens = smaller
+      // drag needed to commit (more responsive). Lower sens = larger drag needed
+      // (more deliberate). aimDir itself is a unit vector — magnitude doesn't
+      // affect direction after normalization.
+      const threshold = ATTACK_DRAG_PX / Math.max(this.aimSensitivity, 0.01);
+      if (!dragged && rawMag > threshold) dragged = true;
       if (dragged && rawMag > 0) {
-        // aimDir is a normalized unit vector — direction only, no magnitude.
-        // Sensitivity does not affect a unit vector after normalization, so it is
-        // not applied here. (The spec keeps `aimSensitivity` for a future use case
-        // where partial-drag committing or snapping is added; it remains read by
-        // applySettings() so the slider value is preserved.)
         this.aimDir.x = rawDx / rawMag;
         this.aimDir.y = -rawDy / rawMag;
         this.snapshot.aimX = this.aimDir.x;
