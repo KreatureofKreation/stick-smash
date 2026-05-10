@@ -1149,20 +1149,23 @@ export class HulkHands extends Weapon {
     if (rig.handR) { rig.handR.getWorldPosition(tmpR); hasR = true; }
     if (rig.handL) { rig.handL.getWorldPosition(tmpL); hasL = true; }
     const facing = player.facing >= 0 ? 1 : -1;
+    // Both fists punch forward — knuckles must point in the facing
+    // direction. The geometry is built knuckles-at-+X, so scale.x = facing
+    // flips the whole fist when the player turns left. Don't mirror the
+    // left fist independently; that left it pointing backwards relative to
+    // the player when facing right.
     if (this._fistR && hasR) {
       this._fistR.position.set(tmpR.x, tmpR.y, 0);
       this._fistR.rotation.set(0, 0, 0);
-      this._fistR.scale.x = HULK_FIST_SCALE * facing;
-      this._fistR.scale.y = HULK_FIST_SCALE;
-      this._fistR.scale.z = HULK_FIST_SCALE;
+      this._fistR.scale.set(HULK_FIST_SCALE * facing, HULK_FIST_SCALE, HULK_FIST_SCALE);
     }
     if (this._fistL && hasL) {
       this._fistL.position.set(tmpL.x, tmpL.y, 0);
       this._fistL.rotation.set(0, 0, 0);
-      // Mirror on the X axis — this is the LEFT fist.
-      this._fistL.scale.x = -HULK_FIST_SCALE * facing;
-      this._fistL.scale.y = HULK_FIST_SCALE;
-      this._fistL.scale.z = HULK_FIST_SCALE;
+      // Mirror on Y so the thumb sits on the opposite side of the left
+      // fist vs the right (right hand has thumb on top in our build) —
+      // keeps both fists punching forward but visually distinct as a pair.
+      this._fistL.scale.set(HULK_FIST_SCALE * facing, -HULK_FIST_SCALE, HULK_FIST_SCALE);
     }
     // During a pound, trail green particles from the active fist.
     if (this._poundActive && Math.random() < 0.7 && this.game?.fx?.particles?.spark) {
