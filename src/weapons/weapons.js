@@ -1134,20 +1134,30 @@ export class HulkHands extends Weapon {
     if (!player) return;
     const rig = player.rig;
     if (!rig) return;
-    // Pin each fist to its corresponding hand world position. Existing
-    // weapons rely on rig hand positions reading as world coords (they do
-    // in flat-gravity levels), so reuse the same convention.
+    // Reset the parent mesh to origin — child fists position themselves in
+    // world space. Without this the parent's stale position (carried over
+    // from when the weapon was a free body before pickup) offsets both
+    // fists by the original spawn point.
+    this.mesh.position.set(0, 0, 0);
+    this.mesh.rotation.set(0, 0, 0);
+    // Compute hand world positions via getWorldPosition. The rig parents
+    // joints to rig.group, whose transform is identity in flat-gravity but
+    // body-following in curved-gravity. getWorldPosition handles both.
+    const tmpR = (this._tmpR ||= new THREE.Vector3());
+    const tmpL = (this._tmpL ||= new THREE.Vector3());
+    let hasR = false, hasL = false;
+    if (rig.handR) { rig.handR.getWorldPosition(tmpR); hasR = true; }
+    if (rig.handL) { rig.handL.getWorldPosition(tmpL); hasL = true; }
     const facing = player.facing >= 0 ? 1 : -1;
-    const handR = rig.handR?.position, handL = rig.handL?.position;
-    if (this._fistR && handR) {
-      this._fistR.position.set(handR.x, handR.y, 0);
+    if (this._fistR && hasR) {
+      this._fistR.position.set(tmpR.x, tmpR.y, 0);
       this._fistR.rotation.set(0, 0, 0);
       this._fistR.scale.x = HULK_FIST_SCALE * facing;
       this._fistR.scale.y = HULK_FIST_SCALE;
       this._fistR.scale.z = HULK_FIST_SCALE;
     }
-    if (this._fistL && handL) {
-      this._fistL.position.set(handL.x, handL.y, 0);
+    if (this._fistL && hasL) {
+      this._fistL.position.set(tmpL.x, tmpL.y, 0);
       this._fistL.rotation.set(0, 0, 0);
       // Mirror on the X axis — this is the LEFT fist.
       this._fistL.scale.x = -HULK_FIST_SCALE * facing;
