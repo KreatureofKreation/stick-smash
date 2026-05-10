@@ -40,13 +40,24 @@ Aim direction is a **sticky 2D unit vector** (`aimDir = {x, y}`) that persists i
 **Melee weapons** follow same rule — swing direction = `aimDir`. Confirmed in brainstorm.
 
 ### Throw (no dedicated button)
-Folded into Grab — mirrors existing PC behavior:
+Two distinct throws fold into the Grab button:
 
+**Throw grabbed thing (player/crate)** — mirrors existing PC behavior:
 - **Tap Grab next to a thing** → grab.
 - **Release Grab with no left-joy input** → drop in place.
 - **Release Grab with left-joy held** → throw in joy direction at moment of release.
 
 Right-thumb (Grab) and left-thumb (joy) operate independently — no conflict.
+
+**Throw wielded weapon (PC `Q` parity)** — swipe-from-Grab. Symmetric with drag-from-Attack:
+- **Tap Grab** (touch-down + release within 20px movement) → grab nearby thing / drop held thing. Same as today.
+- **Hold Grab still** (held but finger doesn't move) → continuous grab on while held. Lets the player walk a grabbed player around with the left joy. Same as today.
+- **Hold Grab + drag finger >20px from start + release** → emits `throw=true` for one frame on release, triggers `_throwWeapon()` which fires the wielded weapon in the swipe direction. The regular grab/drop logic is suppressed for that touch so it doesn't double-fire.
+- If the player has no wielded weapon, swipe is a no-op (no error, no grab side effect).
+
+The 20px threshold matches the drag-from-Attack threshold for consistency. Throw-weapon direction is the swipe vector (from touch-down to release), normalized; this is independent of `aimDir` to keep the gesture's intent obvious.
+
+This keeps the cluster at 4 buttons while preserving full PC-parity weapon-throwing.
 
 ### Action buttons
 4 buttons in a thumb arc on the right side (sized + positioned by §Layout). All single-fire (`attack`, `jump`, `grab`, `special`) plus drag-aim on Attack only.
@@ -125,6 +136,7 @@ New file `src/ui/TutorialOverlay.js` (~150 lines, no deps).
   2. Right thumb taps Attack twice — caption: "tap to attack"
   3. Right thumb holds Attack, drags arc, releases — caption: "hold + drag to aim"
   4. Right thumb holds Grab on a thing, left thumb pushes joy in chosen direction, right thumb releases Grab — caption: "release grab + push = throw"
+  5. Right thumb on Grab, swipes diagonally and releases — caption: "swipe grab to throw weapon"
 - Skip button (top-right corner) dismisses immediately.
 - Auto-dismiss after final step.
 - Sets `localStorage.touch_tutorial_done = '1'` on dismissal.
@@ -150,7 +162,7 @@ New "Mobile Controls" section in existing Settings panel. Persisted to `localSto
 
 | File | Change |
 |---|---|
-| `src/input/TouchControls.js` | Rewrite. Replace AIM toggle + Throw button with 4-button thumb-arc cluster + drag-from-Attack aim. Track sticky `aimDir`. Tap vs drag classification by 12px threshold. Apply Settings sensitivity. |
+| `src/input/TouchControls.js` | Rewrite. Replace AIM toggle + Throw button with 4-button thumb-arc cluster + drag-from-Attack aim + swipe-from-Grab throw. Track sticky `aimDir`. Tap vs drag classification by 12px threshold on Attack, 20px on Grab. Apply Settings sensitivity. Suppress grab toggle on swipe-classified Grab touches. |
 | `src/input/Input.js` | Touch path always sets `aimX/aimY/aimActive=true` (sticky). Remove `aimActive` toggle gate (always active). No new fields. |
 | `src/Game.js` | Wire haptic calls into damage handler (hit landed/taken), jump handler (ground only), special activation. Wrap `navigator.vibrate?.()` with feature + Settings check. Verify grab release-with-joy throw path matches PC parity (likely no change). |
 | `src/ui/styles.css` | Rewrite touch button styles (low-opacity resting, pressed states, squash + overshoot keyframes, radial ripple ::before). Add `--btn-scale` CSS var. Add `.touch.left-handed` mirror class. Drop `.tbtn.throw`, `.tbtn.aim` rules. |
