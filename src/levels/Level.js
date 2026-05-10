@@ -36,6 +36,14 @@ export class Tile {
     // Optional Z-axis rotation (radians) for tilted decorative shards (e.g., crystal spire).
     // Applied to both the physics body and mesh before the static-tile matrix bake.
     this.rotZ = opts.rotZ ?? 0;
+    // Optional parent-tile reference for stacked/segmented props (e.g. crystal
+    // spire sections). Format: 'x,y' string matching another tile's key. When
+    // the parent tile is destroyed (or itself made dynamic), this child is
+    // converted to a falling dynamic body via Level._dropSuspendedTile, and
+    // the cascade recurses into this child's own children.
+    this.parentTileKey = opts.parentTileKey ?? null;
+    this._children = new Set();
+    this._dropped = false;
     this.body = null;
     this.mesh = null;
     this._chainSuspension = null;  // { anchorBody, segs:[], constraints:[] }
@@ -140,6 +148,13 @@ export class Tile {
   destroy() {
     const x = this.body?.position?.x ?? this.gx * TILE;
     const y = this.body?.position?.y ?? this.gy * TILE;
+    // Cascade: drop any tiles that named this one as their parent. Each
+    // child becomes dynamic and will recursively drop its own children via
+    // Level._dropSuspendedTile.
+    if (this._children?.size > 0) {
+      for (const child of this._children) this.level._dropSuspendedTile(child);
+      this._children.clear();
+    }
     // Tear down chain suspension first — sever every chain seg + the anchor
     // mesh/body, then remove the constraint chain. The seg destroys also
     // clean up their own constraints.
@@ -586,6 +601,16 @@ export class Level {
       tile.build(this.scene, this.physics);
     }
 
+    // Wire parent-child relationships for stacked/segmented tiles. Done in a
+    // second pass so a child can reference a parent that appears later in the
+    // tiles array. Parent key is the literal 'x,y' string of the parent tile.
+    for (const tile of this.tiles.values()) {
+      if (!tile.parentTileKey) continue;
+      const parent = this.tiles.get(tile.parentTileKey);
+      if (parent) parent._children.add(tile);
+      else console.warn(`Tile ${tile._key} parentTileKey '${tile.parentTileKey}' not found`);
+    }
+
     // Space-level: build planets from the config.
     if (this.curvedGravity) {
       for (const cfg of this.planetConfigs) {
@@ -903,9 +928,11 @@ export class Level {
     tile._chainSuspension = { anchorBody, anchorMesh, segs, constraints };
   }
 
-  // Convert a chain-suspended static tile into a falling dynamic body.
-  // Called by ChainSeg.onBreak the first time any link in its suspension
-  // chain dies. Idempotent: subsequent links breaking are no-ops.
+  // Convert a chain-suspended OR parent-stacked static tile into a falling
+  // dynamic body. Called by ChainSeg.onBreak when a suspension chain dies,
+  // and by Tile.destroy() when a parent in a parentTileKey stack is broken.
+  // Idempotent: re-calls are no-ops. Cascades recursively into children so a
+  // segmented stack collapses top-to-bottom in one shot.
   _dropSuspendedTile(tile) {
     if (!tile || tile._dropped || !tile.body) return;
     tile._dropped = true;
@@ -924,6 +951,11 @@ export class Level {
     // anchor while the body falls.
     if (tile.mesh) tile.mesh.matrixAutoUpdate = true;
     this._dynamicTiles.add(tile);
+    // Cascade into children — when a parent goes dynamic, anything stacked
+    // on top of it should also drop.
+    if (tile._children?.size > 0) {
+      for (const child of tile._children) this._dropSuspendedTile(child);
+    }
   }
   _aabbOverlap(pos, body, h) {
     const px = pos.x, py = pos.y;
