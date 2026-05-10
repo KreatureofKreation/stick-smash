@@ -1010,76 +1010,113 @@ export const LEVELS = [
   },
 
   // ---------------------------------------------------------------------
-  // BOUNCE HOUSE — carnival party stage. Trampolines, balloons,
-  // spotlights. Friendly chaos.
+  // BOUNCE CASTLE — inflatable party castle. Twin pink towers, rainbow-
+  // arched gateway, crenellated battlements, flag tips. Symmetric tier
+  // stack inside. NO lava: pit of death via killBound. Yellow tiles are
+  // trampoline pads (visual marker for the future stronger-bounce
+  // material). Bouncy restitution lives in PhysicsWorld.js.
   // ---------------------------------------------------------------------
-  {
-    id: 'bounce',
-    name: 'Bounce House',
-    bgColor: 0x180830,
-    tiles: [
-      ...row(0, -10, 10, { material: 'bouncy', hp: 35, color: 0x88e8b8 }),
-      ...tough(-2, -8, 8, { color: 0x301050 }),
-      ...col(-10, 1, 4, { shape: 'box', w: 0.6, h: 1, material: 'bouncy', hp: 40, color: 0xffaaee }),
-      ...col(10,  1, 4, { shape: 'box', w: 0.6, h: 1, material: 'bouncy', hp: 40, color: 0xffaaee }),
-      // Tier 1 (y=3).
-      ...row(3, -7, -4, { material: 'bouncy', hp: 25, color: 0xffe488 }),
-      ...row(3,  4,  7, { material: 'bouncy', hp: 25, color: 0xffe488 }),
-      // Mid trampoline (y=6).
-      ...row(6, -2, 2,  { material: 'bouncy', hp: 25, color: 0xff88aa }),
-      // Tier 2 (y=9).
-      ...row(9, -3, -1, { material: 'bouncy', hp: 20, color: 0x88aaff }),
-      ...row(9,  1,  3, { material: 'bouncy', hp: 20, color: 0x88aaff }),
-      // Bell platform (y=11).
-      { x: 0, y: 11, shape: 'sphere', radius: 0.7, material: 'bouncy', hp: 30, color: 0xffffff },
-    ],
-    hazards: [
-      { kind: 'lava', x: 0, y: -5, w: 36, h: 1.4, dps: 50 },
-      { kind: 'pendulum', x: 0, y: 15, length: 3.5, amplitude: Math.PI / 3.5, speed: 1.5 },
-    ],
-    spawns: [
-      { x: -8, y: 1 }, { x: 8, y: 1 },
-      { x: -5, y: 4 }, { x: 5, y: 4 },
-      { x: 0, y: 7 },
-      { x: 0, y: 13 },
-    ],
-    weaponSpawns: [
-      { x: 0, y: 13 },                        // bell prize
-      { x: 0, y: 7 },
-      { x: -5, y: 4 }, { x: 5, y: 4 },
-      { x: -7, y: 1 }, { x: 7, y: 1 },
-    ],
-    background: [
-      bgGlow(0, 21, 50, 2, 0xff4488, -10),
-      bgGlow(0, 18, 50, 2, 0xff8844, -10),
-      bgGlow(0, 15, 50, 2, 0xffee44, -10),
-      bgGlow(0, 12, 50, 2, 0x88ff44, -10),
-      bgGlow(0, 9,  50, 2, 0x44aaff, -10),
-      bgGlow(0, 6,  50, 2, 0xaa44ff, -10),
-      bgGlow(-12, 16, 1.2, 18, 0xffeeaa, -8.5),
-      bgGlow(12,  16, 1.2, 18, 0xffeeaa, -8.5),
-      bgGlow(0,   18, 1.0, 16, 0xffffff, -8.5),
-      bgSphere(-12, 19, 0.5, 0xff4488, -7.5, { emissive: 0xff4488, emissiveIntensity: 0.6 }),
-      bgSphere(-10, 20, 0.5, 0xffee44, -7.5, { emissive: 0xffee44, emissiveIntensity: 0.6 }),
-      bgSphere(-8,  18.5, 0.5, 0x44aaff, -7.5, { emissive: 0x44aaff, emissiveIntensity: 0.6 }),
-      bgSphere(8,   19, 0.5, 0x88ff44, -7.5, { emissive: 0x88ff44, emissiveIntensity: 0.6 }),
-      bgSphere(10,  20, 0.5, 0xff4488, -7.5, { emissive: 0xff4488, emissiveIntensity: 0.6 }),
-      bgSphere(12,  18.5, 0.5, 0xaa44ff, -7.5, { emissive: 0xaa44ff, emissiveIntensity: 0.6 }),
-      bgSphere(0,   23, 0.6, 0xffffff, -7.5, { emissive: 0xffffff, emissiveIntensity: 0.7 }),
-      bg(-12, 17, 0.06, 3, 0xeeeeee, -7.4),
-      bg(-10, 18, 0.06, 3, 0xeeeeee, -7.4),
-      bg(-8,  16.5, 0.06, 3, 0xeeeeee, -7.4),
-      bg(8,   17, 0.06, 3, 0xeeeeee, -7.4),
-      bg(10,  18, 0.06, 3, 0xeeeeee, -7.4),
-      bg(12,  16.5, 0.06, 3, 0xeeeeee, -7.4),
-      bgGlow(-6, 13, 0.18, 0.18, 0xff8844, -6.5),
-      bgGlow(-2, 16, 0.18, 0.18, 0x88ff44, -6.5),
-      bgGlow(2,  14, 0.18, 0.18, 0xff4488, -6.5),
-      bgGlow(6,  17, 0.18, 0.18, 0xffee44, -6.5),
-      bgGlow(-4, 11, 0.18, 0.18, 0x44aaff, -6.5),
-      bgGlow(4,  10, 0.18, 0.18, 0xaa44ff, -6.5),
-    ],
-  },
+  ...(() => {
+    const RAIN = [0xff5566, 0xff9944, 0xffdd44, 0x55cc66, 0x4488ee, 0xaa66dd];
+    const WALL = 0xee88cc;
+    const TRAMP = 0xffee44;
+    const TIER = [0x66ddee, 0xff99cc, 0x99ee99, 0xffcc66];
+
+    const castleFrame = () => {
+      const t = [];
+      // Twin tower walls (x = ±13), inflated bouncy castle pillars.
+      for (let y = 0; y <= 18; y++) t.push({ x: -13, y, shape: 'box', w: 1.6, h: 1, material: 'bouncy', hp: 60, color: WALL });
+      for (let y = 0; y <= 18; y++) t.push({ x:  13, y, shape: 'box', w: 1.6, h: 1, material: 'bouncy', hp: 60, color: WALL });
+      // Crenellated tower tops (3 merlons each).
+      for (const dx of [-1, 0, 1]) t.push({ x: -13 + dx * 0.6, y: 19.5, shape: 'box', w: 0.5, h: 0.7, material: 'bouncy', hp: 50, color: WALL });
+      for (const dx of [-1, 0, 1]) t.push({ x:  13 + dx * 0.6, y: 19.5, shape: 'box', w: 0.5, h: 0.7, material: 'bouncy', hp: 50, color: WALL });
+      // Outer flanking stub walls.
+      t.push(...col(-15, 0, 5, { shape: 'box', w: 0.7, h: 1, material: 'bouncy', hp: 40, color: 0xffaaee }));
+      t.push(...col( 15, 0, 5, { shape: 'box', w: 0.7, h: 1, material: 'bouncy', hp: 40, color: 0xffaaee }));
+      // Ground floor with central gateway opening (x: -3..3 left clear).
+      t.push(...row(0, -11, -4, { material: 'bouncy', hp: 40, color: TIER[0] }));
+      t.push(...row(0,   4, 11, { material: 'bouncy', hp: 40, color: TIER[0] }));
+      return t;
+    };
+
+    const castleBg = () => {
+      const o = [];
+      // Rainbow arch: 6 nested half-rings. Each disc gets a unique z (no
+      // z-fight) — rendered outer red back, inner violet front.
+      for (let i = 0; i < 6; i++) {
+        const r = 7 - i * 0.65;
+        o.push(bgDisc(0, 4, r, RAIN[i], -9.5 + i * 0.05, { emissive: RAIN[i], emissiveIntensity: 0.5 }));
+      }
+      // Sky-color mask disc carves the rings into a true arch (hides the
+      // bottom half so they don't peek under the gateway floor).
+      o.push(bgDisc(0, 1.0, 8.0, 0x180830, -9.18));
+      // Sky panels (deep purple gradient).
+      o.push(bg(0, 22, 50, 8, 0x2a1050, -11));
+      o.push(bg(0, 12, 50, 12, 0x4818a0, -10.8));
+      // Tower interior shading.
+      o.push(bg(-13, 9, 1.6, 20, 0x5a1f4a, -8.5));
+      o.push(bg( 13, 9, 1.6, 20, 0x5a1f4a, -8.5));
+      // Flag poles + flags above tower tops.
+      o.push(bg(-13, 22, 0.1, 4, 0xeeeeee, -7.5));
+      o.push(bg( 13, 22, 0.1, 4, 0xeeeeee, -7.5));
+      o.push(bg(-12, 23.5, 1.4, 1.0, 0xff4488, -7.4));
+      o.push(bg( 14, 23.5, 1.4, 1.0, 0x44aaff, -7.4));
+      // Spotlights along upper sky line.
+      for (const x of [-10, -5, 0, 5, 10]) o.push(bgGlow(x, 22, 0.5, 0.5, 0xffeeaa, -8.5));
+      // Confetti dots (deterministic — no Math.random at module init).
+      const confetti = [
+        [-12, 7], [-9, 14], [-6, 18], [-3, 9], [-1, 16], [2, 11],
+        [4, 19], [7, 8], [10, 15], [12, 6], [-11, 12], [11, 20],
+        [-7, 11], [3, 14], [8, 17], [-2, 6], [1, 21], [-10, 18],
+        [9, 10], [-4, 17], [5, 12], [13, 9], [-13, 17], [0, 14],
+      ];
+      confetti.forEach(([cx, cy], i) => o.push(bgGlow(cx, cy, 0.18, 0.18, RAIN[i % 6], -7)));
+      // Distant carnival tent silhouettes flanking the castle.
+      o.push(bg(-22, 5, 4, 8, 0xee5566, -10.5));
+      o.push(bg( 22, 5, 4, 8, 0x4488ee, -10.5));
+      o.push(bgDisc(-22, 9, 2.4, 0xffeeaa, -10.4));
+      o.push(bgDisc( 22, 9, 2.4, 0xffeeaa, -10.4));
+      return o;
+    };
+
+    return [{
+      id: 'bounce',
+      name: 'Bounce Castle',
+      bgColor: 0x180830,
+      cameraClamp: { x: [-22, 22], y: [-8, 30], zoom: [12, 28] },
+      killBound: { x: 24, y: 30 },
+      tiles: [
+        ...castleFrame(),
+        // Tier 1 (y=4) — symmetric short bridges.
+        ...row(4, -8, -5, { material: 'bouncy', hp: 30, color: TIER[1] }),
+        ...row(4,  5,  8, { material: 'bouncy', hp: 30, color: TIER[1] }),
+        // Tier 2 (y=8) — wider center bridge.
+        ...row(8, -6,  6, { material: 'bouncy', hp: 30, color: TIER[2] }),
+        // Tier 3 (y=12) — symmetric short bridges + center trampoline pad.
+        ...row(12, -8, -5, { material: 'bouncy', hp: 30, color: TIER[3] }),
+        ...row(12,  5,  8, { material: 'bouncy', hp: 30, color: TIER[3] }),
+        { x: 0, y: 12, shape: 'box', w: 1.6, h: 0.6, material: 'bouncy', hp: 25, color: TRAMP },
+        // Tier 4 (y=16) — narrow top bridge.
+        ...row(16, -3, 3, { material: 'bouncy', hp: 25, color: 0xffffff }),
+        // Bell prize sphere atop center.
+        { x: 0, y: 18.2, shape: 'sphere', radius: 0.7, material: 'bouncy', hp: 30, color: 0xffffff },
+      ],
+      hazards: [],
+      spawns: [
+        { x: -9, y: 1 }, { x: 9, y: 1 },
+        { x: -7, y: 5 }, { x: 7, y: 5 },
+        { x:  0, y: 9 },
+        { x:  0, y: 17 },
+      ],
+      weaponSpawns: [
+        { x: 0, y: 18.5 },                   // bell prize
+        { x: 0, y: 9 },
+        { x: -7, y: 5 }, { x: 7, y: 5 },
+        { x: -7, y: 13 }, { x: 7, y: 13 },
+      ],
+      background: castleBg(),
+    }];
+  })(),
 
   // ---------------------------------------------------------------------
   // PLANET TEST — single planet for tuning curved-gravity feel.

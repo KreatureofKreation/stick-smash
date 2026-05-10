@@ -4,8 +4,9 @@
     {
       "name": "play",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["--yes", "serve@latest", "-p", "5173", "."],
-      "port": 5173
+      "runtimeArgs": ["--yes", "serve@latest", "."],
+      "port": 5173,
+      "autoPort": true
     }
   ]
 }
