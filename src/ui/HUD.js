@@ -1,4 +1,4 @@
-// In-game HUD: scoreboard, kill feed, weapon icon, center messages, FPS counter.
+// In-game HUD: scoreboard, kill feed, per-local HP+weapon strip, center messages, FPS counter.
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 export class HUD {
@@ -11,8 +11,14 @@ export class HUD {
         <div class="fps"></div>
       </div>
       <div class="kill-feed"></div>
-      <div class="weapon-icon" style="display:none"><div class="ico"></div><div class="name"></div><div class="ammo"></div></div>
-      <div class="hp-bar" style="display:none"><div class="hp-fill"></div><div class="armor-fill"></div><div class="hp-text"></div></div>
+      <div class="local-strips">
+        ${[0,1,2,3].map(i => `
+          <div class="local-strip slot-${i}" data-slot="${i}" style="display:none">
+            <div class="ls-name"></div>
+            <div class="ls-hp-bar"><div class="ls-hp-fill"></div><div class="ls-armor-fill"></div><div class="ls-hp-text"></div></div>
+            <div class="ls-weapon" style="display:none"><div class="ls-ico"></div><div class="ls-name-w"></div><div class="ls-ammo"></div></div>
+          </div>`).join('')}
+      </div>
       <div class="buffs"></div>
       <div class="dmg-flash"></div>
       <div class="time-vignette"></div>
@@ -21,18 +27,22 @@ export class HUD {
     this.dmgFlashEl = this.root.querySelector('.dmg-flash');
     this.buffsEl = this.root.querySelector('.buffs');
     this.vignetteEl = this.root.querySelector('.time-vignette');
-    this.hpEl = this.root.querySelector('.hp-bar');
-    this.hpFill = this.root.querySelector('.hp-fill');
-    this.armorFill = this.root.querySelector('.armor-fill');
-    this.hpText = this.root.querySelector('.hp-text');
     this.scoreEl = this.root.querySelector('.scoreboard');
     this.fpsEl = this.root.querySelector('.fps');
     this.feedEl = this.root.querySelector('.kill-feed');
-    this.weaponEl = this.root.querySelector('.weapon-icon');
-    this.weaponIco = this.weaponEl.querySelector('.ico');
-    this.weaponName = this.weaponEl.querySelector('.name');
-    this.weaponAmmo = this.weaponEl.querySelector('.ammo');
     this.centerEl = this.root.querySelector('#center-msg');
+    this.localStrips = [...this.root.querySelectorAll('.local-strip')].map(el => ({
+      root: el,
+      name: el.querySelector('.ls-name'),
+      hpBar: el.querySelector('.ls-hp-bar'),
+      hpFill: el.querySelector('.ls-hp-fill'),
+      armorFill: el.querySelector('.ls-armor-fill'),
+      hpText: el.querySelector('.ls-hp-text'),
+      weapon: el.querySelector('.ls-weapon'),
+      ico: el.querySelector('.ls-ico'),
+      nameW: el.querySelector('.ls-name-w'),
+      ammo: el.querySelector('.ls-ammo'),
+    }));
   }
 
   toast(text, ms = 1200) {
@@ -84,18 +94,43 @@ export class HUD {
     }
     this.scoreEl.innerHTML = html;
 
-    // Weapon
-    const local = this.game.localPlayer;
-    if (local && local.weapon) {
-      this.weaponEl.style.display = '';
-      this.weaponIco.textContent = local.weapon.icon || '⚔';
-      this.weaponName.textContent = local.weapon.name;
-      this.weaponAmmo.textContent = isFinite(local.weapon.ammo) ? `× ${local.weapon.ammo}` : '∞';
-    } else if (local) {
-      this.weaponEl.style.display = 'none';
+    // Per-local HP + weapon strips. Slot 0 = P1 (top-left), 1 = P2 (top-right),
+    // 2 = P3 (bottom-left), 3 = P4 (bottom-right).
+    const locals = this.game.localPlayers || (this.game.localPlayer ? [this.game.localPlayer] : []);
+    for (let i = 0; i < this.localStrips.length; i++) {
+      const slot = this.localStrips[i];
+      const p = locals[i];
+      if (!p) { slot.root.style.display = 'none'; continue; }
+      slot.root.style.display = '';
+      const hex = (p.character.primary ?? 0xffffff).toString(16).padStart(6, '0');
+      slot.root.style.setProperty('--c', `#${hex}`);
+      slot.name.textContent = p.name;
+      if (p.alive) {
+        slot.hpBar.style.display = '';
+        const pct = Math.max(0, p.health) / p.maxHealth;
+        slot.hpFill.style.width = `${pct * 100}%`;
+        const hue = pct > 0.5 ? 130 : pct > 0.25 ? 50 : 0;
+        slot.hpFill.style.background = `linear-gradient(180deg, hsl(${hue} 80% 60%), hsl(${hue} 70% 40%))`;
+        const armorPct = p.armor / p.maxArmor;
+        slot.armorFill.style.width = `${armorPct * 100}%`;
+        slot.hpText.textContent = p.armor > 0
+          ? `${Math.ceil(p.armor)} 🛡 ${Math.ceil(Math.max(0, p.health))} / ${p.maxHealth}`
+          : `${Math.ceil(Math.max(0, p.health))} / ${p.maxHealth}`;
+      } else {
+        slot.hpBar.style.display = 'none';
+      }
+      if (p.weapon) {
+        slot.weapon.style.display = '';
+        slot.ico.textContent = p.weapon.icon || '⚔';
+        slot.nameW.textContent = p.weapon.name;
+        slot.ammo.textContent = isFinite(p.weapon.ammo) ? `× ${p.weapon.ammo}` : '∞';
+      } else {
+        slot.weapon.style.display = 'none';
+      }
     }
 
-    // Active buffs
+    // Active buffs — P1 only (single overlay).
+    const local = this.game.localPlayer;
     if (local && local.alive && this.buffsEl) {
       const now = performance.now();
       const buffs = [
@@ -118,6 +153,8 @@ export class HUD {
         html += `<div class="buff" style="border-color:${b.col};color:${b.col}"><span>${b.icon}</span><span>${sec}s</span></div>`;
       }
       this.buffsEl.innerHTML = html;
+    } else if (this.buffsEl) {
+      this.buffsEl.innerHTML = '';
     }
 
     // Bullet-time vignette
@@ -125,22 +162,6 @@ export class HUD {
       const owner = this.game.timeSlowOwner;
       const slow = owner?.alive && performance.now() < owner.timeSlowUntil;
       this.vignetteEl.style.opacity = slow ? '1' : '0';
-    }
-
-    // Health bar
-    if (local && local.alive) {
-      this.hpEl.style.display = '';
-      const pct = Math.max(0, local.health) / local.maxHealth;
-      this.hpFill.style.width = `${pct * 100}%`;
-      const hue = pct > 0.5 ? 130 : pct > 0.25 ? 50 : 0;
-      this.hpFill.style.background = `linear-gradient(180deg, hsl(${hue} 80% 60%), hsl(${hue} 70% 40%))`;
-      const armorPct = local.armor / local.maxArmor;
-      this.armorFill.style.width = `${armorPct * 100}%`;
-      this.hpText.textContent = local.armor > 0
-        ? `${Math.ceil(local.armor)} 🛡 ${Math.ceil(Math.max(0, local.health))} / ${local.maxHealth}`
-        : `${Math.ceil(Math.max(0, local.health))} / ${local.maxHealth}`;
-    } else if (this.hpEl) {
-      this.hpEl.style.display = 'none';
     }
 
     if (this._fpsAcc == null) { this._fpsAcc = 0; this._fpsN = 0; }
