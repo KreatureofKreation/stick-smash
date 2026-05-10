@@ -49,6 +49,7 @@ export class Game {
     this.level = null;
     this.levelId = 'arena';
     this.localPlayer = null;
+    this.localPlayers = []; // dense, P1 at [0]. localPlayer mirrors localPlayers[0] for back-compat.
     this.matchTimer = 0;
     this.weaponSpawnTimer = 0;
     this.killFeed = [];
@@ -185,20 +186,43 @@ export class Game {
     this.weaponSpawnTimer = 1.5;
 
     if (!asClient) {
-      // Local hero
+      // Local hero (P1) — keyboard + mouse.
       const hero = this._spawnPlayer({
         name: name || 'P1',
         character: rosterById(character || 'bolt'),
         isLocal: true,
+        inputSource: { kind: 'kb-mouse' },
       });
       this.localPlayer = hero;
+      this.localPlayers = [hero];
       this.character = hero.character;
 
-      // Bots
+      // Detect connected gamepads — each becomes one extra local player.
+      // Cap at 3 extras (P1 + 3 = 4 total humans).
       const used = new Set([hero.character.id]);
-      for (let i = 0; i < bots; i++) {
+      const gps = navigator.getGamepads?.() || [];
+      const padIndices = [];
+      for (let i = 0; i < gps.length && padIndices.length < 3; i++) {
+        if (gps[i] && gps[i].connected) padIndices.push(i);
+      }
+      for (let i = 0; i < padIndices.length; i++) {
         const pool = ROSTER.filter(c => !used.has(c.id));
-        const pick = pool[Math.floor(Math.random() * pool.length)] || ROSTER[i + 1];
+        const pick = pool[Math.floor(Math.random() * pool.length)] || ROSTER[(i + 1) % ROSTER.length];
+        used.add(pick.id);
+        const lp = this._spawnPlayer({
+          name: `P${i + 2}`,
+          character: pick,
+          isLocal: true,
+          inputSource: { kind: 'gamepad', gamepadIdx: padIndices[i] },
+        });
+        this.localPlayers.push(lp);
+      }
+
+      // Bots fill remaining slots — locals replace bots one-for-one.
+      const remainingBots = Math.max(0, (bots ?? 0) - padIndices.length);
+      for (let i = 0; i < remainingBots; i++) {
+        const pool = ROSTER.filter(c => !used.has(c.id));
+        const pick = pool[Math.floor(Math.random() * pool.length)] || ROSTER[(i + 1) % ROSTER.length];
         used.add(pick.id);
         const bsm = this._spawnPlayer({
           name: pick.name,
@@ -210,8 +234,7 @@ export class Game {
 
       // Net players added later via startMatchAsHost.
     } else {
-      // Client: build proxy players from snapshot
-      // Spawn empty roster — actual state populated by host snapshots
+      // Client: build proxy players from snapshot.
       for (let i = 0; i < 8; i++) this.players.push(null);
     }
 
@@ -259,6 +282,7 @@ export class Game {
     for (const p of this.pickups) p.destroy?.();
     for (const p of this.projectiles) p.destroy?.();
     this.players = []; this.weapons = []; this.pickups = []; this.projectiles = [];
+    this.localPlayers = [];
     // Clear scene of static lights and bg props
     while (this.scene.children.length > 0) this.scene.remove(this.scene.children[0]);
     // Re-add particles
@@ -379,11 +403,11 @@ export class Game {
     return sp;
   }
 
-  _spawnPlayer({ name, character, isLocal = false, isBot = false, isNet = false }) {
+  _spawnPlayer({ name, character, isLocal = false, isBot = false, isNet = false, inputSource = null }) {
     const sp = this._pickSpawn();
     const id = this.players.length;
     const sm = new Stickman(this.physics, this.scene, {
-      id, name, character, isLocal, isBot, spawn: { x: sp.x, y: sp.y }, game: this,
+      id, name, character, isLocal, isBot, inputSource, spawn: { x: sp.x, y: sp.y }, game: this,
     });
     this.players.push(sm);
     return sm;
@@ -478,26 +502,33 @@ export class Game {
   _update(dt) {
     this.matchTimer += dt;
 
-    // Drive local player input
-    if (this.localPlayer && this.localPlayer.isLocal) {
-      const snap = this.input.getCombined();
-      // Mouse aim: project mouse NDC onto z=0 plane, get direction from player.
+    // Drive each local player from its bound input source. Runs in every
+    // mode (offline, host, client) because every mode has at least one
+    // locally-controlled stickman whose input must be polled.
+    {
       const ndc = this.input.getMouseNDC();
-      if (ndc && !snap.aimActive) {
-        this._aimNDC.set(ndc.x, ndc.y, 0.5).unproject(this.camera);
-        const dir = this._aimDir.copy(this._aimNDC).sub(this.camera.position).normalize();
-        if (Math.abs(dir.z) > 1e-4) {
-          const t = -this.camera.position.z / dir.z;
-          const wx = this.camera.position.x + dir.x * t;
-          const wy = this.camera.position.y + dir.y * t;
-          const ax = wx - this.localPlayer.position.x;
-          const ay = wy - (this.localPlayer.position.y + 0.6);
-          const m = Math.hypot(ax, ay) || 1;
-          snap.aimX = ax / m; snap.aimY = ay / m; snap.aimActive = true;
+      for (const lp of this.localPlayers) {
+        if (!lp || !lp.isLocal || !lp.inputSource) continue;
+        const snap = this.input.getSnapshotFor(lp.inputSource);
+        if (!snap) continue;
+        // Mouse aim only for the kb+mouse player. Project NDC onto z=0 plane.
+        if (lp.inputSource.kind === 'kb-mouse' && ndc && !snap.aimActive) {
+          this._aimNDC.set(ndc.x, ndc.y, 0.5).unproject(this.camera);
+          const dir = this._aimDir.copy(this._aimNDC).sub(this.camera.position).normalize();
+          if (Math.abs(dir.z) > 1e-4) {
+            const t = -this.camera.position.z / dir.z;
+            const wx = this.camera.position.x + dir.x * t;
+            const wy = this.camera.position.y + dir.y * t;
+            const ax = wx - lp.position.x;
+            const ay = wy - (lp.position.y + 0.6);
+            const m = Math.hypot(ax, ay) || 1;
+            snap.aimX = ax / m; snap.aimY = ay / m; snap.aimActive = true;
+          }
         }
+        Object.assign(lp.input, snap);
+        // Online client mode: only P1 (the bound net player) sends input upstream.
+        if (this.net.role === 'client' && lp === this.localPlayer) this.net.sendInput(snap);
       }
-      Object.assign(this.localPlayer.input, snap);
-      if (this.net.role === 'client') this.net.sendInput(snap);
     }
 
     // Drive bot inputs
