@@ -33,11 +33,19 @@ export class TouchControls {
     // Settings — read once at construction, refreshed on Settings change
     // via `applySettings()`.
     this.aimSensitivity = parseFloat(localStorage.getItem('mc_aimSens') || '1') || 1;
+    // Teardown callbacks — populated by _doc(); drained in destroy().
+    this._teardown = [];
     this._build();
-    addEventListener('touchstart', () => this.enable(), { once: true, passive: true });
+    this._doc(window, 'touchstart', () => this.enable(), { once: true, passive: true });
     if (navigator.maxTouchPoints > 0 && (matchMedia('(pointer: coarse)').matches)) {
       this.enable();
     }
+  }
+
+  // Helper: addEventListener with a matching removeEventListener queued in _teardown.
+  _doc(target, type, handler, opts) {
+    target.addEventListener(type, handler, opts);
+    this._teardown.push(() => target.removeEventListener(type, handler, opts));
   }
 
   enable() {
@@ -170,10 +178,10 @@ export class TouchControls {
       }
     };
 
-    document.addEventListener('touchstart', onDocStart, { passive: false });
-    document.addEventListener('touchmove',  onDocMove,  { passive: false });
-    document.addEventListener('touchend',   onDocEnd);
-    document.addEventListener('touchcancel', onDocEnd);
+    this._doc(document, 'touchstart',  onDocStart, { passive: false });
+    this._doc(document, 'touchmove',   onDocMove,  { passive: false });
+    this._doc(document, 'touchend',    onDocEnd);
+    this._doc(document, 'touchcancel', onDocEnd);
   }
 
   // ── Simple press-and-hold button (Jump, Special) ──────────────────────
@@ -197,7 +205,7 @@ export class TouchControls {
     el.addEventListener('touchend',    release, { passive: false });
     el.addEventListener('touchcancel', release, { passive: false });
     el.addEventListener('mousedown',   press);
-    addEventListener('mouseup',        release);
+    this._doc(window, 'mouseup', release);
   }
 
   // ── Attack button: tap = fire, hold + drag = update aimDir + fire on release.
@@ -214,14 +222,18 @@ export class TouchControls {
       el.classList.add('pressed');
     };
     const updateDrag = (x, y) => {
-      const dx = (x - startX) * this.aimSensitivity;
-      const dy = (y - startY) * this.aimSensitivity;
-      const mag = Math.hypot(dx, dy);
-      if (!dragged && mag > ATTACK_DRAG_PX) dragged = true;
-      if (dragged && mag > 0) {
-        // Screen Y grows down, world Y grows up — invert.
-        this.aimDir.x = dx / mag;
-        this.aimDir.y = -dy / mag;
+      const rawDx = x - startX;
+      const rawDy = y - startY;
+      const rawMag = Math.hypot(rawDx, rawDy);
+      if (!dragged && rawMag > ATTACK_DRAG_PX) dragged = true;
+      if (dragged && rawMag > 0) {
+        // aimDir is a normalized unit vector — direction only, no magnitude.
+        // Sensitivity does not affect a unit vector after normalization, so it is
+        // not applied here. (The spec keeps `aimSensitivity` for a future use case
+        // where partial-drag committing or snapping is added; it remains read by
+        // applySettings() so the slider value is preserved.)
+        this.aimDir.x = rawDx / rawMag;
+        this.aimDir.y = -rawDy / rawMag;
         this.snapshot.aimX = this.aimDir.x;
         this.snapshot.aimY = this.aimDir.y;
         this.snapshot.aimActive = true;
@@ -255,7 +267,7 @@ export class TouchControls {
       }
     }, { passive: false });
 
-    document.addEventListener('touchmove', (ev) => {
+    this._doc(document, 'touchmove', (ev) => {
       if (touchId === null) return;
       for (const t of ev.changedTouches) {
         if (t.identifier !== touchId) continue;
@@ -270,10 +282,19 @@ export class TouchControls {
         endPress();
       }
     };
-    el.addEventListener('touchend', onEnd, { passive: false });
-    el.addEventListener('touchcancel', onEnd, { passive: false });
-    document.addEventListener('touchend', onEnd, { passive: false });
-    document.addEventListener('touchcancel', onEnd, { passive: false });
+    const onCancel = (ev) => {
+      if (touchId === null) return;
+      for (const t of ev.changedTouches) {
+        if (t.identifier !== touchId) continue;
+        el.classList.remove('pressed');
+        touchId = null;
+        dragged = false;
+      }
+    };
+    el.addEventListener('touchend',    onEnd,     { passive: false });
+    el.addEventListener('touchcancel', onCancel,  { passive: false });
+    this._doc(document, 'touchend',    onEnd,     { passive: false });
+    this._doc(document, 'touchcancel', onCancel,  { passive: false });
 
     // Mouse for desktop testing (no drag-aim, just click-to-fire).
     el.addEventListener('mousedown', (ev) => {
@@ -320,7 +341,7 @@ export class TouchControls {
       }
     };
     el.addEventListener('touchmove', onMove, { passive: false });
-    document.addEventListener('touchmove', onMove, { passive: false });
+    this._doc(document, 'touchmove', onMove, { passive: false });
 
     const onEnd = (ev) => {
       if (touchId === null) return;
@@ -350,10 +371,20 @@ export class TouchControls {
         touchId = null; dragged = false;
       }
     };
-    el.addEventListener('touchend', onEnd, { passive: false });
-    el.addEventListener('touchcancel', onEnd, { passive: false });
-    document.addEventListener('touchend', onEnd, { passive: false });
-    document.addEventListener('touchcancel', onEnd, { passive: false });
+    const onCancel = (ev) => {
+      if (touchId === null) return;
+      for (const t of ev.changedTouches) {
+        if (t.identifier !== touchId) continue;
+        this.snapshot.grab = false;
+        el.classList.remove('pressed');
+        touchId = null;
+        dragged = false;
+      }
+    };
+    el.addEventListener('touchend',    onEnd,    { passive: false });
+    el.addEventListener('touchcancel', onCancel, { passive: false });
+    this._doc(document, 'touchend',    onEnd,    { passive: false });
+    this._doc(document, 'touchcancel', onCancel, { passive: false });
 
     // Mouse: hold = grab, no swipe support (desktop only — mouse uses keyboard for throw).
     el.addEventListener('mousedown', (ev) => {
@@ -361,12 +392,17 @@ export class TouchControls {
       el.classList.add('pressed');
       ev.preventDefault();
     });
-    addEventListener('mouseup', () => {
+    this._doc(window, 'mouseup', () => {
       this.snapshot.grab = false;
       el.classList.remove('pressed');
     });
   }
 
   getSnapshot() { return { ...this.snapshot }; }
-  destroy() { document.getElementById('touch-root').innerHTML = ''; }
+
+  destroy() {
+    for (const fn of this._teardown) { try { fn(); } catch (_) {} }
+    this._teardown = [];
+    document.getElementById('touch-root').innerHTML = '';
+  }
 }
