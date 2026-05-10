@@ -143,9 +143,10 @@ export class Game {
   }
 
   // === Match start variants ===
-  startLocal({ character, name, bots, levelId }) {
+  startLocal({ character, name, bots, levelId, localMP = false }) {
     try {
-      this._startMatch({ character, name, bots, levelId, isOnline: false });
+      this._lastLocalMP = !!localMP;
+      this._startMatch({ character, name, bots, levelId, isOnline: false, localMP: !!localMP });
       this.running = true;
     } catch (err) {
       console.error('startLocal failed:', err);
@@ -171,7 +172,7 @@ export class Game {
     this.running = true;
   }
 
-  _startMatch({ character, name, bots, levelId, isOnline, asClient, localPlayerId }) {
+  _startMatch({ character, name, bots, levelId, isOnline, asClient, localPlayerId, localMP = false }) {
     this._cleanup();
     this.levelId = levelId;
     this.level = new Level(this.scene, this.physics, this.fx, getLevel(levelId), this);
@@ -186,9 +187,10 @@ export class Game {
     this.weaponSpawnTimer = 1.5;
 
     if (!asClient) {
-      // Local-MP is offline-only. Online host stays single-local so we don't
-      // spawn couch-MP slots that aren't networked anywhere.
-      const allowExtras = !isOnline;
+      // Local-MP is offline-only AND opt-in. PLAY SOLO never spawns extras
+      // even with pads plugged in; only the LOCAL MULTIPLAYER menu sets the
+      // localMP flag.
+      const allowExtras = !isOnline && localMP;
       // Detect connected gamepads first so we know whether P1 must avoid
       // pad input (kb-only) or can fall back to any-pad (kb-mouse combined).
       const gpsAtStart = allowExtras ? (navigator.getGamepads?.() || []) : [];
@@ -322,6 +324,7 @@ export class Game {
       name: heroName,
       bots: this.players.filter(p => p?.isBot).length || 3,
       levelId: nextId,
+      localMP: !!this._lastLocalMP,
     };
     this.levelId = nextId;
     this.startLocal(data);

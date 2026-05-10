@@ -21,16 +21,22 @@ export class Menu {
 
   show(screen, ...args) {
     audio.click();
+    this._stopPadPolling();
     this.root.innerHTML = '';
     if (screen === 'main') return this._main();
     if (screen === 'play') return this._play();
+    if (screen === 'local') return this._local();
     if (screen === 'online') return this._online();
     if (screen === 'settings') return this._settings();
     if (screen === 'pause') return this._pause();
     if (screen === 'over') return this._over(...args);
   }
 
-  hide() { this.root.innerHTML = ''; }
+  hide() { this._stopPadPolling(); this.root.innerHTML = ''; }
+
+  _stopPadPolling() {
+    if (this._padPollId) { clearInterval(this._padPollId); this._padPollId = null; }
+  }
 
   _menuShell(html) {
     const el = document.createElement('div');
@@ -46,7 +52,8 @@ export class Menu {
       <div class="tagline">PARTY BRAWLER</div>
       <div class="btn-row" style="flex-direction:column;align-items:center;gap:14px;">
         <button class="btn primary" data-act="online">PLAY ONLINE</button>
-        <button class="btn" data-act="play">PLAY (BOTS)</button>
+        <button class="btn" data-act="play">PLAY SOLO</button>
+        <button class="btn" data-act="local">LOCAL MULTIPLAYER</button>
         <button class="btn small" data-act="settings">SETTINGS</button>
       </div>
       <div class="hint" style="margin-top:32px;text-align:center;max-width:560px;line-height:1.7;">
@@ -58,6 +65,7 @@ export class Menu {
       </div>
     `);
     el.querySelector('[data-act="play"]').onclick = () => this.show('play');
+    el.querySelector('[data-act="local"]').onclick = () => this.show('local');
     el.querySelector('[data-act="online"]').onclick = () => this.show('online');
     el.querySelector('[data-act="settings"]').onclick = () => this.show('settings');
   }
@@ -108,6 +116,9 @@ export class Menu {
   _play() {
     const el = this._menuShell(`
       <div class="panel">
+        <h2>PLAY SOLO</h2>
+        <p class="hint" style="margin-top:0">You vs. bots. Keyboard + mouse, or a single gamepad.</p>
+        <hr class="sep">
         <h2>SELECT CHARACTER</h2>
         <div class="char-grid"></div>
         <hr class="sep">
@@ -131,8 +142,71 @@ export class Menu {
     el.querySelector('[data-act="back"]').onclick = () => this.show('main');
     el.querySelector('[data-act="start"]').onclick = () => {
       this.hide();
-      this.game.startLocal({ character: this.selectedChar, name: this.playerName, bots: this.bots, levelId: this.level });
+      this.game.startLocal({ character: this.selectedChar, name: this.playerName, bots: this.bots, levelId: this.level, localMP: false });
     };
+  }
+
+  // Local multiplayer setup. P1 fixed (kb+mouse). P2-P4 = one connected
+  // gamepad each. Live pad list updates as pads connect/disconnect.
+  _local() {
+    const el = this._menuShell(`
+      <div class="panel">
+        <h2>LOCAL MULTIPLAYER</h2>
+        <p class="hint" style="margin-top:0">P1 = keyboard + mouse. Plug a gamepad for each extra player (up to 3 more). Press any button on the pad to wake it up.</p>
+        <hr class="sep">
+        <h2>YOUR CHARACTER (P1)</h2>
+        <div class="char-grid"></div>
+        <hr class="sep">
+        <h2>PLAYERS</h2>
+        <div class="players-list" id="pad-slots"></div>
+        <hr class="sep">
+        <div class="row">
+          <label>Bots <input type="number" min="0" max="7" value="${this.bots}" id="bots" /></label>
+          <label>Level
+            <select id="level">${LEVELS.map(l => `<option value="${l.id}" ${l.id === this.level ? 'selected' : ''}>${l.name}</option>`).join('')}</select>
+          </label>
+          <label>Name <input type="text" maxlength="10" value="${this.playerName}" id="pname" /></label>
+        </div>
+        <div class="btn-row">
+          <button class="btn" data-act="back">← BACK</button>
+          <button class="btn primary" data-act="start">START</button>
+        </div>
+      </div>
+    `);
+    this._renderRoster(el);
+    el.querySelector('#bots').oninput = (e) => this.bots = +e.target.value;
+    el.querySelector('#level').onchange = (e) => this.level = e.target.value;
+    el.querySelector('#pname').oninput = (e) => { this.playerName = e.target.value || 'P1'; localStorage.setItem('pn', this.playerName); };
+    el.querySelector('[data-act="back"]').onclick = () => this.show('main');
+    el.querySelector('[data-act="start"]').onclick = () => {
+      this._stopPadPolling();
+      this.hide();
+      this.game.startLocal({ character: this.selectedChar, name: this.playerName, bots: this.bots, levelId: this.level, localMP: true });
+    };
+
+    // Live pad-slot rendering. Polls every 250ms — gamepadconnected events
+    // alone don't fire reliably until the pad gets its first input.
+    const slotsEl = el.querySelector('#pad-slots');
+    const renderSlots = () => {
+      const gps = navigator.getGamepads?.() || [];
+      const connected = [];
+      for (let i = 0; i < gps.length && connected.length < 3; i++) {
+        if (gps[i] && gps[i].connected) connected.push({ idx: i, id: gps[i].id });
+      }
+      const rows = [];
+      rows.push(`<div class="player-row"><div class="swatch" style="--c:#ffcc33"></div><strong>P1</strong> &nbsp;<span style="opacity:0.7">keyboard + mouse</span></div>`);
+      for (let i = 0; i < 3; i++) {
+        const slot = connected[i];
+        if (slot) {
+          rows.push(`<div class="player-row"><div class="swatch" style="--c:#66e2a3"></div><strong>P${i + 2}</strong> &nbsp;<span style="opacity:0.7">Pad ${slot.idx} — ${slot.id.split('(')[0].trim().slice(0, 32) || 'gamepad'}</span></div>`);
+        } else {
+          rows.push(`<div class="player-row" style="opacity:0.45"><div class="swatch" style="--c:#666"></div><strong>P${i + 2}</strong> &nbsp;<span>plug a gamepad + press any button</span></div>`);
+        }
+      }
+      slotsEl.innerHTML = rows.join('');
+    };
+    renderSlots();
+    this._padPollId = setInterval(renderSlots, 250);
   }
 
   // Stub — Net layer still calls refreshLobby() on peer changes. Drop-in
