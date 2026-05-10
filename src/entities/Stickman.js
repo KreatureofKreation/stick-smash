@@ -1355,8 +1355,12 @@ export class Stickman {
     else if (this.hitstun > 0) ragAmt = clamp(this.hitstun * 1.5, 0, 0.6);
 
     const gumGum = performance.now() < this.gumGumUntil;
-    // When dead, draw limbs in LOCAL space (origin) — group transform carries world pos+rot.
-    const rigPos = this.state === STATE.DEAD ? { x: 0, y: 0, z: 0 } : this.body.position;
+    // When dead OR on a curved-gravity level, draw limbs in LOCAL space
+    // (origin) — group transform carries world pos+rot so the rig follows
+    // the capsule's planet-aligned rotation. Flat levels keep the
+    // existing world-space rig path (`identity` group + absolute coords).
+    const rigInLocal = this.state === STATE.DEAD || !!this.game?.level?.curvedGravity;
+    const rigPos = rigInLocal ? { x: 0, y: 0, z: 0 } : this.body.position;
     const stepDur = this._attackStep === 0 ? 0.18 : this._attackStep === 1 ? 0.22 : 0.30;
     this.rig.update(rigPos, {
       // Normalize against current top speed so anim scale stays right.
@@ -1382,8 +1386,8 @@ export class Stickman {
       dt,
     });
 
-    if (this.state === STATE.DEAD) {
-      // Ragdoll mode: group carries body's full transform. Limbs render in local space.
+    if (rigInLocal) {
+      // Group carries body's transform; limbs are in local space.
       const q = this.body.quaternion;
       const p = this.body.position;
       this.rig.group.position.set(p.x, p.y, p.z);
