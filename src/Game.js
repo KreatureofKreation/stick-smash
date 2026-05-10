@@ -186,9 +186,12 @@ export class Game {
     this.weaponSpawnTimer = 1.5;
 
     if (!asClient) {
+      // Local-MP is offline-only. Online host stays single-local so we don't
+      // spawn couch-MP slots that aren't networked anywhere.
+      const allowExtras = !isOnline;
       // Detect connected gamepads first so we know whether P1 must avoid
       // pad input (kb-only) or can fall back to any-pad (kb-mouse combined).
-      const gpsAtStart = navigator.getGamepads?.() || [];
+      const gpsAtStart = allowExtras ? (navigator.getGamepads?.() || []) : [];
       const padIndices = [];
       for (let i = 0; i < gpsAtStart.length && padIndices.length < 3; i++) {
         if (gpsAtStart[i] && gpsAtStart[i].connected) padIndices.push(i);
@@ -813,7 +816,12 @@ export class Game {
           spawn: { x: sp.x, y: sp.y }, game: this,
         });
         this.players[i] = p;
-        if (sp.id === this.net.localPlayerId) { this.localPlayer = p; this.localPlayer.isLocal = true; }
+        if (sp.id === this.net.localPlayerId) {
+          this.localPlayer = p;
+          this.localPlayer.isLocal = true;
+          this.localPlayer.inputSource = { kind: 'kb-mouse' };
+          this.localPlayers = [p];
+        }
       }
       // First snapshot for this player: snap to position. Subsequent: interpolate.
       if (!p._firstSnapApplied) {

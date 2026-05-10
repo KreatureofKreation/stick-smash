@@ -96,7 +96,10 @@ export class HUD {
 
     // Per-local HP + weapon strips. Slot 0 = P1 (top-left), 1 = P2 (top-right),
     // 2 = P3 (bottom-left), 3 = P4 (bottom-right).
-    const locals = this.game.localPlayers || (this.game.localPlayer ? [this.game.localPlayer] : []);
+    const locals = this.game.localPlayers?.length
+      ? this.game.localPlayers
+      : (this.game.localPlayer ? [this.game.localPlayer] : []);
+    document.body.classList.toggle('local-mp', locals.length > 1);
     for (let i = 0; i < this.localStrips.length; i++) {
       const slot = this.localStrips[i];
       const p = locals[i];
