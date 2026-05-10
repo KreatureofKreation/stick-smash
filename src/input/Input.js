@@ -134,11 +134,60 @@ export class InputManager {
     return out;
   }
 
-  // True for one frame on Start/Back press.
+  // Strict-by-index gamepad poll. Used by local MP where P2/P3/P4 must each
+  // bind to one specific pad. Unlike getGamepadSnapshot(), this returns an
+  // empty snapshot if that exact slot is null/disconnected — never bleeds
+  // input from another pad into a different player.
+  getGamepadSnapshotByIndex(idx) {
+    const out = { moveX: 0, moveY: 0, jump: false, attack: false, grab: false, special: false, throw: false, aimX: 1, aimY: 0, aimActive: false };
+    const gps = navigator.getGamepads?.() || [];
+    const gp = gps[idx];
+    if (!gp || !gp.connected) return out;
+    const dz = (v) => Math.abs(v) < 0.2 ? 0 : v;
+    const btn = (i) => !!gp.buttons[i]?.pressed;
+    const axis = (i) => gp.axes[i] ?? 0;
+    const trig = (i) => Math.max(0, gp.buttons[i]?.value ?? 0);
+
+    let mx = dz(axis(0));
+    let my = -dz(axis(1));
+    if (btn(14)) mx = -1;
+    if (btn(15)) mx = 1;
+    if (btn(12)) my = 1;
+    if (btn(13)) my = -1;
+    out.moveX = mx;
+    out.moveY = my;
+
+    const ax = dz(axis(2)), ay = -dz(axis(3));
+    if (Math.hypot(ax, ay) > 0.35) {
+      out.aimX = ax; out.aimY = ay; out.aimActive = true;
+    }
+
+    out.jump = btn(0);
+    out.attack = btn(5) || trig(7) > 0.35;
+    out.grab   = btn(2) || btn(4) || trig(6) > 0.35;
+    out.throw  = btn(1);
+    out.special = btn(3);
+    return out;
+  }
+
+  // Returns an input snapshot for any local source descriptor.
+  // Used by the per-local-player input loop.
+  getSnapshotFor(source) {
+    if (!source) return null;
+    if (source.kind === 'kb-mouse') return this.getCombined();
+    if (source.kind === 'gamepad') return this.getGamepadSnapshotByIndex(source.gamepadIdx);
+    return null;
+  }
+
+  // True for one frame on Start/Back press from ANY connected gamepad.
+  // Local-MP: any local player's Start triggers pause.
   consumeGamepadPause() {
-    const gp = navigator.getGamepads?.()?.[this.gamepadIdx];
-    if (!gp) return false;
-    const pressed = !!gp.buttons[9]?.pressed || !!gp.buttons[8]?.pressed;
+    const gps = navigator.getGamepads?.() || [];
+    let pressed = false;
+    for (const gp of gps) {
+      if (!gp || !gp.connected) continue;
+      if (gp.buttons[8]?.pressed || gp.buttons[9]?.pressed) { pressed = true; break; }
+    }
     if (pressed && !this._pausePrev) { this._pausePrev = true; return true; }
     if (!pressed) this._pausePrev = false;
     return false;
