@@ -1,5 +1,5 @@
 // Menu UI: title, character select, lobby, settings. Pure DOM.
-import { ROSTER } from '../characters/roster.js';
+import { ROSTER, rosterById } from '../characters/roster.js';
 import { LEVELS } from '../levels/definitions.js';
 import { audio } from '../audio/Audio.js';
 import { SPAWN_TABLE, setDisabledWeapons, getDisabledWeapons } from '../weapons/weapons.js';
@@ -147,12 +147,14 @@ export class Menu {
   }
 
   // Local multiplayer setup. P1 fixed (kb+mouse). P2-P4 = one connected
-  // gamepad each. Live pad list updates as pads connect/disconnect.
+  // gamepad each. Each pad gets its own char carousel: L-stick or D-pad
+  // left/right cycles, A toggles lock. Locked chars become unavailable to
+  // other pads.
   _local() {
     const el = this._menuShell(`
       <div class="panel">
         <h2>LOCAL MULTIPLAYER</h2>
-        <p class="hint" style="margin-top:0">P1 = keyboard + mouse. Plug a gamepad for each extra player (up to 3 more). Press any button on the pad to wake it up.</p>
+        <p class="hint" style="margin-top:0">P1 = keyboard + mouse. Each gamepad picks its own character — D-pad / L-stick ←→ to cycle, <kbd>A</kbd> to lock. <kbd>B</kbd> to unlock.</p>
         <hr class="sep">
         <h2>YOUR CHARACTER (P1)</h2>
         <div class="char-grid"></div>
@@ -179,34 +181,147 @@ export class Menu {
     el.querySelector('#pname').oninput = (e) => { this.playerName = e.target.value || 'P1'; localStorage.setItem('pn', this.playerName); };
     el.querySelector('[data-act="back"]').onclick = () => this.show('main');
     el.querySelector('[data-act="start"]').onclick = () => {
+      const extras = this._collectPadExtras();
       this._stopPadPolling();
       this.hide();
-      this.game.startLocal({ character: this.selectedChar, name: this.playerName, bots: this.bots, levelId: this.level, localMP: true });
+      this.game.startLocal({
+        character: this.selectedChar,
+        name: this.playerName,
+        bots: this.bots,
+        levelId: this.level,
+        localMP: true,
+        extras,
+      });
     };
 
-    // Live pad-slot rendering. Polls every 250ms — gamepadconnected events
-    // alone don't fire reliably until the pad gets its first input.
+    // Per-pad pick state. Map: padIdx → { charIdx, locked, navCD, prev:{a,b,lr} }.
+    if (!this.padPicks) this.padPicks = new Map();
+
     const slotsEl = el.querySelector('#pad-slots');
-    const renderSlots = () => {
-      const gps = navigator.getGamepads?.() || [];
-      const connected = [];
-      for (let i = 0; i < gps.length && connected.length < 3; i++) {
-        if (gps[i] && gps[i].connected) connected.push({ idx: i, id: gps[i].id });
+    const tick = () => {
+      this._tickPadPicks();
+      this._renderPadSlots(slotsEl);
+    };
+    tick();
+    // 60 ms — fast enough for snappy edge-detected button presses, slow
+    // enough not to thrash the DOM.
+    this._padPollId = setInterval(tick, 60);
+  }
+
+  // Cycle direction for one pad. Skips P1's char + already-locked picks
+  // from other pads so each player ends up on a unique color.
+  _padCycle(padIdx, dir) {
+    const taken = this._takenCharIds(padIdx);
+    const n = ROSTER.length;
+    const cur = this.padPicks.get(padIdx);
+    let i = cur?.charIdx ?? 0;
+    for (let step = 0; step < n; step++) {
+      i = (i + dir + n) % n;
+      if (!taken.has(ROSTER[i].id)) {
+        cur.charIdx = i;
+        return;
       }
-      const rows = [];
-      rows.push(`<div class="player-row"><div class="swatch" style="--c:#ffcc33"></div><strong>P1</strong> &nbsp;<span style="opacity:0.7">keyboard + mouse</span></div>`);
-      for (let i = 0; i < 3; i++) {
-        const slot = connected[i];
-        if (slot) {
-          rows.push(`<div class="player-row"><div class="swatch" style="--c:#66e2a3"></div><strong>P${i + 2}</strong> &nbsp;<span style="opacity:0.7">Pad ${slot.idx} — ${slot.id.split('(')[0].trim().slice(0, 32) || 'gamepad'}</span></div>`);
-        } else {
-          rows.push(`<div class="player-row" style="opacity:0.45"><div class="swatch" style="--c:#666"></div><strong>P${i + 2}</strong> &nbsp;<span>plug a gamepad + press any button</span></div>`);
+    }
+  }
+
+  // Char ids reserved by P1 + every other pad (locked OR hovered) except
+  // `selfPadIdx`. Treating hovered as taken keeps each player visually on
+  // a unique color while picking, even before anyone locks in.
+  _takenCharIds(selfPadIdx) {
+    const taken = new Set([this.selectedChar]);
+    for (const [pi, st] of this.padPicks) {
+      if (pi === selfPadIdx) continue;
+      taken.add(ROSTER[st.charIdx].id);
+    }
+    return taken;
+  }
+
+  // Read every connected pad, advance its pick state for this tick.
+  _tickPadPicks() {
+    const gps = navigator.getGamepads?.() || [];
+    const connected = [];
+    for (let i = 0; i < gps.length && connected.length < 3; i++) {
+      if (gps[i] && gps[i].connected) connected.push(i);
+    }
+    // Drop entries for disconnected pads.
+    for (const padIdx of [...this.padPicks.keys()]) {
+      if (!connected.includes(padIdx)) this.padPicks.delete(padIdx);
+    }
+    // Add entries for newly-connected pads. Initial pick = first char not
+    // already used by P1 OR by any other pad (locked or just hovered). The
+    // any-hovered exclusion stops every pad starting on the same char.
+    for (const padIdx of connected) {
+      if (this.padPicks.has(padIdx)) continue;
+      const taken = new Set([this.selectedChar]);
+      for (const [pi, st] of this.padPicks) {
+        if (pi !== padIdx) taken.add(ROSTER[st.charIdx].id);
+      }
+      let initial = 0;
+      for (let i = 0; i < ROSTER.length; i++) {
+        if (!taken.has(ROSTER[i].id)) { initial = i; break; }
+      }
+      this.padPicks.set(padIdx, { charIdx: initial, locked: false, navCD: 0, prev: { a: false, b: false, lr: 0 } });
+    }
+    // Per-pad input edge-detect.
+    const now = performance.now();
+    for (const padIdx of connected) {
+      const gp = gps[padIdx];
+      const st = this.padPicks.get(padIdx);
+      const ax = gp.axes[0] ?? 0;
+      const dpL = !!gp.buttons[14]?.pressed || ax < -0.5;
+      const dpR = !!gp.buttons[15]?.pressed || ax > 0.5;
+      const lr = dpR ? 1 : dpL ? -1 : 0;
+      const a = !!gp.buttons[0]?.pressed;
+      const b = !!gp.buttons[1]?.pressed;
+      // Cycle on edge (release-to-press) — and also auto-repeat when held
+      // past the cooldown so users can scroll quickly.
+      if (lr !== 0 && !st.locked) {
+        if (st.prev.lr === 0 || now > st.navCD) {
+          this._padCycle(padIdx, lr);
+          st.navCD = now + (st.prev.lr === 0 ? 250 : 120);
         }
       }
-      slotsEl.innerHTML = rows.join('');
-    };
-    renderSlots();
-    this._padPollId = setInterval(renderSlots, 250);
+      if (a && !st.prev.a) st.locked = !st.locked;
+      if (b && !st.prev.b && st.locked) st.locked = false;
+      st.prev.a = a; st.prev.b = b; st.prev.lr = lr;
+    }
+  }
+
+  _renderPadSlots(slotsEl) {
+    const gps = navigator.getGamepads?.() || [];
+    const connected = [];
+    for (let i = 0; i < gps.length && connected.length < 3; i++) {
+      if (gps[i] && gps[i].connected) connected.push({ idx: i, id: gps[i].id });
+    }
+    const rows = [];
+    rows.push(`<div class="player-row"><div class="swatch" style="--c:#${(rosterById(this.selectedChar).primary).toString(16).padStart(6,'0')}"></div><strong>P1</strong> &nbsp;<span style="opacity:0.7">keyboard + mouse — ${rosterById(this.selectedChar).name}</span></div>`);
+    for (let i = 0; i < 3; i++) {
+      const slot = connected[i];
+      if (slot) {
+        const st = this.padPicks.get(slot.idx);
+        const c = ROSTER[st?.charIdx ?? 0];
+        const hex = '#' + c.primary.toString(16).padStart(6, '0');
+        const lockMark = st?.locked ? '🔒 LOCKED' : '<span style="opacity:0.55">←/→ to cycle · A to lock</span>';
+        rows.push(`<div class="player-row"${st?.locked ? ' style="border:1px solid '+hex+';"' : ''}><div class="swatch" style="--c:${hex}"></div><strong>P${i + 2}</strong> &nbsp;<span style="font-weight:700;color:${hex}">${c.name}</span> &nbsp;${lockMark} &nbsp;<span style="opacity:0.4;font-size:11px;margin-left:auto">Pad ${slot.idx}</span></div>`);
+      } else {
+        rows.push(`<div class="player-row" style="opacity:0.45"><div class="swatch" style="--c:#666"></div><strong>P${i + 2}</strong> &nbsp;<span>plug a gamepad + press any button</span></div>`);
+      }
+    }
+    slotsEl.innerHTML = rows.join('');
+  }
+
+  // Snapshot of pad-bound extras for startLocal. Locked picks honor user's
+  // choice; unlocked pads use their currently-hovered char (good default).
+  _collectPadExtras() {
+    const gps = navigator.getGamepads?.() || [];
+    const out = [];
+    for (let i = 0; i < gps.length && out.length < 3; i++) {
+      if (!gps[i] || !gps[i].connected) continue;
+      const st = this.padPicks.get(i);
+      const charId = st ? ROSTER[st.charIdx].id : null;
+      out.push({ padIdx: i, charId });
+    }
+    return out;
   }
 
   // Stub — Net layer still calls refreshLobby() on peer changes. Drop-in

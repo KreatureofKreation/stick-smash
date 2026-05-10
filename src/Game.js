@@ -143,10 +143,11 @@ export class Game {
   }
 
   // === Match start variants ===
-  startLocal({ character, name, bots, levelId, localMP = false }) {
+  startLocal({ character, name, bots, levelId, localMP = false, extras = null }) {
     try {
       this._lastLocalMP = !!localMP;
-      this._startMatch({ character, name, bots, levelId, isOnline: false, localMP: !!localMP });
+      this._lastExtras = extras ? extras.map(e => ({ ...e })) : null;
+      this._startMatch({ character, name, bots, levelId, isOnline: false, localMP: !!localMP, extras });
       this.running = true;
     } catch (err) {
       console.error('startLocal failed:', err);
@@ -172,7 +173,7 @@ export class Game {
     this.running = true;
   }
 
-  _startMatch({ character, name, bots, levelId, isOnline, asClient, localPlayerId, localMP = false }) {
+  _startMatch({ character, name, bots, levelId, isOnline, asClient, localPlayerId, localMP = false, extras = null }) {
     this._cleanup();
     this.levelId = levelId;
     this.level = new Level(this.scene, this.physics, this.fx, getLevel(levelId), this);
@@ -191,13 +192,20 @@ export class Game {
       // even with pads plugged in; only the LOCAL MULTIPLAYER menu sets the
       // localMP flag.
       const allowExtras = !isOnline && localMP;
-      // Detect connected gamepads first so we know whether P1 must avoid
-      // pad input (kb-only) or can fall back to any-pad (kb-mouse combined).
-      const gpsAtStart = allowExtras ? (navigator.getGamepads?.() || []) : [];
-      const padIndices = [];
-      for (let i = 0; i < gpsAtStart.length && padIndices.length < 3; i++) {
-        if (gpsAtStart[i] && gpsAtStart[i].connected) padIndices.push(i);
+      // Pad list: explicit extras from the menu (with chosen char ids), or
+      // fall back to live-detected pad indices when caller didn't pass any.
+      let padPicks = [];
+      if (allowExtras) {
+        if (extras && extras.length) {
+          padPicks = extras.slice(0, 3).map(e => ({ padIdx: e.padIdx, charId: e.charId }));
+        } else {
+          const gpsAtStart = navigator.getGamepads?.() || [];
+          for (let i = 0; i < gpsAtStart.length && padPicks.length < 3; i++) {
+            if (gpsAtStart[i] && gpsAtStart[i].connected) padPicks.push({ padIdx: i, charId: null });
+          }
+        }
       }
+      const padIndices = padPicks.map(p => p.padIdx);
       // Pads bound to P2/P3/P4 must NOT bleed into P1, so P1 reads
       // keyboard+mouse+touch only when extras exist.
       const heroSource = padIndices.length > 0
@@ -216,17 +224,24 @@ export class Game {
       this.character = hero.character;
 
       // Each detected gamepad becomes one extra local player. Cap at 3 extras
-      // (P1 + 3 = 4 total humans).
+      // (P1 + 3 = 4 total humans). Use the per-pad char id chosen on the
+      // setup screen if provided; otherwise pick a random unused char.
       const used = new Set([hero.character.id]);
-      for (let i = 0; i < padIndices.length; i++) {
-        const pool = ROSTER.filter(c => !used.has(c.id));
-        const pick = pool[Math.floor(Math.random() * pool.length)] || ROSTER[(i + 1) % ROSTER.length];
+      for (let i = 0; i < padPicks.length; i++) {
+        const pp = padPicks[i];
+        let pick = pp.charId ? rosterById(pp.charId) : null;
+        // Fallback / collision: if no char id, or char already used, pick a
+        // random unused one.
+        if (!pick || used.has(pick.id)) {
+          const pool = ROSTER.filter(c => !used.has(c.id));
+          pick = pool[Math.floor(Math.random() * pool.length)] || ROSTER[(i + 1) % ROSTER.length];
+        }
         used.add(pick.id);
         const lp = this._spawnPlayer({
           name: `P${i + 2}`,
           character: pick,
           isLocal: true,
-          inputSource: { kind: 'gamepad', gamepadIdx: padIndices[i] },
+          inputSource: { kind: 'gamepad', gamepadIdx: pp.padIdx },
         });
         this.localPlayers.push(lp);
       }
@@ -325,6 +340,7 @@ export class Game {
       bots: this.players.filter(p => p?.isBot).length || 3,
       levelId: nextId,
       localMP: !!this._lastLocalMP,
+      extras: this._lastExtras,
     };
     this.levelId = nextId;
     this.startLocal(data);
