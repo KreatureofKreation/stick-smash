@@ -281,3 +281,40 @@ body.local-mp .fps { display: none; }
 .mobile-settings input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
 .mobile-settings select { background: rgba(0,0,0,0.4); border: 1px solid var(--panel-border); color: var(--fg); padding: 6px 10px; border-radius: 8px; font: inherit; }
 
+/* First-run mobile tutorial overlay. */
+.tut-root { position: fixed; inset: 0; z-index: 1500; pointer-events: none; }
+.tut-dim { position: absolute; inset: 0; background: rgba(0,0,0,0.55); }
+.tut-caption { position: absolute; top: 14%; left: 50%; transform: translateX(-50%); font-size: clamp(18px, 4vw, 28px); font-weight: 800; letter-spacing: 2px; color: var(--accent); text-shadow: 0 2px 12px rgba(0,0,0,0.85); text-align: center; }
+.tut-finger { position: absolute; width: 56px; height: 56px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.9), rgba(255,255,255,0.2) 70%); border: 3px solid #fff; transform: translate(-50%, -50%); opacity: 0; }
+.tut-finger.show { opacity: 1; }
+.tut-finger.tut-arc      { animation: tut-arc 1.4s ease-in-out infinite; }
+.tut-finger.tut-tap      { animation: tut-tap 1.0s ease-in-out infinite; }
+.tut-finger.tut-drag     { animation: tut-drag 1.6s ease-in-out infinite; }
+.tut-finger.tut-swipe    { animation: tut-swipe 1.4s ease-out infinite; }
+@keyframes tut-arc {
+  0%   { transform: translate(-50%, -50%) translate(-40px, 0); }
+  25%  { transform: translate(-50%, -50%) translate(0, -40px); }
+  50%  { transform: translate(-50%, -50%) translate(40px, 0); }
+  75%  { transform: translate(-50%, -50%) translate(0, 40px); }
+  100% { transform: translate(-50%, -50%) translate(-40px, 0); }
+}
+@keyframes tut-tap {
+  0%, 70%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  35%           { transform: translate(-50%, -50%) scale(0.7); opacity: 0.7; }
+}
+@keyframes tut-drag {
+  0%   { transform: translate(-50%, -50%) translate(0, 0) scale(0.95); }
+  60%  { transform: translate(-50%, -50%) translate(70px, -50px) scale(1.1); }
+  100% { transform: translate(-50%, -50%) translate(0, 0) scale(0.95); }
+}
+@keyframes tut-swipe {
+  0%   { transform: translate(-50%, -50%) translate(0, 0); opacity: 0.4; }
+  20%  { opacity: 1; }
+  100% { transform: translate(-50%, -50%) translate(120px, -120px); opacity: 0; }
+}
+.tut-skip { position: absolute; top: max(16px, var(--safe-t)); right: max(16px, var(--safe-r)); pointer-events: auto; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 8px 16px; font: inherit; font-weight: 700; letter-spacing: 1.5px; border-radius: 8px; cursor: pointer; }
+.tut-skip:hover { background: rgba(255,204,51,0.2); border-color: var(--accent); }
+
+/* Suppress all touch input while tutorial is showing. */
+body.tutorial-active #touch-root { pointer-events: none !important; }
+

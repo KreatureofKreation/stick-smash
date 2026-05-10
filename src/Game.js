@@ -12,6 +12,7 @@ import { pickRandomSpawn, PICKUP_CLASSES, setDisabledWeapons } from './weapons/w
 import { audio } from './audio/Audio.js';
 import { HUD } from './ui/HUD.js';
 import { Menu } from './ui/Menu.js';
+import { TutorialOverlay } from './ui/TutorialOverlay.js';
 import { Net } from './network/Net.js';
 import { rand, clamp, lerp } from './util/math.js';
 
@@ -65,6 +66,7 @@ export class Game {
 
     this.net = new Net(this);
     this.menu = new Menu(this);
+    this.tutorial = new TutorialOverlay();
     this.hud = new HUD(this);
 
     this._tick = this._tick.bind(this);
@@ -283,6 +285,12 @@ export class Game {
 
     // Mark match as live so styles.css un-hides #hud-root / #touch-root.
     document.body.classList.add('in-game');
+
+    // First-run mobile tutorial — only on touch devices, only once per browser.
+    if (this.input?.touch?.active && !TutorialOverlay.isDone()) {
+      // Defer one frame so the cluster is in the DOM before placing fingers.
+      requestAnimationFrame(() => this.tutorial.show());
+    }
   }
 
   _startCountdown() {
