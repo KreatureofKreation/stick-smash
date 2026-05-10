@@ -298,15 +298,17 @@ export class Game {
   restart() {
     if (this.net.role) this.net.disconnect();
     if (!this.localPlayer) return this.menu.show('main');
-    // Round-end map rotation: pick a different level for variety. Random
-    // among the others — this prevents the same arena two rounds in a row
-    // while keeping the rotation unpredictable. Falls back to current id
-    // if there's only one level.
+    // Round-end map rotation: pick a different level for variety.
     const otherIds = LEVELS.map(l => l.id).filter(id => id !== this.levelId);
     const nextId = otherIds.length ? otherIds[Math.floor(Math.random() * otherIds.length)] : this.levelId;
+    // Snapshot the local roster before _cleanup nukes it. P1's character is
+    // restored verbatim; P2–P4 will be re-randomized from the live pad list
+    // inside _startMatch (so disconnected pads' slots simply drop out).
+    const heroChar = this.localPlayer.character.id;
+    const heroName = this.localPlayer.name;
     const data = {
-      character: this.localPlayer.character.id,
-      name: this.localPlayer.name,
+      character: heroChar,
+      name: heroName,
       bots: this.players.filter(p => p?.isBot).length || 3,
       levelId: nextId,
     };
