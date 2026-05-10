@@ -1265,38 +1265,72 @@ export const LEVELS = [
       }),
       // Top sanctum y=20 (durable prize platform).
       ...row(20, -5, 5, { material: 'stone', hp: 80, color: 0x6a7a68 }),
-      // ---- Crystal spire centerpiece. Tilted shards form a faceted
-      // cluster silhouette spanning nearly the full level height (mockup-
-      // matched). Each shard is its own tile with HP; stone material w/
-      // emissive glow. Wider (w 2-3x), 3x taller than original draft so the
-      // spire reads as a full-height landmark like the design mockup.
-      // Tile y is CENTER of the box; base sits on floor y=0, so y_center = h/2.
-      // GAMEPLAY NOTE: tip cyan reaches y=22 — slightly above the y=20 sanctum.
-      // The spire is now an alternate climb path to the top, in addition to
-      // the side platform ladder.
+      // ---- Crystal spire centerpiece (segmented). Each main shard is split
+      // into vertical sections via parentTileKey: the bottom section is a
+      // normal static tile; each section above names the one below as its
+      // parent. When a parent breaks, the engine cascade-converts every
+      // child into a falling dynamic body via Level._dropSuspendedTile —
+      // a tower-of-blocks collapse driven by real physics.
+      //
+      // Tile y is the CENTER of the box. Section bases align with the top of
+      // the section below: section_n.y - h/2 == section_{n-1}.y + h/2.
+      //
+      // GAMEPLAY NOTE: the main cyan stack tops at y=18 and the tip-cyan cap
+      // sits on top reaching y=22 — slightly above the y=20 sanctum. The
+      // spire is an alternate climb path to the top in addition to the side
+      // platform ladder. Smashing the base toppling the upper sections is
+      // the intended highlight moment.
+      //
       // KNOWN LIMITATION: shards with fractional y bypass the integer-grid
       // damageArea lookup, so explosion splash (grenade/RPG) only reaches
-      // shards whose y happens to land on an integer. Single-target attacks
-      // (bullets, melee, throws) hit every shard via Cannon collision callbacks.
-      // Back magenta — durable, tilted -6°. h=15.
-      { x: -3, y: 7.5, shape: 'box', w: 2.4, h: 15.0, d: 2.0,
-        material: 'stone', hp: 120, rotZ: -0.105,
+      // sections whose y is integer. Single-target attacks (bullets, melee,
+      // throws) hit every section via Cannon collision callbacks.
+
+      // Back magenta stack — h=15 split into 2 sections of h=7.5, tilted -6°.
+      { x: -3, y: 3.75, shape: 'box', w: 2.4, h: 7.5, d: 2.0,
+        material: 'stone', hp: 60, rotZ: -0.105,
         color: 0xb060d0, emissive: 0xb060d0, emissiveIntensity: 0.7 },
-      // Main cyan — durable, vertical, tallest. h=18 → tip y=18.
-      { x: 0, y: 9.0, shape: 'box', w: 3.0, h: 18.0, d: 2.4,
-        material: 'stone', hp: 140,
+      { x: -3, y: 11.25, shape: 'box', w: 2.4, h: 7.5, d: 2.0,
+        material: 'stone', hp: 60, rotZ: -0.105,
+        parentTileKey: '-3,3.75',
+        color: 0xb060d0, emissive: 0xb060d0, emissiveIntensity: 0.7 },
+
+      // Main cyan stack — h=18 split into 3 sections of h=6, vertical.
+      { x: 0, y: 3, shape: 'box', w: 3.0, h: 6.0, d: 2.4,
+        material: 'stone', hp: 50,
         color: 0x5ec8e8, emissive: 0x5ec8e8, emissiveIntensity: 0.8 },
-      // Right magenta — durable, tilted +8°. h=12.
-      { x: 3, y: 6.0, shape: 'box', w: 2.0, h: 12.0, d: 1.8,
-        material: 'stone', hp: 110, rotZ: 0.140,
+      { x: 0, y: 9, shape: 'box', w: 3.0, h: 6.0, d: 2.4,
+        material: 'stone', hp: 50,
+        parentTileKey: '0,3',
+        color: 0x5ec8e8, emissive: 0x5ec8e8, emissiveIntensity: 0.8 },
+      { x: 0, y: 15, shape: 'box', w: 3.0, h: 6.0, d: 2.4,
+        material: 'stone', hp: 50,
+        parentTileKey: '0,9',
+        color: 0x5ec8e8, emissive: 0x5ec8e8, emissiveIntensity: 0.8 },
+
+      // Right magenta stack — h=12 split into 2 sections of h=6, tilted +8°.
+      { x: 3, y: 3, shape: 'box', w: 2.0, h: 6.0, d: 1.8,
+        material: 'stone', hp: 55, rotZ: 0.140,
         color: 0xb060d0, emissive: 0xb060d0, emissiveIntensity: 0.7 },
-      // Front cyan small — brittle, tilted +4°. h=8.
-      { x: -1, y: 4.0, shape: 'box', w: 1.4, h: 8.0, d: 1.2,
-        material: 'stone', hp: 50, rotZ: 0.070,
+      { x: 3, y: 9, shape: 'box', w: 2.0, h: 6.0, d: 1.8,
+        material: 'stone', hp: 55, rotZ: 0.140,
+        parentTileKey: '3,3',
+        color: 0xb060d0, emissive: 0xb060d0, emissiveIntensity: 0.7 },
+
+      // Front cyan stack — h=8 split into 2 sections of h=4, tilted +4°.
+      { x: -1, y: 2, shape: 'box', w: 1.4, h: 4.0, d: 1.2,
+        material: 'stone', hp: 25, rotZ: 0.070,
         color: 0x80c8e0, emissive: 0x80c8e0, emissiveIntensity: 0.7 },
-      // Tip cyan — brightest glow, base y=18 (top of main cyan), top y=22.
+      { x: -1, y: 6, shape: 'box', w: 1.4, h: 4.0, d: 1.2,
+        material: 'stone', hp: 25, rotZ: 0.070,
+        parentTileKey: '-1,2',
+        color: 0x80c8e0, emissive: 0x80c8e0, emissiveIntensity: 0.7 },
+
+      // Tip cyan — single piece, base y=18 (top of main cyan stack), top y=22.
+      // Cascades when ANY main cyan section below it breaks (chain via parent).
       { x: 0, y: 20.0, shape: 'box', w: 1.4, h: 4.0, d: 1.2,
-        material: 'stone', hp: 35,
+        material: 'stone', hp: 25,
+        parentTileKey: '0,15',
         color: 0xc8f4ff, emissive: 0xc8f4ff, emissiveIntensity: 1.2 },
       // Yellow accent nub — short, brittle, breaks for spectacle.
       { x: 1, y: 1.0, shape: 'box', w: 1.0, h: 2.0, d: 0.8,
