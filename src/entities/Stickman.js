@@ -897,6 +897,8 @@ export class Stickman {
         if (this.game?.projectiles) {
           for (const pr of this.game.projectiles) {
             if (pr.dead || pr.owner === this) continue;
+            // Stuck projectiles have no body — they're cosmetic at this point.
+            if (!pr.body || pr.stuck) continue;
             const dx = pr.body.position.x - cx, dy = pr.body.position.y - cy;
             if (dx * dx + dy * dy < 0.9 * 0.9) {
               pr.body.velocity.x = -pr.body.velocity.x * 1.2 + this.facing * 4;
