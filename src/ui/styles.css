@@ -11,6 +11,7 @@
   --safe-r: env(safe-area-inset-right, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
+  --btn-scale: 1;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--fg); font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; user-select: none; -webkit-user-select: none; touch-action: none; overscroll-behavior: none; }
@@ -104,24 +105,42 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1p
 
 #touch-root { display: none; }
 body.touch #touch-root { display: block; }
-/* Floating joystick — positioned dynamically by TouchControls on touchstart, hidden when no touch active. */
-.joy { position: absolute; width: 140px; height: 140px; border-radius: 50%; background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.18); pointer-events: none; touch-action: none; transition: opacity 0.12s; opacity: 1; left: 0; top: 0; }
+/* Floating joystick — barely visible at rest so it doesn't fight gameplay attention. */
+.joy { position: absolute; width: 140px; height: 140px; border-radius: 50%; background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.14); pointer-events: none; touch-action: none; transition: opacity 0.12s; opacity: 1; left: 0; top: 0; }
 .joy.hidden { opacity: 0; }
-.joy .nub { position: absolute; left: 50%; top: 50%; width: 60px; height: 60px; border-radius: 50%; background: rgba(255,255,255,0.3); transform: translate(-50%, -50%); border: 2px solid rgba(255,255,255,0.5); transition: background 0.1s; }
+.joy .nub { position: absolute; left: 50%; top: 50%; width: 60px; height: 60px; border-radius: 50%; background: rgba(255,255,255,0.22); transform: translate(-50%, -50%); border: 2px solid rgba(255,255,255,0.4); transition: background 0.1s; }
 
-/* Right action cluster — 2 columns × 3 rows so all 6 actions fit thumb-friendly. */
-.btn-cluster { position: absolute; right: max(20px, var(--safe-r)); bottom: max(20px, var(--safe-b)); width: 220px; height: 280px; pointer-events: none; }
-.tbtn { position: absolute; width: 76px; height: 76px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.2); color: #fff; font-weight: 800; font-size: 14px; pointer-events: auto; touch-action: none; display: flex; align-items: center; justify-content: center; user-select: none; -webkit-user-select: none; transition: transform 0.05s, background 0.1s; }
-.tbtn:active, .tbtn.pressed { transform: scale(0.92); background: rgba(255,204,51,0.45); border-color: rgba(255,204,51,0.7); }
-/* Layout: bottom row = most-used (attack/jump). Aim + special at top. */
-.tbtn.attack  { right: 0;    bottom: 0;    background: rgba(255,77,109,0.40); }
-.tbtn.jump    { right: 86px; bottom: 0;    background: rgba(102,226,163,0.40); }
-.tbtn.grab    { right: 0;    bottom: 86px; background: rgba(255,204,51,0.35); }
-.tbtn.throw   { right: 86px; bottom: 86px; background: rgba(255,160,80,0.35); font-size: 24px; }
-.tbtn.aim     { right: 0;    bottom: 172px; background: rgba(180,180,255,0.40); font-size: 12px; }
-.tbtn.special { right: 86px; bottom: 172px; background: rgba(220,140,255,0.45); font-size: 22px; }
-/* Aim toggle stays visibly engaged when active even if finger has lifted. */
-.tbtn.aim.pressed { background: rgba(120,120,255,0.85); border-color: rgba(200,200,255,1); }
+/* Right action cluster — 4 buttons in a thumb arc. Sized via --btn-scale. */
+.btn-cluster { position: absolute; right: max(12px, var(--safe-r)); bottom: max(12px, var(--safe-b)); width: calc(220px * var(--btn-scale)); height: calc(220px * var(--btn-scale)); pointer-events: none; }
+
+/* Buttons: nearly invisible at rest (12% fill, 40% border), pop on press. */
+.tbtn { position: absolute; border-radius: 50%; color: rgba(255,255,255,0.5); font-weight: 800; font-size: 14px; pointer-events: auto; touch-action: none; display: flex; align-items: center; justify-content: center; user-select: none; -webkit-user-select: none; transition: transform 0.08s ease-out, background 0.1s, border-color 0.1s, color 0.1s; will-change: transform; }
+.tbtn::before { content: ''; position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.4), transparent 60%); opacity: 0; transition: opacity 0.25s ease-out; pointer-events: none; }
+.tbtn.pressed::before { opacity: 1; transition: opacity 0s; animation: tbtn-ripple 0.35s ease-out forwards; }
+@keyframes tbtn-ripple { 0% { opacity: 0.7; transform: scale(0.6); } 100% { opacity: 0; transform: scale(1.3); } }
+
+.tbtn:active, .tbtn.pressed { color: #fff; }
+.tbtn.pressed { animation: tbtn-overshoot 0.15s ease-out; }
+@keyframes tbtn-overshoot { 0% { transform: scale(0.92); } 60% { transform: scale(1.06); } 100% { transform: scale(1); } }
+
+/* Layout: Attack large bottom-right corner, Jump above, Grab + Special on inner arc. */
+.tbtn.attack  { right: 8px;   bottom: 8px;   width: calc(96px * var(--btn-scale)); height: calc(96px * var(--btn-scale)); background: rgba(255,77,109,0.12); border: 2px solid rgba(255,77,109,0.40); font-size: 28px; }
+.tbtn.jump    { right: 8px;   bottom: calc(110px * var(--btn-scale)); width: calc(72px * var(--btn-scale)); height: calc(72px * var(--btn-scale)); background: rgba(102,226,163,0.12); border: 2px solid rgba(102,226,163,0.40); font-size: 22px; }
+.tbtn.grab    { right: calc(110px * var(--btn-scale)); bottom: calc(30px * var(--btn-scale)); width: calc(68px * var(--btn-scale)); height: calc(68px * var(--btn-scale)); background: rgba(255,204,51,0.10); border: 2px solid rgba(255,204,51,0.35); font-size: 18px; }
+.tbtn.special { right: calc(110px * var(--btn-scale)); bottom: calc(110px * var(--btn-scale)); width: calc(64px * var(--btn-scale)); height: calc(64px * var(--btn-scale)); background: rgba(220,140,255,0.12); border: 2px solid rgba(220,140,255,0.40); font-size: 20px; }
+
+/* Pressed state — bright fill matches per-button hue. */
+.tbtn.attack.pressed  { background: rgba(255,77,109,0.6);  border-color: #fff; }
+.tbtn.jump.pressed    { background: rgba(102,226,163,0.6); border-color: #fff; }
+.tbtn.grab.pressed    { background: rgba(255,204,51,0.6);  border-color: #fff; }
+.tbtn.special.pressed { background: rgba(220,140,255,0.6); border-color: #fff; }
+
+/* Left-handed mirror — swap cluster + joystick spawn region. */
+body.touch.left-handed .btn-cluster { right: auto; left: max(12px, var(--safe-l)); }
+body.touch.left-handed .tbtn.attack  { right: auto; left: 8px; }
+body.touch.left-handed .tbtn.jump    { right: auto; left: 8px; }
+body.touch.left-handed .tbtn.grab    { right: auto; left: calc(110px * var(--btn-scale)); }
+body.touch.left-handed .tbtn.special { right: auto; left: calc(110px * var(--btn-scale)); }
 
 .dmg-flash { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, transparent 30%, rgba(255, 30, 50, 0.55) 100%); transition: opacity 0.18s ease-out; z-index: 5; }
 .time-vignette { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, transparent 35%, rgba(120, 0, 200, 0.35) 100%); transition: opacity 0.3s ease-out; z-index: 4; mix-blend-mode: screen; }
@@ -253,4 +272,49 @@ body.portrait::after {
    so it doesn't sit on top of the strip border. */
 body.local-mp .kill-feed { top: max(100px, calc(var(--safe-t) + 100px)); }
 body.local-mp .fps { display: none; }
+
+/* Mobile Controls settings — vertical stack of labeled inputs. */
+.mobile-settings { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.mobile-settings label { display: flex; align-items: center; gap: 10px; opacity: 0.9; font-size: 13px; }
+.mobile-settings input[type="range"] { flex: 1; max-width: 220px; accent-color: var(--accent); }
+.mobile-settings #mc-sens-val { font-variant-numeric: tabular-nums; opacity: 0.7; min-width: 56px; text-align: right; }
+.mobile-settings input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
+.mobile-settings select { background: rgba(0,0,0,0.4); border: 1px solid var(--panel-border); color: var(--fg); padding: 6px 10px; border-radius: 8px; font: inherit; }
+
+/* First-run mobile tutorial overlay. */
+.tut-root { position: fixed; inset: 0; z-index: 1500; pointer-events: none; }
+.tut-dim { position: absolute; inset: 0; background: rgba(0,0,0,0.55); }
+.tut-caption { position: absolute; top: 14%; left: 50%; transform: translateX(-50%); font-size: clamp(18px, 4vw, 28px); font-weight: 800; letter-spacing: 2px; color: var(--accent); text-shadow: 0 2px 12px rgba(0,0,0,0.85); text-align: center; }
+.tut-finger { position: absolute; width: 56px; height: 56px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.9), rgba(255,255,255,0.2) 70%); border: 3px solid #fff; transform: translate(-50%, -50%); opacity: 0; }
+.tut-finger.show { opacity: 1; }
+.tut-finger.tut-arc      { animation: tut-arc 1.4s ease-in-out infinite; }
+.tut-finger.tut-tap      { animation: tut-tap 1.0s ease-in-out infinite; }
+.tut-finger.tut-drag     { animation: tut-drag 1.6s ease-in-out infinite; }
+.tut-finger.tut-swipe    { animation: tut-swipe 1.4s ease-out infinite; }
+@keyframes tut-arc {
+  0%   { transform: translate(-50%, -50%) translate(-40px, 0); }
+  25%  { transform: translate(-50%, -50%) translate(0, -40px); }
+  50%  { transform: translate(-50%, -50%) translate(40px, 0); }
+  75%  { transform: translate(-50%, -50%) translate(0, 40px); }
+  100% { transform: translate(-50%, -50%) translate(-40px, 0); }
+}
+@keyframes tut-tap {
+  0%, 70%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  35%           { transform: translate(-50%, -50%) scale(0.7); opacity: 0.7; }
+}
+@keyframes tut-drag {
+  0%   { transform: translate(-50%, -50%) translate(0, 0) scale(0.95); }
+  60%  { transform: translate(-50%, -50%) translate(70px, -50px) scale(1.1); }
+  100% { transform: translate(-50%, -50%) translate(0, 0) scale(0.95); }
+}
+@keyframes tut-swipe {
+  0%   { transform: translate(-50%, -50%) translate(0, 0); opacity: 0.4; }
+  20%  { opacity: 1; }
+  100% { transform: translate(-50%, -50%) translate(120px, -120px); opacity: 0; }
+}
+.tut-skip { position: absolute; top: max(16px, var(--safe-t)); right: max(16px, var(--safe-r)); pointer-events: auto; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 8px 16px; font: inherit; font-weight: 700; letter-spacing: 1.5px; border-radius: 8px; cursor: pointer; }
+.tut-skip:hover { background: rgba(255,204,51,0.2); border-color: var(--accent); }
+
+/* Suppress all touch input while tutorial is showing. */
+body.touch.tutorial-active #touch-root { pointer-events: none !important; }
 

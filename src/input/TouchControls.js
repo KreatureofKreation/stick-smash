@@ -1,36 +1,61 @@
-// On-screen joystick + action buttons. Auto-enables on touch devices.
+// On-screen joystick + 4-button thumb-arc cluster.
 //
-// Behavior notes:
-//  - Joystick is FLOATING: a touchstart anywhere in the left half of the
-//    screen spawns the joy at that point. Releases anywhere finalize move.
-//    This is much friendlier for variable hand sizes / phone orientations
-//    than the fixed-corner joy we used to have.
-//  - Aim button is a TOGGLE (tap on / tap off). Holding aim used to require
-//    a third finger to also press Attack — toggling lets the player use the
-//    same right-thumb that runs Attack to enter/exit aim.
-//  - Move tracking is bound to the document (not the joy element). Once a
-//    touch starts on the joy area, it's tracked even if the finger drags
-//    off the visual element — no more dead-zones at the edges.
+// Aim model (PC mouse parallel):
+//  - aimDir is sticky — last drag-set 2D unit vector persists indefinitely.
+//  - Tap Attack = fire in current aimDir. Hold + drag from Attack updates
+//    aimDir per-frame as the finger moves. Release after a drag fires once
+//    in the new direction (Brawl-Stars-style aim-and-fire in one motion).
+//  - Drag classification: if finger moves >12px from touch-down before
+//    release, it's a drag (no fire on touch-down, fire on release).
+//    Otherwise it's a tap (fire on touch-up).
+//
+// Throw model:
+//  - Grabbed players/crates: handled by Stickman code on grab-release with
+//    movement input (joystick direction at release).
+//  - Wielded weapons (PC `Q` parity): swipe-from-Grab. Tap = grab/drop,
+//    hold-still = continuous grab, drag >20px on Grab = throw weapon in
+//    swipe direction on release (suppresses the regular grab toggle for
+//    that touch).
 import { clamp } from '../util/math.js';
+
+const ATTACK_DRAG_PX = 12;
+const GRAB_DRAG_PX   = 20;
 
 export class TouchControls {
   constructor() {
     this.active = false;
     this.snapshot = {
       moveX: 0, moveY: 0, jump: false, attack: false, grab: false,
-      special: false, throw: false, aimX: 1, aimY: 0, aimActive: false,
+      special: false, throw: false, aimX: 1, aimY: 0, aimActive: true,
     };
-    this.aimMode = false;
+    // Sticky aim direction — unit vector. Default right-facing.
+    this.aimDir = { x: 1, y: 0 };
+    // Settings — read once at construction, refreshed on Settings change
+    // via `applySettings()`.
+    this.aimSensitivity = parseFloat(localStorage.getItem('mc_aimSens') || '1') || 1;
+    // Teardown callbacks — populated by _doc(); drained in destroy().
+    this._teardown = [];
     this._build();
-    addEventListener('touchstart', () => this.enable(), { once: true, passive: true });
+    this._doc(window, 'touchstart', () => this.enable(), { once: true, passive: true });
     if (navigator.maxTouchPoints > 0 && (matchMedia('(pointer: coarse)').matches)) {
       this.enable();
     }
   }
 
+  // Helper: addEventListener with a matching removeEventListener queued in _teardown.
+  _doc(target, type, handler, opts) {
+    target.addEventListener(type, handler, opts);
+    this._teardown.push(() => target.removeEventListener(type, handler, opts));
+  }
+
   enable() {
     this.active = true;
     document.body.classList.add('touch');
+  }
+
+  // Called by Settings panel when sensitivity slider changes.
+  applySettings({ aimSensitivity } = {}) {
+    if (aimSensitivity != null) this.aimSensitivity = aimSensitivity;
   }
 
   _build() {
@@ -46,7 +71,7 @@ export class TouchControls {
     root.appendChild(joy);
     this.joy = joy; this.nub = nub;
 
-    // Right action cluster.
+    // Right action cluster — 4 buttons.
     const cluster = document.createElement('div');
     cluster.className = 'btn-cluster';
     const mkBtn = (cls, label) => {
@@ -59,38 +84,40 @@ export class TouchControls {
     this.btnAttack  = mkBtn('attack',  '✊');
     this.btnJump    = mkBtn('jump',    '⤴');
     this.btnGrab    = mkBtn('grab',    '✋');
-    this.btnAim     = mkBtn('aim',     'AIM');
-    this.btnThrow   = mkBtn('throw',   '🤾');
     this.btnSpecial = mkBtn('special', '★');
     root.appendChild(cluster);
 
-    // ── Floating joystick ───────────────────────────────────────────────
+    this._wireJoystick();
+    this._wireSimpleButton(this.btnJump,    'jump');
+    this._wireSimpleButton(this.btnSpecial, 'special');
+    this._wireAttackButton();
+    this._wireGrabButton();
+  }
+
+  // ── Floating joystick ─────────────────────────────────────────────────
+  _wireJoystick() {
     let joyId = null, joyCx = 0, joyCy = 0;
 
     const setNub = (ndx, ndy) => {
-      nub.style.left = `calc(50% + ${ndx * 40}px)`;
-      nub.style.top  = `calc(50% + ${ndy * 40}px)`;
+      this.nub.style.left = `calc(50% + ${ndx * 40}px)`;
+      this.nub.style.top  = `calc(50% + ${ndy * 40}px)`;
     };
 
     const showJoyAt = (x, y) => {
-      joy.classList.remove('hidden');
+      this.joy.classList.remove('hidden');
       joyCx = x; joyCy = y;
-      // Position center of joy at (x, y).
-      joy.style.left = `${x - 70}px`;
-      joy.style.top  = `${y - 70}px`;
-      joy.style.bottom = 'auto';
+      this.joy.style.left = `${x - 70}px`;
+      this.joy.style.top  = `${y - 70}px`;
+      this.joy.style.bottom = 'auto';
       setNub(0, 0);
     };
     const hideJoy = () => {
-      joy.classList.add('hidden');
+      this.joy.classList.add('hidden');
       setNub(0, 0);
       this.snapshot.moveX = 0;
       this.snapshot.moveY = 0;
-      if (this.aimMode) this.snapshot.aimActive = false;
     };
 
-    // touchstart on document — claim the touch if it landed in the left
-    // half of the screen and isn't on a button.
     const isOverButton = (el) => {
       while (el) {
         if (el.classList?.contains?.('tbtn')) return true;
@@ -99,14 +126,14 @@ export class TouchControls {
       return false;
     };
 
-    // Only claim touches when a match is actually live AND no menu is open.
-    // Without this gate the floating-joystick handler called preventDefault()
-    // on every left-half touch — which silently swallowed every menu tap on
-    // mobile, making the menu unusable.
     const isMenuActive = () => {
       const cl = document.body.classList;
       return cl.contains('menu-open') || !cl.contains('in-game');
     };
+
+    // Joystick lives on the LEFT half by default; on the RIGHT half when
+    // left-handed mirror is on. Keep the cluster opposite.
+    const joyOnLeft = () => !document.body.classList.contains('left-handed');
 
     const onDocStart = (ev) => {
       if (joyId !== null) return;
@@ -114,7 +141,9 @@ export class TouchControls {
       const t = ev.changedTouches?.[0];
       if (!t) return;
       if (isOverButton(t.target)) return;
-      if (t.clientX > innerWidth * 0.5) return; // right half is for buttons
+      const wantLeft = joyOnLeft();
+      if (wantLeft && t.clientX > innerWidth * 0.5) return;
+      if (!wantLeft && t.clientX < innerWidth * 0.5) return;
       joyId = t.identifier;
       showJoyAt(t.clientX, t.clientY);
       ev.preventDefault();
@@ -134,16 +163,8 @@ export class TouchControls {
         const m = clamp(mag / r, 0, 1);
         setNub(ndx * m, ndy * m);
         const t2 = m > 0.15 ? m : 0;
-        if (this.aimMode) {
-          this.snapshot.aimX = ndx;
-          this.snapshot.aimY = -ndy;
-          this.snapshot.aimActive = m > 0.2;
-          this.snapshot.moveX = 0;
-          this.snapshot.moveY = 0;
-        } else {
-          this.snapshot.moveX = ndx * t2;
-          this.snapshot.moveY = -ndy * t2;
-        }
+        this.snapshot.moveX = ndx * t2;
+        this.snapshot.moveY = -ndy * t2;
         ev.preventDefault();
       }
     };
@@ -157,58 +178,231 @@ export class TouchControls {
       }
     };
 
-    document.addEventListener('touchstart', onDocStart, { passive: false });
-    document.addEventListener('touchmove',  onDocMove,  { passive: false });
-    document.addEventListener('touchend',   onDocEnd);
-    document.addEventListener('touchcancel', onDocEnd);
+    this._doc(document, 'touchstart',  onDocStart, { passive: false });
+    this._doc(document, 'touchmove',   onDocMove,  { passive: false });
+    this._doc(document, 'touchend',    onDocEnd);
+    this._doc(document, 'touchcancel', onDocEnd);
+  }
 
-    // ── Action buttons ──────────────────────────────────────────────────
-    const bindBtn = (el, prop) => {
-      const ids = new Set();
-      const press = (ev) => {
-        for (const t of (ev.changedTouches ?? [ev])) ids.add(t.identifier ?? 'mouse');
-        this.snapshot[prop] = true;
-        el.classList.add('pressed');
-        ev.preventDefault();
-        ev.stopPropagation();
-      };
-      const release = (ev) => {
-        for (const t of (ev.changedTouches ?? [ev])) ids.delete(t.identifier ?? 'mouse');
-        if (ids.size === 0) {
-          this.snapshot[prop] = false;
-          el.classList.remove('pressed');
-        }
-      };
-      el.addEventListener('touchstart',  press,   { passive: false });
-      el.addEventListener('touchend',    release, { passive: false });
-      el.addEventListener('touchcancel', release, { passive: false });
-      el.addEventListener('mousedown',   press);
-      addEventListener('mouseup',        release);
-    };
-    bindBtn(this.btnAttack,  'attack');
-    bindBtn(this.btnJump,    'jump');
-    bindBtn(this.btnGrab,    'grab');
-    bindBtn(this.btnThrow,   'throw');
-    bindBtn(this.btnSpecial, 'special');
-
-    // ── Aim toggle ──────────────────────────────────────────────────────
-    // Tap to enter aim mode (joystick now steers aim), tap again to exit.
-    // While aim is active, the player can still tap Attack with the same
-    // thumb that toggled aim — that's the whole point of toggling vs hold.
-    const setAim = (on) => {
-      this.aimMode = on;
-      this.btnAim.classList.toggle('pressed', on);
-      if (!on) this.snapshot.aimActive = false;
-    };
-    const toggleAim = (ev) => {
-      setAim(!this.aimMode);
+  // ── Simple press-and-hold button (Jump, Special) ──────────────────────
+  _wireSimpleButton(el, prop) {
+    const ids = new Set();
+    const press = (ev) => {
+      for (const t of (ev.changedTouches ?? [ev])) ids.add(t.identifier ?? 'mouse');
+      this.snapshot[prop] = true;
+      el.classList.add('pressed');
       ev.preventDefault();
       ev.stopPropagation();
     };
-    this.btnAim.addEventListener('touchstart', toggleAim, { passive: false });
-    this.btnAim.addEventListener('mousedown',  toggleAim);
+    const release = (ev) => {
+      for (const t of (ev.changedTouches ?? [ev])) ids.delete(t.identifier ?? 'mouse');
+      if (ids.size === 0) {
+        this.snapshot[prop] = false;
+        el.classList.remove('pressed');
+      }
+    };
+    el.addEventListener('touchstart',  press,   { passive: false });
+    el.addEventListener('touchend',    release, { passive: false });
+    el.addEventListener('touchcancel', release, { passive: false });
+    el.addEventListener('mousedown',   press);
+    this._doc(window, 'mouseup', release);
+  }
+
+  // ── Attack button: tap = fire, hold + drag = update aimDir + fire on release.
+  _wireAttackButton() {
+    const el = this.btnAttack;
+    let touchId = null;
+    let startX = 0, startY = 0;
+    let dragged = false;
+
+    const startPress = (id, x, y) => {
+      touchId = id;
+      startX = x; startY = y;
+      dragged = false;
+      el.classList.add('pressed');
+    };
+    const updateDrag = (x, y) => {
+      const rawDx = x - startX;
+      const rawDy = y - startY;
+      const rawMag = Math.hypot(rawDx, rawDy);
+      // Sensitivity scales the drag threshold inversely. Higher sens = smaller
+      // drag needed to commit (more responsive). Lower sens = larger drag needed
+      // (more deliberate). aimDir itself is a unit vector — magnitude doesn't
+      // affect direction after normalization.
+      const threshold = ATTACK_DRAG_PX / Math.max(this.aimSensitivity, 0.01);
+      if (!dragged && rawMag > threshold) dragged = true;
+      if (dragged && rawMag > 0) {
+        this.aimDir.x = rawDx / rawMag;
+        this.aimDir.y = -rawDy / rawMag;
+        this.snapshot.aimX = this.aimDir.x;
+        this.snapshot.aimY = this.aimDir.y;
+        this.snapshot.aimActive = true;
+      }
+    };
+    const endPress = () => {
+      // Fire one frame regardless of whether it was tap or drag.
+      this.snapshot.attack = true;
+      // Clear on next animation frame so Stickman's edge-detector sees the press.
+      requestAnimationFrame(() => requestAnimationFrame(() => { this.snapshot.attack = false; }));
+      el.classList.remove('pressed');
+      // Re-trigger animation by toggling the class.
+      el.classList.add('pressed');
+      requestAnimationFrame(() => el.classList.remove('pressed'));
+      touchId = null; dragged = false;
+    };
+
+    el.addEventListener('touchstart', (ev) => {
+      const t = ev.changedTouches[0];
+      if (!t || touchId !== null) return;
+      startPress(t.identifier, t.clientX, t.clientY);
+      ev.preventDefault(); ev.stopPropagation();
+    }, { passive: false });
+
+    el.addEventListener('touchmove', (ev) => {
+      if (touchId === null) return;
+      for (const t of ev.changedTouches) {
+        if (t.identifier !== touchId) continue;
+        updateDrag(t.clientX, t.clientY);
+        ev.preventDefault();
+      }
+    }, { passive: false });
+
+    this._doc(document, 'touchmove', (ev) => {
+      if (touchId === null) return;
+      for (const t of ev.changedTouches) {
+        if (t.identifier !== touchId) continue;
+        updateDrag(t.clientX, t.clientY);
+      }
+    }, { passive: false });
+
+    const onEnd = (ev) => {
+      if (touchId === null) return;
+      for (const t of ev.changedTouches) {
+        if (t.identifier !== touchId) continue;
+        endPress();
+      }
+    };
+    const onCancel = (ev) => {
+      if (touchId === null) return;
+      for (const t of ev.changedTouches) {
+        if (t.identifier !== touchId) continue;
+        el.classList.remove('pressed');
+        touchId = null;
+        dragged = false;
+      }
+    };
+    el.addEventListener('touchend',    onEnd,     { passive: false });
+    el.addEventListener('touchcancel', onCancel,  { passive: false });
+    this._doc(document, 'touchend',    onEnd,     { passive: false });
+    this._doc(document, 'touchcancel', onCancel,  { passive: false });
+
+    // Mouse for desktop testing (no drag-aim, just click-to-fire).
+    el.addEventListener('mousedown', (ev) => {
+      this.snapshot.attack = true;
+      el.classList.add('pressed');
+      requestAnimationFrame(() => requestAnimationFrame(() => { this.snapshot.attack = false; }));
+      requestAnimationFrame(() => el.classList.remove('pressed'));
+      ev.preventDefault();
+    });
+  }
+
+  // ── Grab button: tap = grab/drop (held = continuous grab), drag = throw weapon.
+  _wireGrabButton() {
+    const el = this.btnGrab;
+    let touchId = null;
+    let startX = 0, startY = 0;
+    let dragged = false;
+
+    el.addEventListener('touchstart', (ev) => {
+      const t = ev.changedTouches[0];
+      if (!t || touchId !== null) return;
+      touchId = t.identifier;
+      startX = t.clientX; startY = t.clientY;
+      dragged = false;
+      this.snapshot.grab = true;
+      el.classList.add('pressed');
+      ev.preventDefault(); ev.stopPropagation();
+    }, { passive: false });
+
+    const onMove = (ev) => {
+      if (touchId === null) return;
+      for (const t of ev.changedTouches) {
+        if (t.identifier !== touchId) continue;
+        const dx = t.clientX - startX;
+        const dy = t.clientY - startY;
+        if (!dragged && Math.hypot(dx, dy) > GRAB_DRAG_PX) {
+          dragged = true;
+          // Releasing grab while dragged would drop the held thing — that's
+          // wrong for "swipe to throw weapon". Suppress grab so swipe-only
+          // is treated as a separate gesture: drop grab immediately.
+          this.snapshot.grab = false;
+          el.classList.remove('pressed');
+        }
+      }
+    };
+    el.addEventListener('touchmove', onMove, { passive: false });
+    this._doc(document, 'touchmove', onMove, { passive: false });
+
+    const onEnd = (ev) => {
+      if (touchId === null) return;
+      for (const t of ev.changedTouches) {
+        if (t.identifier !== touchId) continue;
+        if (dragged) {
+          // Swipe — fire one-frame throw flag in the swipe direction. The
+          // swipe vector overrides aimDir for this throw only by setting
+          // aim to the swipe direction one frame before throw.
+          const dx = t.clientX - startX;
+          const dy = t.clientY - startY;
+          const mag = Math.hypot(dx, dy);
+          if (mag > 0) {
+            this.aimDir.x = dx / mag;
+            this.aimDir.y = -dy / mag;
+            this.snapshot.aimX = this.aimDir.x;
+            this.snapshot.aimY = this.aimDir.y;
+            this.snapshot.aimActive = true;
+          }
+          this.snapshot.throw = true;
+          requestAnimationFrame(() => requestAnimationFrame(() => { this.snapshot.throw = false; }));
+        } else {
+          // Tap — release grab cleanly.
+          this.snapshot.grab = false;
+          el.classList.remove('pressed');
+        }
+        touchId = null; dragged = false;
+      }
+    };
+    const onCancel = (ev) => {
+      if (touchId === null) return;
+      for (const t of ev.changedTouches) {
+        if (t.identifier !== touchId) continue;
+        this.snapshot.grab = false;
+        el.classList.remove('pressed');
+        touchId = null;
+        dragged = false;
+      }
+    };
+    el.addEventListener('touchend',    onEnd,    { passive: false });
+    el.addEventListener('touchcancel', onCancel, { passive: false });
+    this._doc(document, 'touchend',    onEnd,    { passive: false });
+    this._doc(document, 'touchcancel', onCancel, { passive: false });
+
+    // Mouse: hold = grab, no swipe support (desktop only — mouse uses keyboard for throw).
+    el.addEventListener('mousedown', (ev) => {
+      this.snapshot.grab = true;
+      el.classList.add('pressed');
+      ev.preventDefault();
+    });
+    this._doc(window, 'mouseup', () => {
+      this.snapshot.grab = false;
+      el.classList.remove('pressed');
+    });
   }
 
   getSnapshot() { return { ...this.snapshot }; }
-  destroy() { document.getElementById('touch-root').innerHTML = ''; }
+
+  destroy() {
+    for (const fn of this._teardown) { try { fn(); } catch (_) {} }
+    this._teardown = [];
+    document.getElementById('touch-root').innerHTML = '';
+  }
 }

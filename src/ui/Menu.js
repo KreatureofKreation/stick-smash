@@ -3,6 +3,7 @@ import { ROSTER, rosterById } from '../characters/roster.js';
 import { LEVELS } from '../levels/definitions.js';
 import { audio } from '../audio/Audio.js';
 import { SPAWN_TABLE, setDisabledWeapons, getDisabledWeapons } from '../weapons/weapons.js';
+import { setHapticsEnabled } from '../util/haptics.js';
 
 export class Menu {
   constructor(game) {
@@ -17,6 +18,8 @@ export class Menu {
     // shared-link flow feel instant.
     const params = new URLSearchParams(location.search);
     this.show(params.get('room') ? 'online' : 'main');
+    this._applyMobileSettings();
+    setHapticsEnabled(localStorage.getItem('mc_haptics') !== '0');
   }
 
   show(screen, ...args) {
@@ -41,6 +44,20 @@ export class Menu {
 
   _stopPadPolling() {
     if (this._padPollId) { clearInterval(this._padPollId); this._padPollId = null; }
+  }
+
+  // Apply persisted Mobile Controls settings to the live document + input layer.
+  // Called from _settings() on every change, and from constructor on boot
+  // so left-handed/scale survive page reloads.
+  _applyMobileSettings() {
+    const sens   = parseFloat(localStorage.getItem('mc_aimSens') || '1') || 1;
+    const scale  = localStorage.getItem('mc_btnScale') || 'M';
+    const lefty  = localStorage.getItem('mc_lefty') === '1';
+    document.documentElement.style.setProperty('--btn-scale', scale === 'S' ? '0.85' : scale === 'L' ? '1.15' : '1');
+    document.body.classList.toggle('left-handed', lefty);
+    if (this.game?.input?.touch?.applySettings) {
+      this.game.input.touch.applySettings({ aimSensitivity: sens });
+    }
   }
 
   _menuShell(html) {
@@ -378,21 +395,40 @@ export class Menu {
           ${renderCat('pickup')}
           ${renderCat('power')}
         </div>
+        <hr class="sep">
+        <h2>MOBILE CONTROLS</h2>
+        <div class="mobile-settings">
+          <label>Aim Sensitivity
+            <input type="range" min="0.5" max="2" step="0.05" id="mc-sens" value="${parseFloat(localStorage.getItem('mc_aimSens') || '1')}" />
+            <span id="mc-sens-val">${parseFloat(localStorage.getItem('mc_aimSens') || '1').toFixed(2)}×</span>
+          </label>
+          <label>Button Size
+            <select id="mc-scale">
+              <option value="S" ${(localStorage.getItem('mc_btnScale') || 'M') === 'S' ? 'selected' : ''}>Small</option>
+              <option value="M" ${(localStorage.getItem('mc_btnScale') || 'M') === 'M' ? 'selected' : ''}>Medium</option>
+              <option value="L" ${(localStorage.getItem('mc_btnScale') || 'M') === 'L' ? 'selected' : ''}>Large</option>
+            </select>
+          </label>
+          <label><input type="checkbox" id="mc-lefty" ${localStorage.getItem('mc_lefty') === '1' ? 'checked' : ''} /> Left-handed (mirror layout)</label>
+          <label><input type="checkbox" id="mc-haptics" ${localStorage.getItem('mc_haptics') !== '0' ? 'checked' : ''} /> Haptic feedback</label>
+          <button class="btn small" data-act="replay-tut">SHOW TUTORIAL AGAIN</button>
+        </div>
         <div class="btn-row">
           <button class="btn primary" data-act="back">← BACK</button>
         </div>
       </div>
     `);
+    const weaponBoxes = () => [...el.querySelectorAll('.weapon-toggle input[type=checkbox]')];
     const save = () => {
-      const ids = [...el.querySelectorAll('input[type=checkbox]')]
+      const ids = weaponBoxes()
         .filter(cb => !cb.checked)
         .map(cb => cb.dataset.id);
       setDisabledWeapons(ids);
       localStorage.setItem('disabledWeapons', JSON.stringify(ids));
     };
-    el.querySelectorAll('input[type=checkbox]').forEach(cb => cb.addEventListener('change', save));
+    weaponBoxes().forEach(cb => cb.addEventListener('change', save));
     const setAll = (predicate) => {
-      el.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      weaponBoxes().forEach(cb => {
         const entry = SPAWN_TABLE.find(e => e.id === cb.dataset.id);
         cb.checked = predicate(entry);
       });
@@ -405,6 +441,30 @@ export class Menu {
     el.querySelector('[data-act="powersoff"]').onclick = () =>
       setAll(e => e?.cat !== 'power');
     el.querySelector('[data-act="back"]').onclick = () => this.show('main');
+    const sens = el.querySelector('#mc-sens');
+    const sensVal = el.querySelector('#mc-sens-val');
+    sens.oninput = () => {
+      sensVal.textContent = parseFloat(sens.value).toFixed(2) + '×';
+      localStorage.setItem('mc_aimSens', sens.value);
+      this._applyMobileSettings();
+    };
+    el.querySelector('#mc-scale').onchange = (e) => {
+      localStorage.setItem('mc_btnScale', e.target.value);
+      this._applyMobileSettings();
+    };
+    el.querySelector('#mc-lefty').onchange = (e) => {
+      localStorage.setItem('mc_lefty', e.target.checked ? '1' : '0');
+      this._applyMobileSettings();
+    };
+    el.querySelector('#mc-haptics').onchange = (e) => {
+      setHapticsEnabled(e.target.checked);  // writes localStorage + updates cache
+      this._applyMobileSettings();
+    };
+    el.querySelector('[data-act="replay-tut"]').onclick = () => {
+      localStorage.removeItem('touch_tutorial_done');
+      // Trigger overlay open if tutorial module is loaded.
+      if (this.game?.tutorial?.show) this.game.tutorial.show();
+    };
   }
 
   _pause() {
