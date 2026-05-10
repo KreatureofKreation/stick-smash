@@ -31,9 +31,36 @@ export class Planet {
   get haloRadius() { return this.radius * this.haloMul; }
 
   build(scene, world) {
+    this._buildSurface(scene, world);
     this._buildCrust(scene, world);
     this._buildMantle(scene, world);
     this._buildCore(scene, world);
+  }
+
+  _buildSurface(scene, world) {
+    // Solid impenetrable surface sphere. Player walks on this; wedges sit
+    // visually on top and take damage from projectiles + explosions but
+    // are NOT what blocks the capsule. This eliminates the gap-tunneling
+    // bug where the wedge Box colliders left angular gaps the capsule
+    // could slip through.
+    const body = new CANNON.Body({
+      mass: 0,
+      collisionFilterGroup: COL_GROUPS.WORLD,
+      collisionFilterMask: -1,
+    });
+    body.addShape(new CANNON.Sphere(this.radius));
+    body.position.set(this.cx, this.cy, 0);
+    world.add(body);
+    this.surfaceBody = body;
+  }
+
+  destroy() {
+    if (this.surfaceBody) {
+      this.level.physics.remove(this.surfaceBody);
+      this.surfaceBody = null;
+    }
+    // Wedges + core are torn down via level.tiles / level.hazards sweeps
+    // in Level.destroy. Nothing else to do here.
   }
 
   _buildMantle(scene, world) {
@@ -166,8 +193,12 @@ export class Planet {
     const halfZ = 0.25;
     const body = new CANNON.Body({
       mass: 0,
+      // Wedge colliders do NOT block players — surface sphere does.
+      // Wedges still need to receive projectile + explosion hits, so they
+      // collide with PROJECTILE only. The `kind: 'tile'` userData routes
+      // damage events the same way as before.
       collisionFilterGroup: COL_GROUPS.WORLD,
-      collisionFilterMask: -1,
+      collisionFilterMask: COL_GROUPS.PROJECTILE,
     });
     body.addShape(new CANNON.Box(new CANNON.Vec3(halfX, halfY, halfZ)));
     body.position.set(this.cx + localX, this.cy + localY, 0);

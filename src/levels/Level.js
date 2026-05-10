@@ -939,6 +939,7 @@ export class Level {
     this._dynamicTiles.clear();
     this._chainSegs.clear();
     this._hazardDrivers.clear();
+    for (const p of this.planets) p.destroy?.();
     this.planets.length = 0;
   }
 }

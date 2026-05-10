@@ -1038,6 +1038,42 @@ export const LEVELS = [
   },
 
   // ---------------------------------------------------------------------
+  // PLANET TEST — single planet for tuning curved-gravity feel.
+  // Once movement + gravity feel right here, scale up to multi-planet.
+  // ---------------------------------------------------------------------
+  {
+    id: 'planettest',
+    name: 'Planet Test',
+    bgColor: 0x000008,
+    gravity: 0,
+    curvedGravity: true,
+    cameraClamp: { x: [-30, 30], y: [-25, 25], zoom: [12, 30] },
+    killBound: { x: 30, y: 25 },
+    planets: [
+      { id: 'p1', cx: 0, cy: 0, radius: 5.0, mantleRadius: 3.5, coreRadius: 1.6, mass: 200 },
+    ],
+    tiles: [],
+    hazards: [],
+    spawns: [
+      { x: 0, y: 6.5 },     // top
+      { x: -6.5, y: 0 },    // left
+      { x: 6.5, y: 0 },     // right
+      { x: 0, y: -6.5 },    // bottom
+    ],
+    weaponSpawns: [
+      { x: 0, y: 6.5 }, { x: -6.5, y: 0 }, { x: 6.5, y: 0 }, { x: 0, y: -6.5 },
+    ],
+    background: [
+      bgGlow(-12, 14, 0.18, 0.18, 0xffffff, -16),
+      bgGlow(8, 12, 0.18, 0.18, 0xffffff, -16),
+      bgGlow(-8, -12, 0.18, 0.18, 0xeeeeff, -16),
+      bgGlow(14, -8, 0.18, 0.18, 0xffffff, -16),
+      bgGlow(-14, 4, 0.15, 0.15, 0xddddff, -16),
+      bgGlow(11, -14, 0.15, 0.15, 0xffffff, -16),
+    ],
+  },
+
+  // ---------------------------------------------------------------------
   // CRATE ZONE — pure crate physics. No static floor inside the kill
   // arena; three wooden pallet bases (the "outside the killbox" supports)
   // are the only static surfaces — everything else is dynamic crates that

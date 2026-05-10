@@ -4,7 +4,7 @@ import * as CANNON from 'cannon-es';
 // dynamic body in the world AND every active projectile in `game`. The same
 // callback is used for both pre-step physics integration and projectile arc.
 export function makePlanetGravity(level, game) {
-  const G = 1.5;                  // tuning constant
+  const G = 1.0;                  // tuning constant
   return function applyPlanetGravity() {
     const planets = level.planets;
     if (!planets.length) return;
@@ -31,7 +31,7 @@ export function makePlanetGravity(level, game) {
       // pulls can't yeet a body across the map. ~25 m/s² is roughly 2.5G —
       // strong enough to feel weighty, gentle enough to keep play in frame.
       const aMag = Math.hypot(ax, ay);
-      const aMax = 25;
+      const aMax = 12;
       if (aMag > aMax) {
         const k = aMax / aMag;
         ax *= k;
