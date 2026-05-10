@@ -714,21 +714,43 @@ export class Game {
   }
 
   _checkGameOver() {
-    if (!this.localPlayer) return;
+    if (!this.localPlayers || this.localPlayers.length === 0) return;
     // A player is still "in the match" while they have lives remaining. Being
     // mid-respawn (state===DEAD with lives>0) does NOT count them out — they'll
     // be back. Only when lives==0 and state===DEAD are they truly eliminated.
     const stillIn = this.players.filter(p => p && p.lives > 0);
-    if (this.localPlayer.lives <= 0 && this.localPlayer.state === STATE.DEAD) {
+    const totalEverIn = this.players.filter(p => p).length;
+
+    // Solo: keep the existing "you died" early exit so the over-screen fires
+    // the moment P1 runs out of lives.
+    if (this.localPlayers.length === 1) {
+      const local = this.localPlayer;
+      if (local.lives <= 0 && local.state === STATE.DEAD) {
+        this.running = false;
+        audio.death();
+        setTimeout(() => this.menu.show('over', 'KO!', `${local.name} eliminated.`), 1200);
+        return;
+      }
+    }
+
+    if (totalEverIn <= 1) return;
+
+    // All locals dead AND no one alive → simultaneous wipeout = draw.
+    if (stillIn.length === 0) {
       this.running = false;
       audio.death();
-      setTimeout(() => this.menu.show('over', 'KO!', `${this.localPlayer.name} eliminated.`), 1200);
+      setTimeout(() => this.menu.show('over', 'DRAW', 'Everyone went down.'), 1200);
       return;
     }
-    if (this.players.filter(p => p).length > 1 && stillIn.length === 1 && stillIn[0] === this.localPlayer) {
+
+    // Last fighter standing wins — anyone, not just P1.
+    if (stillIn.length === 1) {
+      const winner = stillIn[0];
       this.running = false;
-      audio.win();
-      setTimeout(() => this.menu.show('over', 'VICTORY', `${this.localPlayer.name} wins!`), 800);
+      const localWon = this.localPlayers.includes(winner);
+      if (localWon) audio.win(); else audio.death();
+      const sub = `${winner.name} wins!`;
+      setTimeout(() => this.menu.show('over', 'VICTORY', sub), 800);
     }
   }
 
