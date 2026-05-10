@@ -33,6 +33,7 @@ export class Stickman {
     this.team = opts.team ?? 0;
     this.isLocal = opts.isLocal ?? false;
     this.isBot = opts.isBot ?? false;
+    this.inputSource = opts.inputSource ?? null;  // {kind:'kb-mouse'} | {kind:'gamepad', gamepadIdx:N} | null (bot/net)
 
     // Physics: capsule = sphere + cylinder + sphere via two spheres + box (cheap & robust)
     const body = new CANNON.Body({
