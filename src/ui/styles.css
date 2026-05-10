@@ -273,3 +273,11 @@ body.portrait::after {
 body.local-mp .kill-feed { top: max(100px, calc(var(--safe-t) + 100px)); }
 body.local-mp .fps { display: none; }
 
+/* Mobile Controls settings — vertical stack of labeled inputs. */
+.mobile-settings { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.mobile-settings label { display: flex; align-items: center; gap: 10px; opacity: 0.9; font-size: 13px; }
+.mobile-settings input[type="range"] { flex: 1; max-width: 220px; accent-color: var(--accent); }
+.mobile-settings #mc-sens-val { font-variant-numeric: tabular-nums; opacity: 0.7; min-width: 56px; text-align: right; }
+.mobile-settings input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
+.mobile-settings select { background: rgba(0,0,0,0.4); border: 1px solid var(--panel-border); color: var(--fg); padding: 6px 10px; border-radius: 8px; font: inherit; }
+
