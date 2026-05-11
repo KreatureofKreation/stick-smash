@@ -1734,6 +1734,7 @@ export class Stickman {
       aim,
       crouching: this.crouching,
       sliding: this.sliding,
+      prone: this.crouching && !this.sliding,
       ragdollAmount: ragAmt,
       gumGumPunch: gumGum && this.attackTimer > 0 && !this.weapon,
       // Throw windup ramps 0→1 over the windup window so the rig telegraphs

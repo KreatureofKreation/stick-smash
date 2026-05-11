@@ -609,6 +609,15 @@ export class StickmanRig {
       this._slideArmDrift = false;
     }
 
+    // Prone crouch — body lays near-horizontal.
+    if (params.prone) {
+      const bob = Math.sin(performance.now() * 0.003) * 0.04;
+      this.bodyTiltTarget = this.facing * (-Math.PI / 2) + bob;
+      this._proneLooseLimbs = true;
+    } else {
+      this._proneLooseLimbs = false;
+    }
+
     this.bodyTilt = damp(this.bodyTilt, this.bodyTiltTarget, 0.0001, dt);
     this.hitTilt = damp(this.hitTilt, 0, 0.001, dt);
 
@@ -1074,6 +1083,23 @@ export class StickmanRig {
       handRY = sRY + 0.20;                  // slightly up (wind drag)
       handLX = sLX - this.facing * 0.40;   // mirror left arm trailing
       handLY = sLY + 0.15;
+    }
+
+    // Prone loose limbs — drop pose blend weight for off-arm + both legs.
+    // The aim arm stays stiff and tracks params.aim even while prone.
+    if (this._proneLooseLimbs && !params.aim && params.armPoseR !== 'strikePosed') {
+      // Slacken off-arm target toward neutral hanging position.
+      handLX = lerp(handLX, sLX, 0.85);
+      handLY = lerp(handLY, sLY - 0.20, 0.85);
+      // Legs hang where they fall — push targets toward ground.
+      footRY = baseFootY - 0.05;
+      footLY = baseFootY - 0.05;
+    }
+    // Aim-arm tracks aim vector even in prone.
+    if (params.prone && params.aim) {
+      const aimAngProne = Math.atan2(params.aim.y, params.aim.x);
+      handRX = sRX + Math.cos(aimAngProne) * 0.7;
+      handRY = sRY + Math.sin(aimAngProne) * 0.7;
     }
 
     // Idle baseline ragdoll droop on arms (only in walk pose)
