@@ -22,11 +22,11 @@ export class Sword extends Weapon {
   }
   _buildMesh() {
     const grp = new THREE.Group();
-    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.07, 0.04), new THREE.MeshLambertMaterial({ color: 0xddeeff, metalness: 0.8, roughness: 0.2 }));
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.07, 0.04), new THREE.MeshLambertMaterial({ color: 0xddeeff }));
     blade.position.x = 0.4;
     const handle = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.1, 0.08), new THREE.MeshLambertMaterial({ color: 0x331a08 }));
     handle.position.x = -0.05;
-    const guard = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.18, 0.1), new THREE.MeshLambertMaterial({ color: 0xffcc33, metalness: 0.7 }));
+    const guard = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.18, 0.1), new THREE.MeshLambertMaterial({ color: 0xffcc33 }));
     guard.position.x = 0.05;
     grp.add(blade, handle, guard);
     this.mesh = grp;
@@ -134,15 +134,15 @@ export class Longsword extends Weapon {
   }
   _buildMesh() {
     const grp = new THREE.Group();
-    const blade = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.04), new THREE.MeshLambertMaterial({ color: 0xddddee, metalness: 0.85, roughness: 0.18 }));
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.04), new THREE.MeshLambertMaterial({ color: 0xddddee }));
     blade.position.x = 0.6;
-    const fuller = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.025, 0.045), new THREE.MeshLambertMaterial({ color: 0xb0b0c0, metalness: 0.5 }));
+    const fuller = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.025, 0.045), new THREE.MeshLambertMaterial({ color: 0xb0b0c0 }));
     fuller.position.x = 0.55;
-    const guard = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.28, 0.12), new THREE.MeshLambertMaterial({ color: 0x886633, metalness: 0.7 }));
+    const guard = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.28, 0.12), new THREE.MeshLambertMaterial({ color: 0x886633 }));
     guard.position.x = 0.05;
     const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.22, 8), new THREE.MeshLambertMaterial({ color: 0x331a08 }));
     grip.rotation.z = Math.PI / 2; grip.position.x = -0.07;
-    const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), new THREE.MeshLambertMaterial({ color: 0xb8a050, metalness: 0.8 }));
+    const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), new THREE.MeshLambertMaterial({ color: 0xb8a050 }));
     pommel.position.x = -0.18;
     grp.add(blade, fuller, guard, grip, pommel);
     this.mesh = grp;
@@ -195,12 +195,12 @@ export class Mace extends Weapon {
     const grp = new THREE.Group();
     const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.6, 8), new THREE.MeshLambertMaterial({ color: 0x331a08 }));
     handle.rotation.z = Math.PI / 2; handle.position.x = 0.2;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), new THREE.MeshLambertMaterial({ color: 0x707880, metalness: 0.7, roughness: 0.4 }));
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), new THREE.MeshLambertMaterial({ color: 0x707880 }));
     head.position.x = 0.55;
     // Spikes on the mace head
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2;
-      const sp = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.13, 5), new THREE.MeshLambertMaterial({ color: 0xa0a8b8, metalness: 0.85 }));
+      const sp = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.13, 5), new THREE.MeshLambertMaterial({ color: 0xa0a8b8 }));
       sp.position.set(0.55 + Math.cos(a) * 0.18, Math.sin(a) * 0.18, 0);
       sp.rotation.z = a - Math.PI / 2;
       grp.add(sp);
@@ -258,11 +258,11 @@ export class WarHammer extends Weapon {
     const grp = new THREE.Group();
     const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.85, 8), new THREE.MeshLambertMaterial({ color: 0x4a2a18 }));
     handle.rotation.z = Math.PI / 2; handle.position.x = 0.32;
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.28, 0.22), new THREE.MeshLambertMaterial({ color: 0x606870, metalness: 0.65, roughness: 0.45 }));
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.28, 0.22), new THREE.MeshLambertMaterial({ color: 0x606870 }));
     head.position.x = 0.78;
-    const claw = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.22, 4), new THREE.MeshLambertMaterial({ color: 0x707880, metalness: 0.8 }));
+    const claw = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.22, 4), new THREE.MeshLambertMaterial({ color: 0x707880 }));
     claw.rotation.z = Math.PI / 2; claw.position.x = 0.97;
-    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.05, 8), new THREE.MeshLambertMaterial({ color: 0xb8a050, metalness: 0.7 }));
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.05, 8), new THREE.MeshLambertMaterial({ color: 0xb8a050 }));
     cap.rotation.z = Math.PI / 2; cap.position.x = -0.13;
     grp.add(handle, head, claw, cap);
     this.mesh = grp;
@@ -319,14 +319,14 @@ export class Halberd extends Weapon {
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.5, 8), new THREE.MeshLambertMaterial({ color: 0x4a2a18 }));
     pole.rotation.z = Math.PI / 2; pole.position.x = 0.5;
     // Axe blade
-    const axe = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.4, 0.04), new THREE.MeshLambertMaterial({ color: 0xddddee, metalness: 0.85, roughness: 0.2 }));
+    const axe = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.4, 0.04), new THREE.MeshLambertMaterial({ color: 0xddddee }));
     axe.position.set(0.95, 0.18, 0);
     // Spike top
-    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.28, 4), new THREE.MeshLambertMaterial({ color: 0xddddee, metalness: 0.85 }));
+    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.28, 4), new THREE.MeshLambertMaterial({ color: 0xddddee }));
     spike.position.x = 1.35;
     spike.rotation.z = Math.PI / 2;
     // Hook
-    const hook = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.18, 4), new THREE.MeshLambertMaterial({ color: 0x808898, metalness: 0.85 }));
+    const hook = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.18, 4), new THREE.MeshLambertMaterial({ color: 0x808898 }));
     hook.position.set(0.95, -0.16, 0);
     hook.rotation.z = Math.PI;
     grp.add(pole, axe, spike, hook);
@@ -379,7 +379,7 @@ export class Pistol extends Weapon {
   }
   _buildMesh() {
     const grp = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.15, 0.1), new THREE.MeshLambertMaterial({ color: 0x333344, metalness: 0.6 }));
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.15, 0.1), new THREE.MeshLambertMaterial({ color: 0x333344 }));
     body.position.x = 0.25;
     const grip = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.22, 0.1), new THREE.MeshLambertMaterial({ color: 0x222222 }));
     grip.position.set(0.05, -0.18, 0); grip.rotation.z = -0.2;
@@ -415,9 +415,9 @@ export class Shotgun extends Weapon {
   }
   _buildMesh() {
     const g = new THREE.BoxGeometry(0.85, 0.16, 0.12);
-    const m = new THREE.MeshLambertMaterial({ color: 0x553322, metalness: 0.5 });
+    const m = new THREE.MeshLambertMaterial({ color: 0x553322 });
     const main = new THREE.Mesh(g, m); main.position.x = 0.4;
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.85, 10), new THREE.MeshLambertMaterial({ color: 0x222233, metalness: 0.7 }));
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.85, 10), new THREE.MeshLambertMaterial({ color: 0x222233 }));
     barrel.rotation.z = Math.PI / 2; barrel.position.x = 0.4; barrel.position.y = 0.05;
     const grp = new THREE.Group(); grp.add(main, barrel);
     this.mesh = grp;
@@ -456,9 +456,9 @@ export class Minigun extends Weapon {
   }
   _buildMesh() {
     const grp = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.22, 0.18), new THREE.MeshLambertMaterial({ color: 0x444455, metalness: 0.5 }));
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.22, 0.18), new THREE.MeshLambertMaterial({ color: 0x444455 }));
     body.position.x = 0.35;
-    const barrels = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.5, 8), new THREE.MeshLambertMaterial({ color: 0x222233, metalness: 0.8 }));
+    const barrels = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.5, 8), new THREE.MeshLambertMaterial({ color: 0x222233 }));
     barrels.rotation.z = Math.PI / 2; barrels.position.x = 0.7;
     grp.add(body, barrels);
     this.mesh = grp;
@@ -502,7 +502,7 @@ export class Bow extends Weapon {
     // Build a slightly more arrow-shaped mesh: shaft + fletching cone.
     const arrowMat = new THREE.MeshLambertMaterial({ color: 0xc8a85c });
     const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.7, 6), arrowMat);
-    const head = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.12, 6), new THREE.MeshLambertMaterial({ color: 0x666666, metalness: 0.6 }));
+    const head = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.12, 6), new THREE.MeshLambertMaterial({ color: 0x666666 }));
     head.position.y = 0.4;
     const fletch = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.06, 0.01), new THREE.MeshLambertMaterial({ color: 0xff4d6d }));
     fletch.position.y = -0.32;
@@ -535,17 +535,17 @@ export class Grenade extends Weapon {
   }
   _buildMesh() {
     const grp = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.18, 14, 10), new THREE.MeshLambertMaterial({ color: 0x305030, roughness: 0.85, metalness: 0.2 }));
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.18, 14, 10), new THREE.MeshLambertMaterial({ color: 0x305030 }));
     // Pineapple-style ridges for visual interest.
     for (let i = 0; i < 3; i++) {
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.022, 6, 14), new THREE.MeshLambertMaterial({ color: 0x224020, roughness: 0.9 }));
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.022, 6, 14), new THREE.MeshLambertMaterial({ color: 0x224020 }));
       ring.position.y = -0.1 + i * 0.1;
       ring.rotation.x = Math.PI / 2;
       grp.add(ring);
     }
-    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.07, 8), new THREE.MeshLambertMaterial({ color: 0x707880, metalness: 0.7 }));
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.07, 8), new THREE.MeshLambertMaterial({ color: 0x707880 }));
     cap.position.y = 0.21;
-    const pin = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.012, 4, 8), new THREE.MeshLambertMaterial({ color: 0xc8a060, metalness: 0.7 }));
+    const pin = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.012, 4, 8), new THREE.MeshLambertMaterial({ color: 0xc8a060 }));
     pin.position.y = 0.27;
     pin.rotation.x = Math.PI / 2;
     grp.add(body, cap, pin);
@@ -554,9 +554,9 @@ export class Grenade extends Weapon {
   fire(player) {
     const fuse = 2.0;
     // Build the world-mesh so we can blink the body emissive as fuse runs out.
-    const bodyMat = new THREE.MeshLambertMaterial({ color: 0x305030, emissive: 0x000000, roughness: 0.85 });
+    const bodyMat = new THREE.MeshLambertMaterial({ color: 0x305030, emissive: 0x000000 });
     const body = new THREE.Mesh(new THREE.SphereGeometry(0.18, 14, 10), bodyMat);
-    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.07, 8), new THREE.MeshLambertMaterial({ color: 0x707880, metalness: 0.7 }));
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.07, 8), new THREE.MeshLambertMaterial({ color: 0x707880 }));
     cap.position.y = 0.21;
     const grp = new THREE.Group();
     grp.add(body, cap);
@@ -612,7 +612,7 @@ export class RPG extends Weapon {
   }
   _buildMesh() {
     const grp = new THREE.Group();
-    const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.9, 10), new THREE.MeshLambertMaterial({ color: 0x444444, metalness: 0.5 }));
+    const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.9, 10), new THREE.MeshLambertMaterial({ color: 0x444444 }));
     tube.rotation.z = Math.PI / 2; tube.position.x = 0.4;
     const tip = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.2, 8), new THREE.MeshLambertMaterial({ color: 0xff4d6d }));
     tip.rotation.z = -Math.PI / 2; tip.position.x = 0.85;
@@ -657,13 +657,13 @@ export class SniperRifle extends Weapon {
     const grp = new THREE.Group();
     const stock = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.13, 0.09), new THREE.MeshLambertMaterial({ color: 0x2a1a10 }));
     stock.position.x = -0.05;
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.11, 0.09), new THREE.MeshLambertMaterial({ color: 0x222230, metalness: 0.6 }));
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.11, 0.09), new THREE.MeshLambertMaterial({ color: 0x222230 }));
     body.position.x = 0.32;
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.95, 10), new THREE.MeshLambertMaterial({ color: 0x111118, metalness: 0.85 }));
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.95, 10), new THREE.MeshLambertMaterial({ color: 0x111118 }));
     barrel.rotation.z = Math.PI / 2; barrel.position.x = 0.78;
-    const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.06, 8), new THREE.MeshLambertMaterial({ color: 0x080808, metalness: 0.9 }));
+    const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.06, 8), new THREE.MeshLambertMaterial({ color: 0x080808 }));
     muzzle.rotation.z = Math.PI / 2; muzzle.position.x = 1.27;
-    const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.32, 12), new THREE.MeshLambertMaterial({ color: 0x101018, metalness: 0.75 }));
+    const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.32, 12), new THREE.MeshLambertMaterial({ color: 0x101018 }));
     scope.rotation.z = Math.PI / 2; scope.position.set(0.32, 0.16, 0);
     const lens = new THREE.Mesh(new THREE.CircleGeometry(0.05, 12), new THREE.MeshLambertMaterial({ color: 0x44ddff, emissive: 0x2288cc, emissiveIntensity: 0.8 }));
     lens.rotation.y = Math.PI / 2; lens.position.set(0.5, 0.16, 0);
@@ -856,7 +856,7 @@ export class ThrowingKnives extends Weapon {
   }
   _buildMesh() {
     const grp = new THREE.Group();
-    const blade = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.32, 4), new THREE.MeshLambertMaterial({ color: 0xddddee, metalness: 0.85 }));
+    const blade = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.32, 4), new THREE.MeshLambertMaterial({ color: 0xddddee }));
     blade.rotation.z = -Math.PI / 2; blade.position.x = 0.25;
     const grip = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.05, 0.05), new THREE.MeshLambertMaterial({ color: 0x332010 }));
     grip.position.x = 0.05;
@@ -865,7 +865,7 @@ export class ThrowingKnives extends Weapon {
   }
   fire(player) {
     const ax = player.aimDir.x, ay = player.aimDir.y;
-    const knifeMat = new THREE.MeshLambertMaterial({ color: 0xddddee, metalness: 0.8 });
+    const knifeMat = new THREE.MeshLambertMaterial({ color: 0xddddee });
     const blade = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.34, 4), knifeMat);
     const grip = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.04, 0.04), new THREE.MeshLambertMaterial({ color: 0x332010 }));
     grip.position.y = -0.2;
@@ -898,7 +898,7 @@ export class StickyBomb extends Weapon {
   }
   _buildMesh() {
     const grp = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.16, 14, 10), new THREE.MeshLambertMaterial({ color: 0x66cc44, emissive: 0x224422, emissiveIntensity: 0.5, roughness: 0.6 }));
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.16, 14, 10), new THREE.MeshLambertMaterial({ color: 0x66cc44, emissive: 0x224422, emissiveIntensity: 0.5 }));
     // Spikes give it the "burr" look — visually sticky.
     for (let i = 0; i < 10; i++) {
       const a = (i / 10) * Math.PI * 2;
@@ -913,7 +913,7 @@ export class StickyBomb extends Weapon {
   fire(player) {
     const ax = player.aimDir.x, ay = player.aimDir.y;
     const fuse = 1.5;
-    const bodyMat = new THREE.MeshLambertMaterial({ color: 0x66cc44, emissive: 0x224422, emissiveIntensity: 0.6, roughness: 0.6 });
+    const bodyMat = new THREE.MeshLambertMaterial({ color: 0x66cc44, emissive: 0x224422, emissiveIntensity: 0.6 });
     const body = new THREE.Mesh(new THREE.SphereGeometry(0.16, 14, 10), bodyMat);
     const grp = new THREE.Group();
     grp.add(body);
@@ -1056,10 +1056,10 @@ function _buildStoneFist({ skinMat, knuckMat, veinMat, shardMat, crackMat }) {
 
 function _stoneFistMaterials() {
   return {
-    skinMat: new THREE.MeshLambertMaterial({ color: 0x4a6845, roughness: 0.98, metalness: 0.05, emissive: 0x081008, emissiveIntensity: 0.10 }),
-    knuckMat: new THREE.MeshLambertMaterial({ color: 0x5a7b54, roughness: 0.85, emissive: 0x33ff66, emissiveIntensity: 0.35 }),
+    skinMat: new THREE.MeshLambertMaterial({ color: 0x4a6845, emissive: 0x081008, emissiveIntensity: 0.10 }),
+    knuckMat: new THREE.MeshLambertMaterial({ color: 0x5a7b54, emissive: 0x33ff66, emissiveIntensity: 0.35 }),
     veinMat: new THREE.MeshBasicMaterial({ color: 0x223322 }),
-    shardMat: new THREE.MeshLambertMaterial({ color: 0x4a5a44, roughness: 1.0 }),
+    shardMat: new THREE.MeshLambertMaterial({ color: 0x4a5a44 }),
     crackMat: new THREE.MeshBasicMaterial({ color: 0x88ee77 }),
   };
 }
@@ -1400,7 +1400,7 @@ export class FishSlap extends Weapon {
   _buildMesh() {
     const g = new THREE.SphereGeometry(0.18, 10, 8);
     g.scale(2.2, 1, 0.6);
-    const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: 0x5a7aaa, metalness: 0.4, roughness: 0.5 }));
+    const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: 0x5a7aaa }));
     m.position.x = 0.3;
     const tail = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.22, 6), new THREE.MeshLambertMaterial({ color: 0x405066 }));
     tail.rotation.z = Math.PI / 2; tail.position.x = -0.05;
@@ -1522,7 +1522,7 @@ export class ArmorPlate {
     this.kind = 'pickup-armor';
     this.icon = '🛡';
     const grp = new THREE.Group();
-    const plate = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.45, 0.18), new THREE.MeshLambertMaterial({ color: 0xa0a8b8, metalness: 0.7, roughness: 0.4 }));
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.45, 0.18), new THREE.MeshLambertMaterial({ color: 0xa0a8b8 }));
     const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.19), new THREE.MeshLambertMaterial({ color: 0xffcc33, emissive: 0xffcc33, emissiveIntensity: 0.4 }));
     grp.add(plate, stripe);
     this.mesh = grp;
@@ -1615,9 +1615,9 @@ export class Lightsaber extends Weapon {
     );
     blade.rotation.z = Math.PI / 2;
     blade.position.x = 0.5;
-    const hilt = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.22, 10), new THREE.MeshLambertMaterial({ color: 0x222233, metalness: 0.85, roughness: 0.3 }));
+    const hilt = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.22, 10), new THREE.MeshLambertMaterial({ color: 0x222233 }));
     hilt.rotation.z = Math.PI / 2; hilt.position.x = -0.05;
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.015, 6, 12), new THREE.MeshLambertMaterial({ color: 0xcccccc, metalness: 0.8 }));
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.015, 6, 12), new THREE.MeshLambertMaterial({ color: 0xcccccc }));
     ring.rotation.y = Math.PI / 2; ring.position.x = 0.05;
     grp.add(blade, hilt, ring);
     this.mesh = grp;
@@ -1796,7 +1796,7 @@ export class IceSword extends Weapon {
   }
   _buildMesh() {
     const grp = new THREE.Group();
-    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.09, 0.05), new THREE.MeshLambertMaterial({ color: 0x9bdcff, emissive: 0x4d9fff, emissiveIntensity: 1.0, metalness: 0.4, transparent: true, opacity: 0.85 }));
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.09, 0.05), new THREE.MeshLambertMaterial({ color: 0x9bdcff, emissive: 0x4d9fff, emissiveIntensity: 1.0, transparent: true, opacity: 0.85 }));
     blade.position.x = 0.45;
     const handle = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.1, 0.08), new THREE.MeshLambertMaterial({ color: 0x182040 }));
     handle.position.x = -0.05;
@@ -2114,7 +2114,7 @@ export class Nuke extends Weapon {
   }
   _buildMesh() {
     const grp = new THREE.Group();
-    const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.5, 12), new THREE.MeshLambertMaterial({ color: 0x444444, metalness: 0.7 }));
+    const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.5, 12), new THREE.MeshLambertMaterial({ color: 0x444444 }));
     tube.rotation.z = Math.PI / 2; tube.position.x = 0.25;
     const tip = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.25, 12), new THREE.MeshLambertMaterial({ color: 0xff4400, emissive: 0xff4400, emissiveIntensity: 0.6 }));
     tip.rotation.z = -Math.PI / 2; tip.position.x = 0.55;

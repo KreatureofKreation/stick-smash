@@ -490,7 +490,7 @@ export class StickmanRig {
     this.accent = accent;
 
     // Single shared material for the whole figure (silhouette feel).
-    const mat = new THREE.MeshLambertMaterial({ color: primary, roughness: 0.55, metalness: 0.05 });
+    const mat = new THREE.MeshLambertMaterial({ color: primary });
     this.material = mat;
 
     // Head — slightly larger so silhouette reads.
@@ -560,7 +560,7 @@ export class StickmanRig {
     // Optional armor chestplate — toggled via setArmor().
     this.chestArmor = new THREE.Mesh(
       new THREE.BoxGeometry(0.46, 0.46, 0.32),
-      new THREE.MeshLambertMaterial({ color: 0xa0a8b8, metalness: 0.7, roughness: 0.4 }),
+      new THREE.MeshLambertMaterial({ color: 0xa0a8b8 }),
     );
     // Armor sits in torso silhouette — shadow contribution is invisible.
     this.chestArmor.castShadow = false;

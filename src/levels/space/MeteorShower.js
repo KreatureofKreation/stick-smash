@@ -66,7 +66,7 @@ export class MeteorShower {
 
     const r = 0.4;
     const geo = new THREE.SphereGeometry(r, 12, 8);
-    const mat = new THREE.MeshLambertMaterial({ color: 0xff5520, emissive: 0xff5520, emissiveIntensity: 1.6, roughness: 0.5 });
+    const mat = new THREE.MeshLambertMaterial({ color: 0xff5520, emissive: 0xff5520, emissiveIntensity: 1.6 });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(x, y, 0);
     this.level.scene.add(mesh);

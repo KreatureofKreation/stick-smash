@@ -25,10 +25,29 @@ export class Game {
     // fragment-shader cost on integrated GPUs (20 FPS in-game while a
     // synchronous CPU probe reported 290 FPS = pure GPU bottleneck).
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
-    // Pixel ratio: clamp at 1.0 — a 1080p panel at 1.5× = 2.4M frag/pass,
-    // and we run two passes (shadow + main). 1.0 cuts fragment count 56%
-    // and is the single biggest GPU win on HiDPI Windows laptops.
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1));
+
+    // Detect software WebGL (SwiftShader / llvmpipe / Mesa / Microsoft
+    // Basic Render). Brave's anti-fingerprinting + driver blocklists
+    // commonly land users on the software rasterizer, where every pixel
+    // is CPU work. At 1920×1080 that's 2M frag/pass → ~50 ms/frame even
+    // with empty scenes. Detect once and drop internal render res to
+    // half (1/4 fragment count). Quality loss is minimal on stylized
+    // art; the alternative is ~17 FPS.
+    const gl = this.renderer.getContext();
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    const rendererStr = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : '';
+    const softwareGL = /SwiftShader|llvmpipe|Mesa|Software|Microsoft Basic|ANGLE.*Software/i.test(rendererStr);
+    this._softwareGL = softwareGL;
+    this._rendererStr = rendererStr;
+    // Manual override: window.__lowQ = true forces half-res; = false forces full.
+    const lowQ = (typeof window !== 'undefined' && 'undefined' !== typeof window.__lowQ)
+      ? !!window.__lowQ
+      : softwareGL;
+    const ratio = lowQ ? 0.5 : Math.min(devicePixelRatio, 1);
+    this.renderer.setPixelRatio(ratio);
+    if (softwareGL) {
+      console.warn(`[perf] software WebGL detected (${rendererStr}). Rendering at half-res. Set window.__lowQ=false then reload to force full-res.`);
+    }
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     // Shadows entirely OFF. The shadow pass was a full second render of
     // every castShadow object every frame, plus a per-pixel sample on

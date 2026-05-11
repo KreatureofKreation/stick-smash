@@ -98,8 +98,6 @@ export class Tile {
 
     const mat = new THREE.MeshLambertMaterial({
       color: this.color,
-      roughness: 0.85,
-      metalness: this.material === 'metal' ? 0.6 : 0.05,
       emissive: this.emissive ?? 0x000000,
       emissiveIntensity: this.emissiveIntensity,
     });
@@ -260,7 +258,7 @@ export class Hazard {
     const world = this.level.physics;
     if (this.kind === 'lava') {
       const geo = new THREE.BoxGeometry(this.w, this.h, 1.1);
-      const mat = new THREE.MeshLambertMaterial({ color: 0xff4400, emissive: 0xff6600, emissiveIntensity: 1, roughness: 0.6 });
+      const mat = new THREE.MeshLambertMaterial({ color: 0xff4400, emissive: 0xff6600, emissiveIntensity: 1 });
       const m = new THREE.Mesh(geo, mat);
       m.position.set(this.x, this.y, 0);
       scene.add(m);
@@ -283,7 +281,7 @@ export class Hazard {
       for (let i = 0; i < count; i++) {
         const c = new THREE.Mesh(
           new THREE.ConeGeometry(down ? 0.16 : 0.18, down ? 0.6 : 0.5, 6),
-          new THREE.MeshLambertMaterial({ color: tipColor, metalness: down ? 0.2 : 0.7, roughness: down ? 0.45 : 0.3 }),
+          new THREE.MeshLambertMaterial({ color: tipColor }),
         );
         // Up-pointing: cone base at y=0, tip at y=0.5. Down-pointing flips
         // so the base sits flush with the platform underside above.
@@ -307,10 +305,10 @@ export class Hazard {
       this.body = body;
       this.pointDown = down;
     } else if (this.kind === 'saw') {
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.1, 8, 16), new THREE.MeshLambertMaterial({ color: 0xcccccc, metalness: 0.8, roughness: 0.2 }));
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.1, 8, 16), new THREE.MeshLambertMaterial({ color: 0xcccccc }));
       const teeth = new THREE.Group();
       for (let i = 0; i < 12; i++) {
-        const t = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.2, 4), new THREE.MeshLambertMaterial({ color: 0xeeeeee, metalness: 0.8 }));
+        const t = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.2, 4), new THREE.MeshLambertMaterial({ color: 0xeeeeee }));
         const a = (i / 12) * Math.PI * 2;
         t.position.set(Math.cos(a) * 0.55, Math.sin(a) * 0.55, 0);
         t.rotation.z = a - Math.PI / 2;
@@ -346,7 +344,7 @@ export class Hazard {
       this._t = opts.phase ?? 0;
 
       // ── Visible anchor block ──
-      const anchorMat = new THREE.MeshLambertMaterial({ color: 0x202028, metalness: 0.5 });
+      const anchorMat = new THREE.MeshLambertMaterial({ color: 0x202028 });
       const anchorMesh = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.3, 0.4), anchorMat);
       anchorMesh.position.set(this.x, this.y, 0);
       anchorMesh.updateMatrix(); anchorMesh.matrixAutoUpdate = false;
@@ -366,7 +364,7 @@ export class Hazard {
       const segCount = Math.max(4, Math.floor(this.length * 1.6));
       const segLen = this.length / segCount;
       const segR = 0.10;
-      const chainMat = new THREE.MeshLambertMaterial({ color: 0x444455, metalness: 0.7, roughness: 0.4 });
+      const chainMat = new THREE.MeshLambertMaterial({ color: 0x444455 });
       this.chainSegs = [];
       let prevBody = anchorBody;
       let prevPivot = new CANNON.Vec3(0, 0, 0);   // bottom of anchor block
@@ -409,7 +407,7 @@ export class Hazard {
       }
 
       // ── Blade tip body (the threat) ──
-      const bladeMat = new THREE.MeshLambertMaterial({ color: 0xddddee, metalness: 0.85, roughness: 0.15 });
+      const bladeMat = new THREE.MeshLambertMaterial({ color: 0xddddee });
       const bladeGrp = new THREE.Group();
       const ring = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.1, 8, 18), bladeMat);
       bladeGrp.add(ring);
@@ -594,10 +592,12 @@ export class Level {
     const gy = this.def.gravity ?? -17;
     this.physics.world.gravity = { x: 0, y: gy, z: 0 };
 
-    // sky / fog — vertical gradient via giant inverted sphere
+    // sky / fog — flat bg color; gradient sky-dome below skips on software
+    // WebGL since its custom ShaderMaterial runs a full-screen fragment
+    // pass which is expensive in CPU rasterization.
     this.scene.background = new THREE.Color(this.bgColor);
     this.scene.fog = new THREE.Fog(this.bgColor, 30, 80);
-    this._addSkyDome();
+    if (!this.game?._softwareGL) this._addSkyDome();
 
     // tiles
     for (const t of this.def.tiles) {
@@ -646,14 +646,14 @@ export class Level {
           const grp = new THREE.Group();
           const len = b.length ?? 6;
           const segs = Math.max(4, Math.floor(len * 1.8));
-          const mat = new THREE.MeshLambertMaterial({ color: b.color ?? 0x444455, metalness: 0.7, roughness: 0.4 });
+          const mat = new THREE.MeshLambertMaterial({ color: b.color ?? 0x444455 });
           for (let i = 0; i < segs; i++) {
             const s = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), mat);
             s.position.set(0, -((i + 0.5) / segs) * len, 0);
             grp.add(s);
           }
           // Anchor block on top
-          const anchor = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.25, 0.4), new THREE.MeshLambertMaterial({ color: 0x202028, metalness: 0.5 }));
+          const anchor = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.25, 0.4), new THREE.MeshLambertMaterial({ color: 0x202028 }));
           grp.add(anchor);
           grp.position.set(b.x, b.y, b.z ?? -1);
           grp.updateMatrixWorld();
@@ -666,7 +666,6 @@ export class Level {
             color: b.color ?? 0x223355,
             emissive: b.emissive ?? 0x000000,
             emissiveIntensity: b.emissiveIntensity ?? 0,
-            roughness: b.roughness ?? 0.85,
           });
           const m = new THREE.Mesh(new THREE.SphereGeometry(r, 18, 14), matBg);
           m.position.set(b.x, b.y, b.z ?? -10);
@@ -680,7 +679,7 @@ export class Level {
             color: b.color ?? 0xffffff,
             emissive: b.emissive ?? (b.color ?? 0xffffff),
             emissiveIntensity: b.emissiveIntensity ?? 0.5,
-            roughness: 1, side: THREE.DoubleSide,
+            side: THREE.DoubleSide,
           });
           const m = new THREE.Mesh(new THREE.CircleGeometry(r, 24), matBg);
           m.position.set(b.x, b.y, b.z ?? -11);
@@ -693,7 +692,6 @@ export class Level {
             color: b.color ?? 0x222233,
             emissive: b.emissive ?? 0x000000,
             emissiveIntensity: b.emissiveIntensity ?? 0,
-            roughness: b.roughness ?? 0.9,
           });
           const m = new THREE.Mesh(new THREE.BoxGeometry(b.w ?? 4, b.h ?? 4, b.d ?? 1), matBg);
           m.position.set(b.x, b.y, b.z ?? -3);
@@ -867,7 +865,7 @@ export class Level {
     // Visible anchor block (decorative).
     const anchorMesh = new THREE.Mesh(
       new THREE.BoxGeometry(0.5, 0.25, 0.4),
-      new THREE.MeshLambertMaterial({ color: 0x202028, metalness: 0.5 }),
+      new THREE.MeshLambertMaterial({ color: 0x202028 }),
     );
     anchorMesh.position.set(ax, ay, 0);
     anchorMesh.updateMatrix(); anchorMesh.matrixAutoUpdate = false;
@@ -894,7 +892,7 @@ export class Level {
 
       const segMesh = new THREE.Mesh(
         new THREE.SphereGeometry(segR + 0.02, 8, 6),
-        new THREE.MeshLambertMaterial({ color: 0x444455, metalness: 0.7, roughness: 0.4 }),
+        new THREE.MeshLambertMaterial({ color: 0x444455 }),
       );
       segMesh.position.copy(segBody.position);
       this.scene.add(segMesh);
