@@ -40,6 +40,72 @@ function solveIK(out, rootX, rootY, targetX, targetY, upperLen, lowerLen, bend =
   out.y = rootY + Math.sin(elbowAngle) * upperLen;
 }
 
+// ---------------------------------------------------------------------------
+// Strike pose functions — each returns a partial override object with any
+// subset of { armRX, armRY, armLX, armLY, legRX, legRY, legLX, legLY, leanZ }.
+// Coordinates are OFFSETS from the shoulder/hip anchor; rig applies them.
+// `t` = params.attackProgress (0..1 over move duration).
+// ---------------------------------------------------------------------------
+
+function poseJab(rig, params) {
+  const t = clamp(params.attackProgress ?? 0, 0, 1);
+  let armX, armY, leanZ;
+  if (t < 0.25) {
+    const w = t / 0.25;
+    armX = lerp(0.30, -0.10, w);   // chamber back
+    armY = lerp(0.15, 0.20, w);
+    leanZ = lerp(0, -0.10, w);
+  } else if (t < 0.70) {
+    const w = (t - 0.25) / 0.45;
+    const e = w * w * (3 - 2 * w);
+    armX = lerp(-0.10, 0.90, e);   // straight out
+    armY = lerp(0.20, 0.15, e);
+    leanZ = lerp(-0.10, 0.20, e);
+  } else {
+    const w = (t - 0.70) / 0.30;
+    armX = lerp(0.90, 0.30, w);
+    armY = lerp(0.15, 0.15, w);
+    leanZ = lerp(0.20, 0, w);
+  }
+  return { armRX: armX, armRY: armY, leanZ };
+}
+
+function poseCross(rig, params) { return poseJab(rig, params); }   // stub — Task 11
+function poseHook(rig, params)  { return poseJab(rig, params); }   // stub — Task 11
+function poseKnee(rig, params)  { return poseJab(rig, params); }   // stub — Task 11
+function poseSpinBack(rig, params) { return poseJab(rig, params); } // stub — Task 11
+function poseBlowAway(rig, params) { return poseJab(rig, params); } // stub — Task 11
+function poseUppercut(rig, params) { return poseJab(rig, params); } // stub — Task 11
+function poseAxe(rig, params)      { return poseJab(rig, params); } // stub — Task 11
+function poseCharge(rig, params)   { return poseJab(rig, params); } // stub — Task 11
+function poseCounterStance(rig, params) { return null; }            // no strike arc — Task 11
+function poseFlyingKnee(rig, params)    { return poseJab(rig, params); } // stub — Task 12
+function poseAirHook(rig, params)       { return poseJab(rig, params); } // stub — Task 12
+function poseSomersault(rig, params)    { return poseJab(rig, params); } // stub — Task 12
+function poseRisingKnee(rig, params)    { return poseJab(rig, params); } // stub — Task 12
+function poseDive(rig, params)          { return poseJab(rig, params); } // stub — Task 12
+function poseSlideKick(rig, params)     { return poseJab(rig, params); } // stub — Task 12
+
+// Strike pose functions keyed on moveId.
+const STRIKE_POSES = {
+  jab:          poseJab,
+  cross:        poseCross,
+  hook:         poseHook,
+  knee:         poseKnee,
+  spinBack:     poseSpinBack,
+  heavyNeutral: poseBlowAway,
+  heavyUp:      poseUppercut,
+  heavyDown:    poseAxe,
+  heavyForward: poseCharge,
+  heavyBack:    poseCounterStance,
+  airJab:       poseFlyingKnee,
+  airHook:      poseAirHook,
+  airHeavyN:    poseSomersault,
+  airHeavyU:    poseRisingKnee,
+  airHeavyD:    poseDive,
+  slideKick:    poseSlideKick,
+};
+
 export class StickmanRig {
   constructor({ primary = 0xffcc33, accent = 0x1a1a2e } = {}) {
     this.group = new THREE.Group();
@@ -486,10 +552,27 @@ export class StickmanRig {
     const aimAng = Math.atan2(aim.y, aim.x);
     const aimDist = Math.min(0.7, Math.hypot(aim.x, aim.y) * 0.7 + 0.55);
 
+    // STRIKE_POSES dispatcher — resolves per-move pose BEFORE the legacy
+    // armPoseR branch so the strike arc overrides walk/idle targets.
+    const moveId = params.moveId;
+    const strikePose = moveId ? STRIKE_POSES[moveId]?.(this, params) : null;
+    if (strikePose && strikePose.armRX !== undefined) {
+      // Override right-arm pose with strike-specific arc.
+      // Mutate params so the branch below skips the old 'attack' arc.
+      params.armPoseR = 'strikePosed';
+    }
+
     let handRX, handRY;
     if (params.armPoseR === 'aim') {
       handRX = sRX + Math.cos(aimAng) * aimDist;
       handRY = sRY + Math.sin(aimAng) * aimDist;
+    } else if (params.armPoseR === 'strikePosed') {
+      // Handled by STRIKE_POSES dispatcher above — apply the resolved offsets.
+      handRX = sRX + this.facing * strikePose.armRX;
+      handRY = sRY + strikePose.armRY;
+      if (strikePose.leanZ !== undefined) {
+        this.bodyTiltTarget += this.facing * strikePose.leanZ;
+      }
     } else if (params.armPoseR === 'attack') {
       // Three-phase swing: windup (rear back & up) → strike (whip through a
       // big arc, arm extends at peak) → follow-through (settle to neutral).
@@ -672,7 +755,7 @@ export class StickmanRig {
       this._springInit = true;
     }
     const sdt = Math.min(dt, 1 / 60);
-    const stiff = (params.armPoseR === 'aim' || params.armPoseR === 'attack' || params.armPoseR === 'hold');
+    const stiff = (params.armPoseR === 'aim' || params.armPoseR === 'attack' || params.armPoseR === 'strikePosed' || params.armPoseR === 'hold');
     // Ragdoll softens spring stiffness so limbs flop instead of snapping back.
     // Fully ragdoll (1.0) = very soft; idle ragdoll (0.10) barely affects feel.
     const ragSoft = clamp(this.ragdollAmount, 0, 1);
@@ -717,7 +800,7 @@ export class StickmanRig {
     this._drawLeg(hipRX, hipRY, this._footRPos.x, this._footRPos.y, zR, this.upperLegR, this.lowerLegR, this.footR, this.hipR, this.kneeR, true);
 
     // Hand orientation for aim
-    if (params.armPoseR === 'aim' || params.armPoseR === 'attack') {
+    if (params.armPoseR === 'aim' || params.armPoseR === 'attack' || params.armPoseR === 'strikePosed') {
       this.handR.rotation.z = aimAng;
     } else {
       this.handR.rotation.z = 0;

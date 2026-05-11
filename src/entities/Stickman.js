@@ -1729,6 +1729,7 @@ export class Stickman {
       attackProgress: this.attackTimer > 0 ? 1 - this.attackTimer / stepDur : 0,
       attackStep: this._attackStep,    // 0=jab, 1=cross, 2=kick
       kicking: this.kicking,
+      moveId: this.moveId,
       armPoseR, armPoseL, holdPos,
       aim,
       crouching: this.crouching,
