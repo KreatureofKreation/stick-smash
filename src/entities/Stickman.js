@@ -1349,11 +1349,14 @@ export class Stickman {
 
     // Kill box — instakill when launched outside the play area.
     if (this.position.y < -16 || this.position.y > 32 || Math.abs(this.position.x) > 30) {
+      const px = this.position.x;
       this.die('void');
-      // Stop runaway ragdoll so respawn teleport applies cleanly.
+      // Freeze ragdoll and park it far below the play area until respawn.
+      // Previously teleported to (0,5,0), which put the visible corpse
+      // smack in the middle of the map during the 1.6s death timer.
       this.body.velocity.setZero();
       this.body.angularVelocity.setZero();
-      this.body.position.set(0, 5, 0);
+      this.body.position.set(px, -200, 0);
     }
 
     if (this.game?.level?.curvedGravity) {
