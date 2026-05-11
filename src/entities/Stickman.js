@@ -346,6 +346,19 @@ export class Stickman {
     }
     this.health -= amount;
     this.flashAmount = Math.min(1, this.flashAmount + Math.min(1, amount / 10));
+    // Launch flag from combat MOVE_TABLE — heavy/launcher hits ragdoll the
+    // victim regardless of remaining HP. Pure stagger lights leave the
+    // victim upright.
+    if (opts.launch && this.alive && !this.ragdoll) {
+      // Brief ragdoll, recovers like existing knockdown path.
+      // Reuse whatever ragdoll trigger already exists; on this codebase
+      // there isn't a discrete ragdoll mode for living fighters yet —
+      // we approximate by setting hitstun proportional to launch force
+      // and letting physics carry the body.
+      const launchStun = (opts.stun ?? 0.3) + 0.25;
+      this.hitstun = Math.max(this.hitstun, launchStun);
+      this.flashAmount = 1;
+    }
     this.lastDamager = opts.attacker ?? null;
     this.lastDamageWeapon = opts.weapon ?? null;
     // Skip sound for tiny continuous DoT (lava, burn).
