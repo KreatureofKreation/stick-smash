@@ -1816,7 +1816,19 @@ export class Stickman {
     const gumGum = performance.now() < this.gumGumUntil;
     // Somersault (airHeavyN) spins the whole rig around Z — only meaningful
     // while attackTimer is live (rotation snaps back to 0 after the move).
+    // Direction follows movement: spinning toward where you're going (head
+    // pitches over forward in the motion direction). Captured at fire time
+    // so direction doesn't flip mid-spin if velocity reverses.
     const somersaulting = this.moveId === 'airHeavyN' && this.attackTimer > 0;
+    if (somersaulting && this._somersaultSpinDir === undefined) {
+      const vx = this.body.velocity.x;
+      const motionX = Math.abs(vx) > 0.5 ? vx : this.facing;
+      // Negative because head sits at +Y in body local; rotating CCW (positive
+      // Z) sends head to -X, CW (negative Z) sends head to +X.
+      this._somersaultSpinDir = -Math.sign(motionX) || -1;
+    } else if (!somersaulting && this._somersaultSpinDir !== undefined) {
+      this._somersaultSpinDir = undefined;
+    }
     // When dead OR on a curved-gravity level OR mid-somersault, draw limbs
     // in LOCAL space (origin) — group transform carries world pos+rot so
     // the rig follows the capsule's planet-aligned rotation (or the
@@ -1848,6 +1860,7 @@ export class Stickman {
     params.gumGumPunch = gumGum && this.attackTimer > 0 && !this.weapon;
     params.throwWindup = this._throwWindupT > 0 ? clamp(1 - this._throwWindupT / 0.10, 0, 1) : 0;
     params.angVz = this.body.angularVelocity?.z || 0;
+    params.spinning = somersaulting;
     params.dt = dt;
     this.rig.update(rigPos, params);
 
@@ -1868,7 +1881,7 @@ export class Stickman {
           const dur = MOVE_TABLE.airHeavyN?.dur ?? 0.58;
           const t = clamp(1 - this.attackTimer / dur, 0, 1);
           const e = t * t * (3 - 2 * t);
-          angle += this.facing * Math.PI * 2 * e;
+          angle += (this._somersaultSpinDir ?? -this.facing) * Math.PI * 2 * e;
         }
         this.rig.group.quaternion.setFromAxisAngle(_RIG_Z_AXIS, angle);
       }

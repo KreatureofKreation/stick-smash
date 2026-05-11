@@ -1298,8 +1298,15 @@ export class StickmanRig {
     // Ragdoll softens spring stiffness so limbs flop instead of snapping back.
     // Fully ragdoll (1.0) = very soft; idle ragdoll (0.10) barely affects feel.
     const ragSoft = clamp(this.ragdollAmount, 0, 1);
-    const handK = lerp(stiff ? 380 : 130, 28, ragSoft);
-    const handD = lerp(stiff ? 22 : 9, 2.8, ragSoft);
+    let handK = lerp(stiff ? 380 : 130, 28, ragSoft);
+    let handD = lerp(stiff ? 22 : 9, 2.8, ragSoft);
+    // Mid-spin (somersault) — drop spring stiffness so hands trail behind
+    // the body rotation instead of snapping to the pose. Reads as floppy
+    // ragdoll arms whirling around the spin axis.
+    if (params.spinning) {
+      handK = 70;
+      handD = 4;
+    }
     const stepSpring = (pos, vel, tx, ty, k, d) => {
       vel.x += (tx - pos.x) * k * sdt;
       vel.y += (ty - pos.y) * k * sdt;
@@ -1314,7 +1321,7 @@ export class StickmanRig {
     // provides the in/out curve over the move duration; spring smoothing
     // here just delays the visible motion past the move's end and makes
     // strikes look like they're barely firing.
-    if (params.armPoseR === 'strikePosed') {
+    if (params.armPoseR === 'strikePosed' && !params.spinning) {
       this._handRPos.set(handRX, handRY, hipZ);
       this._handRVel.set(0, 0, 0);
       // Left arm: snap only if the strike pose itself overrides the left
@@ -1341,8 +1348,11 @@ export class StickmanRig {
       this._footLVel.set(0, 0, 0);
       this._footRVel.set(0, 0, 0);
     } else {
-      const legK = lerp(280, 32, ragSoft);
-      const legD = lerp(18, 3.2, ragSoft);
+      let legK = lerp(280, 32, ragSoft);
+      let legD = lerp(18, 3.2, ragSoft);
+      // Spin softens leg springs the same way it softens arms — feet drag
+      // behind the rotation for a ragdoll whirl.
+      if (params.spinning) { legK = 90; legD = 5; }
       stepSpring(this._footLPos, this._footLVel, footLX, footLY, legK, legD);
       stepSpring(this._footRPos, this._footRVel, footRX, footRY, legK, legD);
     }
