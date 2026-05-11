@@ -1104,6 +1104,8 @@ export class Stickman {
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
     // Drain a buffered press once the FSM is ready to accept input again.
     // Lets a mash-press during recovery turn into the next chain hit.
+    // Fires a LIGHT directly (buffer is by-design a quick tap) so we don't
+    // start a charge that has no release frame to resolve it.
     if (this._attackBuffer
         && performance.now() < this._attackBuffer
         && this.attackCooldown <= 0
@@ -1112,7 +1114,18 @@ export class Stickman {
         && !this.weapon
         && performance.now() >= this.parryRecoverUntil) {
       this._attackBuffer = 0;
-      this._doAttack();
+      if (this.sliding && this.grounded) {
+        this._fireMove('slideKick');
+      } else if (!this.grounded) {
+        const id = (this.airChainStep === 0) ? 'airJab' : 'airHook';
+        this.airChainStep = (this.airChainStep + 1) % 2;
+        this._fireMove(id);
+      } else {
+        const id = GROUND_CHAIN[this.chainStep];
+        this.chainStep = (this.chainStep + 1) % GROUND_CHAIN.length;
+        this.chainTimer = 0.45;
+        this._fireMove(id);
+      }
     } else if (this._attackBuffer && performance.now() >= this._attackBuffer) {
       this._attackBuffer = 0;
     }
