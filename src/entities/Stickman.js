@@ -54,6 +54,10 @@ const MOVE_TABLE = {
 // Ground light chain order.
 const GROUND_CHAIN = ['jab','cross','hook','knee','spinBack'];
 
+// Weapon strings that the back-counter parry can deflect. Must stay in sync
+// with the melee weapon list used by _tryClashOnIncoming.
+const PARRY_DEFLECT_WEAPONS = new Set(['fist','sword','bat','longsword','mace','hammer','halberd','saber']);
+
 export class Stickman {
   constructor(world, scene, opts) {
     this.world = world;
@@ -195,6 +199,7 @@ export class Stickman {
     this.juggled = false;        // launched-airborne flag
     this.juggledUntil = 0;       // ms
     this.juggleHits = 0;         // count of launched hits this window
+    this.juggleStartedAt = 0;    // ms — when launcher hit landed (juggle ceiling anchor)
 
     // Back-compat aliases for legacy code paths (rig reads, weapons, etc.).
     // Keep these as derived flags so renders + bot AI continue working unchanged
@@ -297,6 +302,7 @@ export class Stickman {
   get alive() { return this.state !== STATE.DEAD && this.lives > 0; }
 
   setWeapon(weapon) {
+    if (this.charging) this._clearCombatState();
     if (this.weapon) {
       const old = this.weapon;
       old.detach();
@@ -331,7 +337,7 @@ export class Stickman {
     // both cancel) — no damage taken on either side.
     const tNow = performance.now();
     const parryActive = tNow < this.parryUntil;
-    const allowed = opts.weapon === 'fist' || opts.weapon === 'melee' || opts.weapon === 'lightProj';
+    const allowed = PARRY_DEFLECT_WEAPONS.has(opts.weapon);
     if (parryActive && allowed && opts.attacker && opts.attacker !== this) {
       // Reuse the existing two-strike clash resolution.
       if (this._clash) this._clash(opts.attacker);
@@ -369,12 +375,9 @@ export class Stickman {
     // Launch flag from combat MOVE_TABLE — heavy/launcher hits ragdoll the
     // victim regardless of remaining HP. Pure stagger lights leave the
     // victim upright.
-    if (opts.launch && this.alive && !this.ragdoll) {
-      // Brief ragdoll, recovers like existing knockdown path.
-      // Reuse whatever ragdoll trigger already exists; on this codebase
-      // there isn't a discrete ragdoll mode for living fighters yet —
-      // we approximate by setting hitstun proportional to launch force
-      // and letting physics carry the body.
+    if (opts.launch && this.alive) {
+      // Approximate by setting hitstun proportional to launch force and
+      // letting physics carry the body.
       const launchStun = (opts.stun ?? 0.3) + 0.25;
       this.hitstun = Math.max(this.hitstun, launchStun);
       this.flashAmount = 1;
@@ -410,6 +413,7 @@ export class Stickman {
 
   die(reason = 'ko') {
     if (this.state === STATE.DEAD) return;
+    this._clearCombatState();
     this.state = STATE.DEAD;
     this.health = 0;
     this.deaths++;
@@ -961,6 +965,12 @@ export class Stickman {
   // Called per-frame from tick() to resolve a held attack on release.
   _chargeTick(dt) {
     if (!this.charging) return;
+    // If frozen mid-charge, cancel — we won't receive a release edge during freeze.
+    if (performance.now() < this._frozenUntil) {
+      this.charging = false;
+      this.chargeStartedAt = 0;
+      return;
+    }
     // Cancel on jump, hit, ragdoll, etc. (Those branches clear this.charging
     // elsewhere — here we only resolve on release.)
     if (!this.input.attackReleased) {
@@ -972,7 +982,7 @@ export class Stickman {
         if (this._chargeTellTick % 5 === 0) {
           const dir = this.input;
           const id = this._heavyForDir({ x: dir.moveX, y: dir.moveY }, !this.grounded);
-          const useFoot = (id === 'heavyDown' || id === 'airHeavyD' || id === 'airHeavyN');
+          const useFoot = (id === 'airHeavyD' || id === 'airHeavyN');
           const cx = this.position.x + this.facing * (useFoot ? 0.25 : 0.55);
           const cy = this.position.y + (useFoot ? -0.30 : 0.30);
           this.game.fx.particles.spark?.spawn?.({
@@ -1021,6 +1031,23 @@ export class Stickman {
     return 'heavyNeutral';
   }
 
+  _clearCombatState() {
+    this.charging = false;
+    this.chargeStartedAt = 0;
+    this._chargeTellTick = 0;
+    this.moveId = null;
+    this.attackTimer = 0;
+    this.kicking = false;
+    this.chainStep = 0;
+    this.airChainStep = 0;
+    this.chainTimer = 0;
+    this.juggled = false;
+    this.juggledUntil = 0;
+    this.juggleHits = 0;
+    this.parryUntil = 0;
+    this.parryRecoverUntil = 0;
+  }
+
   _fireMove(id) {
     const m = MOVE_TABLE[id];
     if (!m) return;
@@ -1030,7 +1057,7 @@ export class Stickman {
     this.attackHits.clear();
     // Legacy rig flags so old rig code paths render reasonable poses until
     // the rig is rewritten in Task 11–13.
-    this.kicking = (id === 'knee' || id === 'spinBack' || id === 'heavyDown' || id === 'heavyForward'
+    this.kicking = (id === 'knee' || id === 'spinBack'
                     || id === 'airHeavyN' || id === 'airHeavyD' || id === 'slideKick');
     this._attackStep = (id === 'jab') ? 0 : (id === 'cross') ? 1 : 2;
 
@@ -1152,11 +1179,19 @@ export class Stickman {
         p.juggled = true;
         p.juggledUntil = performance.now() + 1200;
         p.juggleHits = 0;
+        p.juggleStartedAt = performance.now();
       }
       if (p.juggled) {
         p.juggleHits++;
         if (p.juggleHits >= 4) p.juggled = false;
-        else p.juggledUntil = Math.min(performance.now() + 400 + 800, p.juggledUntil + 400);
+        else {
+          const JUGGLE_HIT_EXTEND_MS = 400;
+          const JUGGLE_MAX_MS = 1200;
+          p.juggledUntil = Math.min(
+            (p.juggleStartedAt || performance.now()) + JUGGLE_MAX_MS,
+            p.juggledUntil + JUGGLE_HIT_EXTEND_MS
+          );
+        }
       }
 
       if (superPunch && this.game?.fx) {
@@ -1248,6 +1283,7 @@ export class Stickman {
       const tNowSlide = performance.now();
       const inSlideCD = tNowSlide < (this._jumpInputCooldown || 0);
       if (this.input.jumpPressed && this.grounded && !inSlideCD) {
+        if (this.charging) this._clearCombatState();
         this.sliding = false;
         this.body.velocity.y = 9.5;
         this.coyote = 0;
@@ -1310,6 +1346,7 @@ export class Stickman {
         const jumpSpeed = 8;
         if (wantJump) {
           if (this.grounded || this.coyote > 0) {
+            if (this.charging) this._clearCombatState();
             // Replace radial component with jumpSpeed outward; preserve tangential.
             const newVR = jumpSpeed;
             this.body.velocity.x = newVT * tx + newVR * ux;
@@ -1321,6 +1358,7 @@ export class Stickman {
             if (this === this.game?.localPlayer) vibrate(12);
             this.grounded = false;
           } else if (this.airJumpsLeft > 0) {
+            if (this.charging) this._clearCombatState();
             this.airJumpsLeft--;
             const newVR = jumpSpeed * 0.95;
             this.body.velocity.x = newVT * tx + newVR * ux;
@@ -1374,6 +1412,7 @@ export class Stickman {
     const inJumpCD = tNowJump < (this._jumpInputCooldown || 0);
     if (this.input.jumpPressed && !inJumpCD) this.jumpBuffer = 0.12;
     if (this.jumpBuffer > 0 && !inJumpCD && (this.coyote > 0 || this.grounded)) {
+      if (this.charging) this._clearCombatState();
       this.body.velocity.y = 11;
       this.jumpBuffer = 0;
       this.coyote = 0;
@@ -1384,6 +1423,7 @@ export class Stickman {
       audio.jump();
       if (this === this.game?.localPlayer) vibrate(12);
     } else if (this.input.jumpPressed && !inJumpCD && this.airJumpsLeft > 0 && !this.grounded) {
+      if (this.charging) this._clearCombatState();
       this.body.velocity.y = 10;
       this.airJumpsLeft--;
       this._jumpLockUntil = tNowJump + 100;
@@ -1676,7 +1716,9 @@ export class Stickman {
     // existing world-space rig path (`identity` group + absolute coords).
     const rigInLocal = this.state === STATE.DEAD || !!this.game?.level?.curvedGravity;
     const rigPos = rigInLocal ? { x: 0, y: 0, z: 0 } : this.body.position;
-    const stepDur = this._attackStep === 0 ? 0.18 : this._attackStep === 1 ? 0.22 : 0.30;
+    const stepDur = this.moveId && MOVE_TABLE[this.moveId]
+      ? MOVE_TABLE[this.moveId].dur
+      : (this._attackStep === 0 ? 0.18 : this._attackStep === 1 ? 0.22 : 0.30);
     this.rig.update(rigPos, {
       // Normalize against current top speed so anim scale stays right.
       moveX: this.body.velocity.x / 5.5,
