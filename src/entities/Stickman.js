@@ -116,6 +116,7 @@ export class Stickman {
       aimActive: false,
     };
     this._prev = { jump: false, attack: false, grab: false, special: false, throw: false };
+    this._attackPressedAt = 0;   // ms — last press timestamp for hold detection
 
     // State
     this.state = STATE.ACTIVE;
@@ -147,11 +148,35 @@ export class Stickman {
     this.attackCooldown = 0;
     this.attackHits = new Set();  // bodies hit this swing
     this.hitstun = 0;
-    // Unarmed combo state — 0=jab, 1=cross, 2=kick. Resets after window.
+    // Combat — combo state
+    this.moveId = null;          // 'jab'|'cross'|'hook'|'knee'|'spinBack'
+                                  // |'heavyNeutral'|'heavyUp'|'heavyDown'|'heavyForward'|'heavyBack'
+                                  // |'airJab'|'airHook'|'airHeavyN'|'airHeavyU'|'airHeavyD'
+                                  // |'slideKick'  or null
+    this.chainStep = 0;          // 0..4 ground light chain
+    this.airChainStep = 0;       // 0..1 air light chain
+    this.chainTimer = 0;         // s remaining in chain window before reset
+    this.charging = false;
+    this.chargeStartedAt = 0;    // performance.now() ms when attack pressed
+    this._pressDir = { x: 0, y: 0 };  // dir cached at press
+    this.parryUntil = 0;         // ms — back-counter active until
+    this.parryRecoverUntil = 0;  // ms — back-counter whiff lockout end
+    this.juggled = false;        // launched-airborne flag
+    this.juggledUntil = 0;       // ms
+    this.juggleHits = 0;         // count of launched hits this window
+
+    // Back-compat aliases for legacy code paths (rig reads, weapons, etc.).
+    // Keep these as derived flags so renders + bot AI continue working unchanged
+    // during partial rollouts.
+    this._attackStep = 0;        // legacy — rig reads this
+    this.kicking = false;        // legacy — rig reads this
+
+    this._chargeTellTick = 0;    // charge tell particle counter
+
+    // Legacy combo fields — kept for any remaining references
     this.comboStep = 0;
     this.comboTimer = 0;
-    this._attackStep = 0;
-    this.kicking = false;
+
     this.invuln = 0;
     this.flashAmount = 0;
     this.lastDamager = null;
