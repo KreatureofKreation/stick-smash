@@ -263,6 +263,12 @@ export class Stickman {
 
     // Misc visuals
     this._handAnchorWorld = new THREE.Vector3();
+    // Reused per-frame scratch passed to rig.update() — avoids allocating
+    // a fresh holdPos Vector3, aim object, and params bag every _syncRig.
+    // 4 chars × 60 Hz = 240 GC-triggering allocs/sec eliminated.
+    this._rigHoldPos = new THREE.Vector3();
+    this._rigAim = { x: 0, y: 0 };
+    this._rigParams = {};
   }
 
   // Cast down from above the requested spawn; return a Y that places the
@@ -1796,9 +1802,10 @@ export class Stickman {
 
     let holdPos = null;
     if (this.grabbing) {
-      holdPos = new THREE.Vector3(this.grabbing.position.x, this.grabbing.position.y, this.grabbing.position.z);
+      holdPos = this._rigHoldPos.set(this.grabbing.position.x, this.grabbing.position.y, this.grabbing.position.z);
     }
-    const aim = { x: this.aimDir.x, y: this.aimDir.y };
+    const aim = this._rigAim;
+    aim.x = this.aimDir.x; aim.y = this.aimDir.y;
 
     // Ragdoll factor: dead, grabbed, hitstun
     let ragAmt = 0;
@@ -1816,31 +1823,29 @@ export class Stickman {
     const stepDur = this.moveId && MOVE_TABLE[this.moveId]
       ? MOVE_TABLE[this.moveId].dur
       : (this._attackStep === 0 ? 0.18 : this._attackStep === 1 ? 0.22 : 0.30);
-    this.rig.update(rigPos, {
-      // Normalize against current top speed so anim scale stays right.
-      moveX: this.body.velocity.x / 5.5,
-      vy: this.body.velocity.y,
-      grounded: this.grounded,
-      facing: this.facing,
-      attack: this.attackTimer > 0,
-      attackProgress: this.attackTimer > 0 ? 1 - this.attackTimer / stepDur : 0,
-      attackStep: this._attackStep,    // 0=jab, 1=cross, 2=kick
-      kicking: this.kicking,
-      moveId: this.moveId,
-      armPoseR, armPoseL, holdPos,
-      aim,
-      crouching: this.crouching,
-      sliding: this.sliding,
-      prone: this.crouching && !this.sliding,
-      ragdollAmount: ragAmt,
-      gumGumPunch: gumGum && this.attackTimer > 0 && !this.weapon,
-      // Throw windup ramps 0→1 over the windup window so the rig telegraphs
-      // the throw before release. Drives hold-arm rear-back in the rig.
-      throwWindup: this._throwWindupT > 0 ? clamp(1 - this._throwWindupT / 0.10, 0, 1) : 0,
-      // Angular velocity drives ragdoll limb whip when dead.
-      angVz: this.body.angularVelocity?.z || 0,
-      dt,
-    });
+    const params = this._rigParams;
+    params.moveX = this.body.velocity.x / 5.5;
+    params.vy = this.body.velocity.y;
+    params.grounded = this.grounded;
+    params.facing = this.facing;
+    params.attack = this.attackTimer > 0;
+    params.attackProgress = this.attackTimer > 0 ? 1 - this.attackTimer / stepDur : 0;
+    params.attackStep = this._attackStep;
+    params.kicking = this.kicking;
+    params.moveId = this.moveId;
+    params.armPoseR = armPoseR;
+    params.armPoseL = armPoseL;
+    params.holdPos = holdPos;
+    params.aim = aim;
+    params.crouching = this.crouching;
+    params.sliding = this.sliding;
+    params.prone = this.crouching && !this.sliding;
+    params.ragdollAmount = ragAmt;
+    params.gumGumPunch = gumGum && this.attackTimer > 0 && !this.weapon;
+    params.throwWindup = this._throwWindupT > 0 ? clamp(1 - this._throwWindupT / 0.10, 0, 1) : 0;
+    params.angVz = this.body.angularVelocity?.z || 0;
+    params.dt = dt;
+    this.rig.update(rigPos, params);
 
     if (rigInLocal) {
       // Group carries body's transform; limbs are in local space.

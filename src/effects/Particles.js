@@ -103,7 +103,9 @@ export class Particles {
   }
 
   blood(x, y, z, dirX = 0, dirY = 0) {
-    for (let i = 0; i < 12; i++) {
+    // 12 → 7 droplets. Per-particle update is matrix build + GPU upload, so
+    // count is a direct frame-cost lever. Trail size was decorative excess.
+    for (let i = 0; i < 7; i++) {
       this.spark.spawn({
         x, y, z,
         vx: dirX * 4 + rand(-3, 3), vy: dirY * 4 + rand(0, 5), vz: rand(-1, 1),
@@ -126,7 +128,9 @@ export class Particles {
   }
 
   smokePuff(x, y, z, color = 0x666677) {
-    for (let i = 0; i < 8; i++) {
+    // 8 → 5 puffs. Smoke uses transparent material — heaviest fragment cost
+    // per particle in the system. Cutting count helps overdraw most.
+    for (let i = 0; i < 5; i++) {
       this.smoke.spawn({
         x, y, z, vx: rand(-1, 1), vy: rand(0.5, 2), vz: rand(-1, 1),
         life: rand(0.5, 1.0), size: rand(0.3, 0.6),

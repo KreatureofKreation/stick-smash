@@ -701,7 +701,8 @@ export class Game {
         // Landing dust
         if (p.alive && p.grounded && !p.prevGrounded && Math.abs(p.body.velocity.y) < 4) {
           this.fx.particles.smokePuff(p.position.x, p.position.y - 0.55, 0, 0x888877);
-          this.fx.particles.burst(p.position.x, p.position.y - 0.5, 0, { count: 6, speed: 3, color: 0x999988 });
+          // 6 → 3 burst sparks; smokePuff already sells the kick-up.
+          this.fx.particles.burst(p.position.x, p.position.y - 0.5, 0, { count: 3, speed: 3, color: 0x999988 });
           audio.land();
         }
       }

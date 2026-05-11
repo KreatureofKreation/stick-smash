@@ -129,15 +129,17 @@ export class Tile {
   damage(amount, by) {
     if (this.indestructible) return false;
     this.hp -= amount;
-    // Visual: tint darker as damaged
+    // Visual: tint darker as damaged. Lerp on the material color in place
+    // — previous impl allocated two THREE.Color objects per hit and queued
+    // a setTimeout closure for the scale-pulse reset, both visible in GC
+    // pressure during sustained fights.
     const f = Math.max(0, this.hp / this.maxHp);
     if (this.mesh) {
-      const c = new THREE.Color(this.color);
-      c.lerp(new THREE.Color(0x111111), 1 - f);
-      this.mesh.material.color.copy(c);
-      // small pulse
-      this.mesh.scale.setScalar(0.96 + 0.04 * Math.random());
-      setTimeout(() => this.mesh && this.mesh.scale.setScalar(1), 60);
+      if (!this._tintBase) {
+        this._tintBase = new THREE.Color(this.color);
+        this._tintDark = new THREE.Color(0x111111);
+      }
+      this.mesh.material.color.copy(this._tintBase).lerp(this._tintDark, 1 - f);
     }
     if (this.hp <= 0) {
       this.destroy();
@@ -208,9 +210,11 @@ export class ChainSeg {
     this.hp -= amount;
     if (this.mesh) {
       const f = Math.max(0, this.hp / this.maxHp);
-      const c = new THREE.Color(0x444455);
-      c.lerp(new THREE.Color(0x884422), 1 - f);
-      this.mesh.material.color.copy(c);
+      if (!this._tintBase) {
+        this._tintBase = new THREE.Color(0x444455);
+        this._tintDark = new THREE.Color(0x884422);
+      }
+      this.mesh.material.color.copy(this._tintBase).lerp(this._tintDark, 1 - f);
     }
     if (this.hp <= 0) { this.destroy(); return true; }
     return false;
@@ -700,12 +704,16 @@ export class Level {
     // (Z-axis lock is handled in PhysicsWorld postStep — no walls needed.)
 
     // Lighting — brighter so dark-toned tiles are visible.
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.45));
-    this.scene.add(new THREE.HemisphereLight(0xddddff, 0x504050, 0.7));
+    // Bumped ambient + hemi to compensate for dropped second point fill,
+    // and pulled the shadow map down to 512² — shadow casters are stick
+    // figures + chunky tiles, so PCF softening hides the resolution drop.
+    // Net win: ~4× fewer fragments in the shadow pass each frame.
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    this.scene.add(new THREE.HemisphereLight(0xddddff, 0x504050, 0.8));
     const dir = new THREE.DirectionalLight(0xffffff, 1.6);
     dir.position.set(8, 22, 14);
     dir.castShadow = true;
-    dir.shadow.mapSize.set(1024, 1024);
+    dir.shadow.mapSize.set(512, 512);
     dir.shadow.camera.left = -28;
     dir.shadow.camera.right = 28;
     dir.shadow.camera.top = 22;
@@ -714,12 +722,11 @@ export class Level {
     dir.shadow.camera.far = 80;
     dir.shadow.bias = -0.0003;
     this.scene.add(dir);
-    const fill = new THREE.PointLight(0xff77aa, 0.6, 40);
-    fill.position.set(-10, 8, 4);
+    // Single warm fill — two point lights doubled the fragment-shader
+    // light-loop cost across every lit pixel. One fill is enough rim.
+    const fill = new THREE.PointLight(0xffaa88, 0.7, 40);
+    fill.position.set(0, 8, 4);
     this.scene.add(fill);
-    const fill2 = new THREE.PointLight(0x77aaff, 0.5, 40);
-    fill2.position.set(10, 8, 4);
-    this.scene.add(fill2);
   }
 
   _addSkyDome() {

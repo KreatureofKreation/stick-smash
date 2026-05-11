@@ -518,6 +518,14 @@ export class StickmanRig {
     this.lowerLegL = makeLimb(0.11, 0.50, mat);
     this.upperLegR = makeLimb(0.13, 0.50, mat);
     this.lowerLegR = makeLimb(0.11, 0.50, mat);
+    // Lower-limb shadows are silhouette-redundant with the uppers (light
+    // angle is high, lowers sit within upper-shadow penumbra). Each cast
+    // saved = one less geo in the shadow-map pass per char per frame.
+    // 4 char × 4 lowers = 16 fewer shadow draws/frame at zoom-out.
+    this.lowerArmL.castShadow = false;
+    this.lowerArmR.castShadow = false;
+    this.lowerLegL.castShadow = false;
+    this.lowerLegR.castShadow = false;
 
     // Joint spheres — visible at every joint so the rig reads cleanly.
     // castShadow defaults to false: small spheres add shadow draw calls without
@@ -554,7 +562,8 @@ export class StickmanRig {
       new THREE.BoxGeometry(0.46, 0.46, 0.32),
       new THREE.MeshStandardMaterial({ color: 0xa0a8b8, metalness: 0.7, roughness: 0.4 }),
     );
-    this.chestArmor.castShadow = true;
+    // Armor sits in torso silhouette — shadow contribution is invisible.
+    this.chestArmor.castShadow = false;
     this.chestArmor.visible = false;
     this.group.add(this.chestArmor);
 
