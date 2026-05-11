@@ -23,6 +23,37 @@ export const STATE = {
   DEAD: 'dead',
 };
 
+// Strike profile table. Every move shares this shape.
+// activeStart/activeEnd are normalized 0..1 progress through `dur`.
+// heightOffset adjusts hitbox Y from body center (negative = low, positive = high).
+// launch=true means the hit triggers ragdoll on the victim.
+// kbX is multiplied by attacker.facing in the hitbox loop.
+const MOVE_TABLE = {
+  // Ground lights — chain step 0..4
+  jab:          { type:'light', dur:0.14, activeStart:0.25, activeEnd:0.70, reach:0.95, radius:1.0, dmg:6,  kbX:5,  kbY:1, stun:0.15, launch:false, heightOffset:0.15, recovery:0.18 },
+  cross:        { type:'light', dur:0.16, activeStart:0.30, activeEnd:0.75, reach:1.00, radius:1.0, dmg:8,  kbX:7,  kbY:1, stun:0.20, launch:false, heightOffset:0.15, recovery:0.20 },
+  hook:         { type:'light', dur:0.18, activeStart:0.30, activeEnd:0.75, reach:0.90, radius:1.0, dmg:10, kbX:6,  kbY:2, stun:0.25, launch:false, heightOffset:0.15, recovery:0.22 },
+  knee:         { type:'light', dur:0.18, activeStart:0.35, activeEnd:0.70, reach:0.70, radius:1.0, dmg:11, kbX:5,  kbY:4, stun:0.30, launch:false, heightOffset:0.00, recovery:0.22 },
+  spinBack:     { type:'light', dur:0.24, activeStart:0.40, activeEnd:0.75, reach:1.10, radius:1.0, dmg:14, kbX:12, kbY:3, stun:0.35, launch:false, heightOffset:0.20, recovery:0.30 },
+  // Ground heavies — direction at release
+  heavyNeutral: { type:'heavy', dur:0.45, activeStart:0.40, activeEnd:0.75, reach:1.10, radius:1.1, dmg:22, kbX:18, kbY:4, stun:0.40, launch:true,  heightOffset:0.15, recovery:0.45 },
+  heavyUp:      { type:'heavy', dur:0.45, activeStart:0.40, activeEnd:0.78, reach:0.85, radius:1.0, dmg:18, kbX:4,  kbY:14,stun:0.40, launch:true,  heightOffset:0.40, recovery:0.45 },
+  heavyDown:    { type:'heavy', dur:0.50, activeStart:0.45, activeEnd:0.80, reach:0.90, radius:1.1, dmg:25, kbX:6,  kbY:-8,stun:0.45, launch:true,  heightOffset:-0.20,recovery:0.50 },
+  heavyForward: { type:'heavy', dur:0.40, activeStart:0.30, activeEnd:0.70, reach:1.30, radius:1.0, dmg:20, kbX:16, kbY:5, stun:0.40, launch:true,  heightOffset:0.15, recovery:0.40 },
+  heavyBack:    { type:'heavy', dur:0.55, activeStart:0.00, activeEnd:0.00, reach:0,    radius:0,   dmg:0,  kbX:0,  kbY:0, stun:0,    launch:false, heightOffset:0,    recovery:0.55 },
+  // Aerials — air chain step 0..1
+  airJab:       { type:'airLight', dur:0.20, activeStart:0.30, activeEnd:0.75, reach:0.85, radius:1.0, dmg:9,  kbX:8, kbY:2,  stun:0.20, launch:false, heightOffset:0.05, recovery:0.18 },
+  airHook:      { type:'airLight', dur:0.22, activeStart:0.30, activeEnd:0.75, reach:0.95, radius:1.0, dmg:11, kbX:9, kbY:2,  stun:0.25, launch:false, heightOffset:0.10, recovery:0.20 },
+  airHeavyN:    { type:'airHeavy', dur:0.45, activeStart:0.40, activeEnd:0.80, reach:1.05, radius:1.1, dmg:20, kbX:10,kbY:3,  stun:0.40, launch:true,  heightOffset:0.10, recovery:0.40 },
+  airHeavyU:    { type:'airHeavy', dur:0.40, activeStart:0.35, activeEnd:0.75, reach:0.80, radius:1.0, dmg:16, kbX:3, kbY:15, stun:0.40, launch:true,  heightOffset:0.30, recovery:0.40 },
+  airHeavyD:    { type:'airHeavy', dur:0.40, activeStart:0.35, activeEnd:0.80, reach:0.90, radius:1.0, dmg:22, kbX:8, kbY:-10,stun:0.45, launch:true,  heightOffset:-0.30,recovery:0.40 },
+  // Special
+  slideKick:    { type:'special', dur:0.32, activeStart:0.20, activeEnd:0.85, reach:1.25, radius:1.0, dmg:14, kbX:8, kbY:1.5,stun:0.35, launch:true,  heightOffset:-0.35, recovery:0.30 },
+};
+
+// Ground light chain order.
+const GROUND_CHAIN = ['jab','cross','hook','knee','spinBack'];
+
 export class Stickman {
   constructor(world, scene, opts) {
     this.world = world;
