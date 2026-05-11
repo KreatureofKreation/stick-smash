@@ -439,7 +439,62 @@ export class Game {
       const hh = (h.h ?? 0.4) / 2 + halfH;
       if (Math.abs(sp.x - hx) < hw && Math.abs(sp.y - hy) < hh) return false;
     }
+    // 3. Require solid ground within a reasonable drop. Spawns on top of
+    //    destroyed tile columns pass checks 1+2 (no overlap, no hazard)
+    //    but drop the player straight into the void on respawn.
+    if (!this._hasGroundBelow(sp.x, sp.y, 14)) return false;
     return true;
+  }
+
+  // Walk down the tile grid from spawn y; return true if we hit a tile
+  // within `maxDrop` units. Scans the spawn column and ±1 since the capsule
+  // has width and may straddle a column boundary.
+  _hasGroundBelow(x, y, maxDrop = 14) {
+    if (!this.level?.tiles) return true;
+    const startGy = Math.floor(y - 0.75); // bottom of capsule
+    for (let dx = -1; dx <= 1; dx++) {
+      const gx = Math.round(x) + dx;
+      for (let dy = 0; dy <= maxDrop; dy++) {
+        if (this.level.tiles.has(`${gx},${startGy - dy}`)) return true;
+      }
+    }
+    return false;
+  }
+
+  // Pick an x for a sky drop that (a) stays within the map's playable
+  // x-range and (b) has solid ground below. Tries a few jittered candidates
+  // near `refX`; if none have ground (e.g., floor is gone), scans outward
+  // from refX for the nearest column that still does.
+  _safeDropX(refX) {
+    let minX = -Infinity, maxX = Infinity;
+    if (this.level?.killBound) {
+      minX = -this.level.killBound.x + 1;
+      maxX = this.level.killBound.x - 1;
+    } else if (this.level?.tiles) {
+      let lo = Infinity, hi = -Infinity;
+      for (const key of this.level.tiles.keys()) {
+        const gx = parseInt(key, 10);
+        if (gx < lo) lo = gx;
+        if (gx > hi) hi = gx;
+      }
+      if (isFinite(lo)) { minX = lo + 1; maxX = hi - 1; }
+    }
+    const clamp = (v) => Math.max(minX, Math.min(maxX, v));
+    for (let i = 0; i < 8; i++) {
+      const x = clamp(refX + rand(-8, 8));
+      if (this._hasGroundBelow(x, 16, 20)) return x;
+    }
+    // Scan outward from refX for first column that has ground.
+    const start = Math.round(clamp(refX));
+    const range = Math.ceil(Math.max(start - minX, maxX - start));
+    for (let d = 0; d <= range; d++) {
+      for (const dir of [-1, 1]) {
+        const x = start + d * dir;
+        if (x < minX || x > maxX) continue;
+        if (this._hasGroundBelow(x, 16, 20)) return x;
+      }
+    }
+    return clamp(refX);
   }
 
   _liftSpawnClear(sp) {
@@ -484,14 +539,20 @@ export class Game {
     const fromSky = opts.fromSky ?? (!isPickup && Math.random() < 0.6);
     let x, y;
     if (fromSky) {
-      // pick an x near the action; spawn high
       const players = this.players.filter(p => p?.alive);
       const refX = players.length ? players[Math.floor(Math.random() * players.length)].position.x : 0;
-      x = refX + rand(-8, 8);
+      x = this._safeDropX(refX);
       y = 16 + rand(0, 4);
     } else {
+      // Static pad. If the pad's tile column was destroyed, fall back to a
+      // safe sky-drop column instead of dropping into the void.
       const sp = this.level.randomWeaponSpawn();
-      x = sp.x; y = sp.y;
+      if (this._hasGroundBelow(sp.x, sp.y, 20)) {
+        x = sp.x; y = sp.y;
+      } else {
+        x = this._safeDropX(sp.x);
+        y = 16 + rand(0, 4);
+      }
     }
     let item;
     if (isPickup) {
