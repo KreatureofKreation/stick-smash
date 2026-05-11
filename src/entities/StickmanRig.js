@@ -490,7 +490,11 @@ export class StickmanRig {
     this.accent = accent;
 
     // Single shared material for the whole figure (silhouette feel).
-    const mat = new THREE.MeshLambertMaterial({ color: primary });
+    // PBR (Standard) gives the body a subtle sheen + responds to fills.
+    // Only 4 players × 1 material = 4 PBR materials total. Tiles stay
+    // Lambert because there are hundreds of them and PBR per-pixel on
+    // floor surfaces was the biggest fragment cost.
+    const mat = new THREE.MeshStandardMaterial({ color: primary, roughness: 0.55, metalness: 0.05 });
     this.material = mat;
 
     // Head — slightly larger so silhouette reads.
@@ -557,10 +561,10 @@ export class StickmanRig {
      this.handL, this.handR, this.footL, this.footR,
     ].forEach(m => this.group.add(m));
 
-    // Optional armor chestplate — toggled via setArmor().
+    // Optional armor chestplate — PBR for proper metallic sheen.
     this.chestArmor = new THREE.Mesh(
       new THREE.BoxGeometry(0.46, 0.46, 0.32),
-      new THREE.MeshLambertMaterial({ color: 0xa0a8b8 }),
+      new THREE.MeshStandardMaterial({ color: 0xa0a8b8, metalness: 0.7, roughness: 0.4 }),
     );
     // Armor sits in torso silhouette — shadow contribution is invisible.
     this.chestArmor.castShadow = false;

@@ -21,44 +21,41 @@ export class Game {
     // Renderer
     const canvas = document.getElementById('game');
     const isCoarse = matchMedia('(pointer: coarse)').matches;
-    // Antialias OFF everywhere — MSAA at native res was the dominant
-    // fragment-shader cost on integrated GPUs (20 FPS in-game while a
-    // synchronous CPU probe reported 290 FPS = pure GPU bottleneck).
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
 
-    // Detect software WebGL (SwiftShader / llvmpipe / Mesa / Microsoft
-    // Basic Render). Brave's anti-fingerprinting + driver blocklists
-    // commonly land users on the software rasterizer, where every pixel
-    // is CPU work. At 1920×1080 that's 2M frag/pass → ~50 ms/frame even
-    // with empty scenes. Detect once and drop internal render res to
-    // half (1/4 fragment count). Quality loss is minimal on stylized
-    // art; the alternative is ~17 FPS.
-    const gl = this.renderer.getContext();
-    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-    const rendererStr = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : '';
+    // Probe GPU first with a throwaway context — antialias flag is fixed
+    // at WebGLRenderer construction, so we need to know the GPU tier
+    // before deciding. Disposed immediately to release the context slot.
+    const probe = new THREE.WebGLRenderer({ canvas: document.createElement('canvas') });
+    const probeGl = probe.getContext();
+    const dbg = probeGl.getExtension('WEBGL_debug_renderer_info');
+    const rendererStr = dbg ? probeGl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : '';
+    probe.dispose();
     const softwareGL = /SwiftShader|llvmpipe|Mesa|Software|Microsoft Basic|ANGLE.*Software/i.test(rendererStr);
     this._softwareGL = softwareGL;
     this._rendererStr = rendererStr;
-    // Manual override: window.__lowQ = true forces half-res; = false forces full.
-    const lowQ = (typeof window !== 'undefined' && 'undefined' !== typeof window.__lowQ)
+    // Manual override: window.__lowQ = true forces low-quality mode.
+    const lowQ = (typeof window !== 'undefined' && typeof window.__lowQ !== 'undefined')
       ? !!window.__lowQ
       : softwareGL;
-    const ratio = lowQ ? 0.5 : Math.min(devicePixelRatio, 1);
-    this.renderer.setPixelRatio(ratio);
-    if (softwareGL) {
-      console.warn(`[perf] software WebGL detected (${rendererStr}). Rendering at half-res. Set window.__lowQ=false then reload to force full-res.`);
-    }
+    this._lowQ = lowQ;
+
+    // Tiered quality. HW gets full polish (AA, shadows, ACES, 1.5× pixel
+    // ratio); software/lowQ keeps all the trims that got 17 FPS → 60 on
+    // the software path. Single source of truth is `_lowQ`.
+    this.renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: !lowQ && !isCoarse,
+      powerPreference: 'high-performance',
+    });
+    this.renderer.setPixelRatio(lowQ ? 0.5 : Math.min(devicePixelRatio, isCoarse ? 1.25 : 1.5));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    // Shadows entirely OFF. The shadow pass was a full second render of
-    // every castShadow object every frame, plus a per-pixel sample on
-    // every lit surface in the main pass. Stick-figure silhouettes read
-    // fine without grounded shadows. Single biggest GPU lever after all
-    // the earlier trims didn't move user-reported FPS off ~10 (HUD floor
-    // displays as 20 due to sim-dt clamp).
-    this.renderer.shadowMap.enabled = false;
-    // Linear tone mapping skips the ACES curve eval per pixel. With flat
-    // pixel-art palette the tonemap was decorative excess.
-    this.renderer.toneMapping = THREE.NoToneMapping;
+    this.renderer.shadowMap.enabled = !lowQ;
+    this.renderer.shadowMap.type = THREE.BasicShadowMap; // 1 tap. Cheap.
+    this.renderer.toneMapping = lowQ ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.2;
+    if (softwareGL) {
+      console.warn(`[perf] software WebGL detected (${rendererStr}). Low-quality mode on. Set window.__lowQ=false then reload to force full quality.`);
+    }
     this._isCoarse = isCoarse;
     this._resize = this._resize.bind(this);
     addEventListener('resize', this._resize);
