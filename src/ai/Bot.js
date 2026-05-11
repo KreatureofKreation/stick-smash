@@ -18,6 +18,8 @@ export class Bot {
     this.dodgeTimer = 0;
     this.dodgeDir = 0;
     this.grabCooldown = 0;
+    this._chargeHoldUntil = 0;
+    this._lastLightAt = 0;
   }
 
   _findTarget(players) {
@@ -88,7 +90,7 @@ export class Bot {
       this.replanTimer = rand(0.5, 1.2);
     }
 
-    let desiredX = 0, jump = false, grab = false, attack = false, special = false;
+    let desiredX = 0, desiredY = null, jump = false, grab = false, attack = false, special = false;
     let aimX = sm.facing, aimY = 0, aimActive = false;
 
     // Flee if low HP — back off from target.
@@ -242,19 +244,110 @@ export class Bot {
       } else if (w) {
         if (d < 1.5) attack = true;
       } else {
-        if (d < 1.0) attack = true;
+        // Unarmed: use heavy hold/release and light-tap pattern.
+        if (d < 1.0) {
+          const target = this.target;
+          const wantHeavy = (Math.random() < this._heavyChance(target));
+          if (wantHeavy) {
+            if (!this._chargeHoldUntil) {
+              // Start a charge — press and hold for 0.25–0.45s.
+              this._chargeHoldUntil = performance.now() + (250 + Math.random() * 200);
+              const dir = this._pickHeavyDir(target);
+              desiredX = dir.x || desiredX;
+              desiredY = dir.y;
+            }
+            // Hold attack until threshold.
+            attack = performance.now() < this._chargeHoldUntil;
+            if (performance.now() >= this._chargeHoldUntil) {
+              this._chargeHoldUntil = 0;   // release happens naturally next frame
+            }
+          } else {
+            // Light tap — single-frame attack pulse.
+            attack = false;
+            if (this._lastLightAt + 200 < performance.now()) {
+              attack = true;
+              this._lastLightAt = performance.now();
+            }
+          }
+        }
+      }
+    }
+
+    // Back-counter: ~15% chance to enter counter-stance against detected swings.
+    const swinger = this._nearestSwingingEnemy();
+    if (swinger && Math.random() < 0.15 && sm.attackCooldown <= 0) {
+      desiredX = -sm.facing;
+      desiredY = 0;
+      this._chargeHoldUntil = performance.now() + 280;
+      attack = true;
+    }
+
+    // Slide-kick: if running fast at a low-altitude opponent, attempt slide-kick.
+    if (this.target) {
+      const speedAbs = Math.abs(sm.body.velocity.x);
+      const opLow = this.target.position.y - sm.position.y < 0.6;
+      if (speedAbs > 5 && opLow && Math.abs(this.target.position.x - sm.position.x) < 3) {
+        desiredY = -1;   // request crouch — triggers slide via existing logic
+        setTimeout(() => { sm.input.attack = true; }, 80);
       }
     }
 
     // Drive inputs
     sm.input.moveX = desiredX;
-    sm.input.moveY = clamp(dy * 0.5, -1, 1);
+    sm.input.moveY = desiredY !== null ? desiredY : clamp(dy * 0.5, -1, 1);
     sm.input.jump = jump;
     sm.input.attack = attack;
     sm.input.grab = grab;
     sm.input.special = special;
     sm.input.aimX = aimX; sm.input.aimY = aimY;
     sm.input.aimActive = aimActive;
+  }
+
+  // Returns a directional vector for choosing a heavy attack variant.
+  _pickHeavyDir(target) {
+    if (!target) return { x: 0, y: 0 };
+    const me = this.sm;
+    const dx = target.position.x - me.position.x;
+    const dy = target.position.y - me.position.y;
+    const sameFacing = Math.sign(dx) === me.facing;
+    // Target airborne above me → up heavy / rising knee.
+    if (dy > 1.2) return { x: 0, y: 1 };
+    // Target airborne below me → down heavy / dive.
+    if (dy < -1.0) return { x: 0, y: -1 };
+    // Far + facing → forward charge.
+    if (Math.abs(dx) > 2.5 && sameFacing) return { x: Math.sign(dx), y: 0 };
+    // Otherwise neutral blow-away.
+    return { x: 0, y: 0 };
+  }
+
+  // Heuristic probability of using a heavy this attack beat.
+  _heavyChance(target) {
+    if (!target) return 0;
+    // More likely to throw heavy if target stunned or in range.
+    if (target.hitstun > 0.1) return 0.7;
+    const dx = Math.abs(target.position.x - this.sm.position.x);
+    if (dx < 1.5) return 0.25;
+    return 0.10;
+  }
+
+  // Returns the nearest enemy who is mid-swing and facing us, within ~2.5 units.
+  _nearestSwingingEnemy() {
+    const me = this.sm;
+    const players = me.game?.players || [];
+    let best = null, bestD2 = 2.5 * 2.5;
+    for (const p of players) {
+      if (!p || p === me || !p.alive) continue;
+      if (p.attackTimer <= 0 || !p.moveId) continue;
+      const dx = p.position.x - me.position.x;
+      const dy = p.position.y - me.position.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 > bestD2) continue;
+      // Opponent must be facing me (their facing points toward us).
+      if (Math.sign(-dx) !== p.facing) continue;
+      bestD2 = d2;
+      best = p;
+    }
+    return best;
   }
 
   // Tile lookup at world (x, y) — checks all tile shape variants in level.tiles.
