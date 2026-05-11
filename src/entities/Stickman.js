@@ -917,23 +917,94 @@ export class Stickman {
   }
 
   _doAttack() {
+    // Compatibility entry-point — still called from tick() on attackPressed.
+    // Routes to weapon path if armed, otherwise enters the unarmed FSM.
     if (this.attackCooldown > 0) return;
-    if (this.weapon) {
-      this.weapon.tryFire(this);
+    if (this.weapon) { this.weapon.tryFire(this); return; }
+    // Slide-kick short-circuit — committed even mid-slide.
+    if (this.sliding && this.grounded) {
+      this._fireMove('slideKick');
       return;
     }
-    // Unarmed combo: jab → cross → kick. Within combo window, each press
-    // chains the next move. After the kick (or expiry), combo resets.
-    if (this.comboTimer <= 0) this.comboStep = 0;
-    const step = this.comboStep;
-    this._attackStep = step;
-    this.kicking = (step === 2);
-    const dur = step === 0 ? 0.18 : step === 1 ? 0.22 : 0.30;
-    this.attackTimer = dur;
-    this.attackCooldown = step === 2 ? 0.45 : 0.30;
+    if (performance.now() < this.parryRecoverUntil) return;
+    if (this.charging || this.moveId) return;
+    this.charging = true;
+    this.chargeStartedAt = performance.now();
+    this._pressDir = { x: this.input.moveX, y: this.input.moveY };
+  }
+
+  // Called per-frame from tick() to resolve a held attack on release.
+  _chargeTick(dt) {
+    if (!this.charging) return;
+    // Cancel on jump, hit, ragdoll, etc. (Those branches clear this.charging
+    // elsewhere — here we only resolve on release.)
+    if (!this.input.attackReleased) return;
+    const heldS = (performance.now() - this.chargeStartedAt) / 1000;
+    this.charging = false;
+    const liveDir = { x: this.input.moveX, y: this.input.moveY };
+    const dir = (heldS >= 0.20) ? liveDir : this._pressDir;
+    const airborne = !this.grounded;
+    let id;
+    if (heldS >= 0.20) {
+      id = this._heavyForDir(dir, airborne);
+    } else if (airborne) {
+      id = (this.airChainStep === 0) ? 'airJab' : 'airHook';
+      this.airChainStep = (this.airChainStep + 1) % 2;
+    } else {
+      id = GROUND_CHAIN[this.chainStep];
+      this.chainStep = (this.chainStep + 1) % GROUND_CHAIN.length;
+      this.chainTimer = 0.45;
+    }
+    this._fireMove(id);
+  }
+
+  _heavyForDir(dir, airborne) {
+    if (airborne) {
+      if (dir.y < -0.4) return 'airHeavyD';
+      if (dir.y >  0.4) return 'airHeavyU';
+      return 'airHeavyN';
+    }
+    if (dir.y >  0.4) return 'heavyUp';
+    if (dir.y < -0.4) return 'heavyDown';
+    // Treat "back" as stick away from facing.
+    const f = this.facing || 1;
+    if (Math.abs(dir.x) > 0.4) {
+      if (Math.sign(dir.x) === f) return 'heavyForward';
+      return 'heavyBack';
+    }
+    return 'heavyNeutral';
+  }
+
+  _fireMove(id) {
+    const m = MOVE_TABLE[id];
+    if (!m) return;
+    this.moveId = id;
+    this.attackTimer = m.dur;
+    this.attackCooldown = m.recovery;
     this.attackHits.clear();
-    this.comboStep = (step + 1) % 3;
-    this.comboTimer = step === 2 ? 0 : 0.55;
+    // Legacy rig flags so old rig code paths render reasonable poses until
+    // the rig is rewritten in Task 11–13.
+    this.kicking = (id === 'knee' || id === 'spinBack' || id === 'heavyDown' || id === 'heavyForward'
+                    || id === 'airHeavyN' || id === 'airHeavyD' || id === 'slideKick');
+    this._attackStep = (id === 'jab') ? 0 : (id === 'cross') ? 1 : 2;
+
+    // Per-move startup impulses.
+    if (id === 'heavyForward') {
+      this.body.velocity.x += this.facing * 8;
+    } else if (id === 'airHeavyD') {
+      this.body.velocity.y -= 12;
+      this.body.velocity.x += this.facing * 6;
+    } else if (id === 'slideKick') {
+      // Maintain slide momentum — no impulse change.
+    }
+
+    // Back-counter — set parry window, no hitbox.
+    if (id === 'heavyBack') {
+      const t = performance.now();
+      this.parryUntil = t + 250;
+      this.parryRecoverUntil = t + 550;
+    }
+
     audio.swing();
   }
 
@@ -1361,6 +1432,7 @@ export class Stickman {
 
       // Attack
       if (now.attackPressed) this._doAttack();
+      this._chargeTick(dt);
 
       // Special / weapon alt fire / force powers.
       if (now.specialPressed) {
@@ -1397,6 +1469,19 @@ export class Stickman {
           audio.swing();
         }
       }
+    }
+    if (this.chainTimer > 0) {
+      this.chainTimer -= dt;
+      if (this.chainTimer <= 0) this.chainStep = 0;
+    }
+    // Reset air chain on landing.
+    if (this.grounded && !this.prevGrounded) {
+      this.airChainStep = 0;
+    }
+    // Clear juggle on touchdown or timeout.
+    if (this.juggled && (this.grounded || performance.now() > this.juggledUntil)) {
+      this.juggled = false;
+      this.juggleHits = 0;
     }
     // Attack timing always ticks (so swing finishes even if hit).
     this._attackTick(dt, players);
