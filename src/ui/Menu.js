@@ -13,6 +13,13 @@ export class Menu {
     this.bots = 3;
     this.level = 'arena';
     this.playerName = localStorage.getItem('pn') || 'P1';
+    // Per-pad-slot names. Slot 0..2 → P2..P4 defaults. Persisted in localStorage
+    // keyed by slot index, NOT physical pad index — so plugging a different pad
+    // into slot 0 still picks up the name the user typed for "P2".
+    this.padNames = new Map();
+    for (let i = 0; i < 3; i++) {
+      this.padNames.set(i, localStorage.getItem(`pn-pad${i}`) || `P${i + 2}`);
+    }
     // Friend opens a shared `?room=foo` URL → drop them straight into the
     // online character picker for that room. Saves a click and makes the
     // shared-link flow feel instant.
@@ -218,7 +225,6 @@ export class Menu {
           <label>Level
             <select id="level">${LEVELS.map(l => `<option value="${l.id}" ${l.id === this.level ? 'selected' : ''}>${l.name}</option>`).join('')}</select>
           </label>
-          <label>Name <input type="text" maxlength="10" value="${this.playerName}" id="pname" /></label>
         </div>
         <div class="btn-row">
           <button class="btn" data-act="back">← BACK</button>
@@ -229,7 +235,6 @@ export class Menu {
     this._renderRoster(el);
     el.querySelector('#bots').oninput = (e) => this.bots = +e.target.value;
     el.querySelector('#level').onchange = (e) => this.level = e.target.value;
-    el.querySelector('#pname').oninput = (e) => { this.playerName = e.target.value || 'P1'; localStorage.setItem('pn', this.playerName); };
     el.querySelector('[data-act="back"]').onclick = () => this.show('main');
     el.querySelector('[data-act="start"]').onclick = () => {
       const extras = this._collectPadExtras();
@@ -252,6 +257,7 @@ export class Menu {
     const tick = () => {
       this._tickPadPicks();
       this._renderPadSlots(slotsEl);
+      this._updateGridCursors(el);
     };
     tick();
     // 60 ms — fast enough for snappy edge-detected button presses, slow
@@ -338,27 +344,125 @@ export class Menu {
     }
   }
 
+  // Rebuild the slot rows ONCE per structural change (pad-connect /
+  // pad-disconnect), then on every tick update only the inline color +
+  // char-name + lock-mark text. Avoids clobbering the name input's focus
+  // every 60 ms.
   _renderPadSlots(slotsEl) {
     const gps = navigator.getGamepads?.() || [];
     const connected = [];
     for (let i = 0; i < gps.length && connected.length < 3; i++) {
       if (gps[i] && gps[i].connected) connected.push({ idx: i, id: gps[i].id });
     }
-    const rows = [];
-    rows.push(`<div class="player-row"><div class="swatch" style="--c:#${(rosterById(this.selectedChar).primary).toString(16).padStart(6,'0')}"></div><strong>P1</strong> &nbsp;<span style="opacity:0.7">keyboard + mouse — ${rosterById(this.selectedChar).name}</span></div>`);
-    for (let i = 0; i < 3; i++) {
-      const slot = connected[i];
-      if (slot) {
-        const st = this.padPicks.get(slot.idx);
-        const c = ROSTER[st?.charIdx ?? 0];
-        const hex = '#' + c.primary.toString(16).padStart(6, '0');
-        const lockMark = st?.locked ? '🔒 LOCKED' : '<span style="opacity:0.55">←/→ to cycle · A to lock</span>';
-        rows.push(`<div class="player-row"${st?.locked ? ' style="border:1px solid '+hex+';"' : ''}><div class="swatch" style="--c:${hex}"></div><strong>P${i + 2}</strong> &nbsp;<span style="font-weight:700;color:${hex}">${c.name}</span> &nbsp;${lockMark} &nbsp;<span style="opacity:0.4;font-size:11px;margin-left:auto">Pad ${slot.idx}</span></div>`);
-      } else {
-        rows.push(`<div class="player-row" style="opacity:0.45"><div class="swatch" style="--c:#666"></div><strong>P${i + 2}</strong> &nbsp;<span>plug a gamepad + press any button</span></div>`);
+    // Detect structural change to decide whether to rebuild the row DOM.
+    const sig = ['P1', ...Array.from({ length: 3 }, (_, i) => connected[i] ? `pad${connected[i].idx}` : 'empty')].join('|');
+    if (sig !== this._padSlotsSig) {
+      this._padSlotsSig = sig;
+      slotsEl.innerHTML = '';
+      // P1 row.
+      const p1 = document.createElement('div');
+      p1.className = 'player-row';
+      p1.innerHTML = `<div class="swatch p1-swatch"></div><strong>P1</strong> <input type="text" class="pad-name p1-name" maxlength="10" /> <span class="char-name p1-char" style="opacity:0.85"></span>`;
+      slotsEl.appendChild(p1);
+      p1.querySelector('.p1-name').value = this.playerName;
+      p1.querySelector('.p1-name').oninput = (e) => {
+        this.playerName = e.target.value || 'P1';
+        localStorage.setItem('pn', this.playerName);
+      };
+      // P2..P4 slots.
+      for (let i = 0; i < 3; i++) {
+        const slot = connected[i];
+        const row = document.createElement('div');
+        row.className = 'player-row';
+        row.dataset.slot = String(i);
+        if (slot) {
+          row.dataset.padIdx = String(slot.idx);
+          row.innerHTML = `<div class="swatch"></div><strong>P${i + 2}</strong> <input type="text" class="pad-name" maxlength="10" /> <span class="char-name" style="font-weight:700"></span> <span class="lock-mark"></span> <span style="opacity:0.4;font-size:11px;margin-left:auto">Pad ${slot.idx}</span>`;
+          const nameInput = row.querySelector('.pad-name');
+          nameInput.value = this.padNames.get(i) || `P${i + 2}`;
+          nameInput.oninput = (e) => {
+            const v = e.target.value || `P${i + 2}`;
+            this.padNames.set(i, v);
+            localStorage.setItem(`pn-pad${i}`, v);
+          };
+        } else {
+          row.style.opacity = '0.45';
+          row.innerHTML = `<div class="swatch" style="--c:#666"></div><strong>P${i + 2}</strong> <span>plug a gamepad + press any button</span>`;
+        }
+        slotsEl.appendChild(row);
       }
     }
-    slotsEl.innerHTML = rows.join('');
+    // Per-tick state updates — touch only the dynamic bits.
+    const p1Row = slotsEl.firstElementChild;
+    if (p1Row) {
+      const p1Char = rosterById(this.selectedChar);
+      const p1Hex = '#' + p1Char.primary.toString(16).padStart(6, '0');
+      p1Row.querySelector('.p1-swatch').style.setProperty('--c', p1Hex);
+      p1Row.querySelector('.p1-char').textContent = `keyboard + mouse — ${p1Char.name}`;
+    }
+    for (let i = 0; i < 3; i++) {
+      const row = slotsEl.querySelector(`[data-slot="${i}"]`);
+      if (!row) continue;
+      const slot = connected[i];
+      if (!slot) continue;
+      const st = this.padPicks.get(slot.idx);
+      const c = ROSTER[st?.charIdx ?? 0];
+      const hex = '#' + c.primary.toString(16).padStart(6, '0');
+      row.querySelector('.swatch').style.setProperty('--c', hex);
+      const charName = row.querySelector('.char-name');
+      charName.textContent = c.name;
+      charName.style.color = hex;
+      const lockMark = row.querySelector('.lock-mark');
+      if (st?.locked) {
+        lockMark.textContent = '🔒 LOCKED';
+        lockMark.style.opacity = '1';
+        row.style.border = '1px solid ' + hex;
+      } else {
+        lockMark.innerHTML = '<span style="opacity:0.55">←/→ cycle · A lock</span>';
+        row.style.border = '';
+      }
+    }
+  }
+
+  // Add a small "P2"/"P3"/"P4" badge on each char-grid card showing which
+  // pads are currently hovering / locked on that char. Solves the bug
+  // where the pad's cycle moved the bottom swatch but nothing on the
+  // grid itself — making it look like the on-screen cursor desynced.
+  _updateGridCursors(rootEl) {
+    if (!rootEl) return;
+    const grid = rootEl.querySelector('.char-grid');
+    if (!grid) return;
+    const gps = navigator.getGamepads?.() || [];
+    const padsByChar = new Map();   // charId → [{slotIdx, locked}]
+    let slotIdx = 0;
+    for (let i = 0; i < gps.length && slotIdx < 3; i++) {
+      if (!gps[i] || !gps[i].connected) continue;
+      const st = this.padPicks.get(i);
+      if (st) {
+        const cid = ROSTER[st.charIdx].id;
+        if (!padsByChar.has(cid)) padsByChar.set(cid, []);
+        padsByChar.get(cid).push({ slotIdx, locked: !!st.locked });
+      }
+      slotIdx++;
+    }
+    for (const card of grid.querySelectorAll('.char-card')) {
+      const cid = card.dataset.id;
+      const pads = padsByChar.get(cid) || [];
+      let badge = card.querySelector('.pad-cursors');
+      if (!badge) {
+        badge = document.createElement('div');
+        badge.className = 'pad-cursors';
+        card.appendChild(badge);
+      }
+      if (!pads.length) {
+        if (badge.innerHTML) badge.innerHTML = '';
+        continue;
+      }
+      const html = pads.map(p =>
+        `<span class="pad-cursor s${p.slotIdx}${p.locked ? ' locked' : ''}">P${p.slotIdx + 2}</span>`
+      ).join('');
+      if (badge.innerHTML !== html) badge.innerHTML = html;
+    }
   }
 
   // Snapshot of pad-bound extras for startLocal. Locked picks honor user's
@@ -370,7 +474,9 @@ export class Menu {
       if (!gps[i] || !gps[i].connected) continue;
       const st = this.padPicks.get(i);
       const charId = st ? ROSTER[st.charIdx].id : null;
-      out.push({ padIdx: i, charId });
+      const slotIdx = out.length;
+      const name = this.padNames.get(slotIdx) || `P${slotIdx + 2}`;
+      out.push({ padIdx: i, charId, name });
     }
     return out;
   }

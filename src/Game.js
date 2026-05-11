@@ -240,7 +240,7 @@ export class Game {
         }
         used.add(pick.id);
         const lp = this._spawnPlayer({
-          name: `P${i + 2}`,
+          name: pp.name || `P${i + 2}`,
           character: pick,
           isLocal: true,
           inputSource: { kind: 'gamepad', gamepadIdx: pp.padIdx },
