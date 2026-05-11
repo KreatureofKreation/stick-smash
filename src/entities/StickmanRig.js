@@ -889,10 +889,13 @@ export class StickmanRig {
       footLY = baseFootY - 0.10;
     }
 
+    // Resolve strikePose here so both the leg-override block below and the
+    // arm dispatcher further down can reference it without a TDZ error.
+    const moveId = params.moveId;
+    const strikePose = moveId ? STRIKE_POSES[moveId]?.(this, params) : null;
+
     // Strike pose leg overrides (e.g. knee, flying-knee, dive, slide-kick).
     // These run AFTER kicking so pose-specific arcs take precedence.
-    // We resolve strikePose here using the same moveId resolved above — it's
-    // already in scope from the arm dispatcher section.
     if (strikePose) {
       if (strikePose.legRX !== undefined) {
         footRX = hipX + this.facing * strikePose.legRX;
@@ -919,10 +922,8 @@ export class StickmanRig {
     const aimAng = Math.atan2(aim.y, aim.x);
     const aimDist = Math.min(0.7, Math.hypot(aim.x, aim.y) * 0.7 + 0.55);
 
-    // STRIKE_POSES dispatcher — resolves per-move pose BEFORE the legacy
-    // armPoseR branch so the strike arc overrides walk/idle targets.
-    const moveId = params.moveId;
-    const strikePose = moveId ? STRIKE_POSES[moveId]?.(this, params) : null;
+    // STRIKE_POSES dispatcher — strikePose is already resolved above (hoisted
+    // to fix TDZ); just apply arm override here if the pose defines one.
     if (strikePose && strikePose.armRX !== undefined) {
       // Override right-arm pose with strike-specific arc.
       // Mutate params so the branch below skips the old 'attack' arc.
