@@ -330,6 +330,22 @@ export class Stickman {
     // also mid-swing of a melee/fist and facing the attacker, both attacks
     // parry. No damage, both knocked back, both staggered briefly.
     if (this._tryClashOnIncoming(opts)) return false;
+    // Back-counter parry: if attacker is mid-melee swing and the defender
+    // is in their active parry window, treat as a clash (both bounce,
+    // both cancel) — no damage taken on either side.
+    const tNow = performance.now();
+    const parryActive = tNow < this.parryUntil;
+    const allowed = opts.weapon === 'fist' || opts.weapon === 'melee' || opts.weapon === 'lightProj';
+    if (parryActive && allowed && opts.attacker && opts.attacker !== this) {
+      // Reuse the existing two-strike clash resolution.
+      if (this._clash) this._clash(opts.attacker);
+      this.parryUntil = 0;
+      // Drop the defender out of counter-stance immediately so they can act.
+      this.attackTimer = 0;
+      this.moveId = null;
+      this.parryRecoverUntil = 0;
+      return;  // damage suppressed
+    }
     // Armor absorbs damage first. When armor breaks, spawn a chunk that falls.
     if (this.armor > 0 && opts.weapon !== 'lava' && opts.weapon !== 'flame') {
       const absorbed = Math.min(this.armor, amount);
