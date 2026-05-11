@@ -104,10 +104,12 @@ export class Tile {
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(x, y, 0);
     if (this.rotZ) mesh.rotation.z = this.rotZ;
-    // Only DYNAMIC tiles cast — static platforms casting onto each other
-    // doubled the shadow-pass scene (100+ tiles per level). Static still
-    // receive shadows from chars + dynamics, which is what reads visually.
-    mesh.castShadow = dyn;
+    // Tile shadow cast: full quality casts on all tiles. lowQ casts only
+    // dynamic tiles (crates) since static platforms casting onto each
+    // other doubled the shadow-pass scene (100+ tile draws). Statics
+    // still receive shadows either way.
+    const lowQ = !!this.level?.game?._lowQ;
+    mesh.castShadow = lowQ ? dyn : true;
     mesh.receiveShadow = true;
     // Static tiles never move — bake the matrix once and skip per-frame
     // updateMatrix() in the renderer's traverse. Saves N matrix multiplies
@@ -592,12 +594,11 @@ export class Level {
     const gy = this.def.gravity ?? -17;
     this.physics.world.gravity = { x: 0, y: gy, z: 0 };
 
-    // sky / fog — flat bg color; gradient sky-dome below skips on software
-    // WebGL since its custom ShaderMaterial runs a full-screen fragment
-    // pass which is expensive in CPU rasterization.
+    // sky / fog — gradient sky-dome skipped in low-quality (lowQ / software
+    // WebGL) since its ShaderMaterial runs a full-screen fragment pass.
     this.scene.background = new THREE.Color(this.bgColor);
     this.scene.fog = new THREE.Fog(this.bgColor, 30, 80);
-    if (!this.game?._softwareGL) this._addSkyDome();
+    if (!this.game?._lowQ) this._addSkyDome();
 
     // tiles
     for (const t of this.def.tiles) {
@@ -704,23 +705,37 @@ export class Level {
 
     // (Z-axis lock is handled in PhysicsWorld postStep — no walls needed.)
 
-    // Lighting — brighter so dark-toned tiles are visible.
-    // Bumped ambient + hemi to compensate for dropped second point fill,
-    // and pulled the shadow map down to 512² — shadow casters are stick
-    // figures + chunky tiles, so PCF softening hides the resolution drop.
-    // Net win: ~4× fewer fragments in the shadow pass each frame.
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-    this.scene.add(new THREE.HemisphereLight(0xddddff, 0x504050, 0.8));
+    // Lighting. HW path gets shadow + dual fills for depth; lowQ keeps
+    // single fill + no shadow (matches game._lowQ tier in Game.js).
+    const lowQ = !!this.game?._lowQ;
+    this.scene.add(new THREE.AmbientLight(0xffffff, lowQ ? 0.55 : 0.45));
+    this.scene.add(new THREE.HemisphereLight(0xddddff, 0x504050, lowQ ? 0.8 : 0.7));
     const dir = new THREE.DirectionalLight(0xffffff, 1.6);
     dir.position.set(8, 22, 14);
-    // Shadow casting disabled at renderer level — no shadow camera config
-    // needed. Keep the directional light for surface shading.
+    if (!lowQ) {
+      dir.castShadow = true;
+      dir.shadow.mapSize.set(1024, 1024);
+      dir.shadow.camera.left = -28;
+      dir.shadow.camera.right = 28;
+      dir.shadow.camera.top = 22;
+      dir.shadow.camera.bottom = -12;
+      dir.shadow.camera.near = 1;
+      dir.shadow.camera.far = 80;
+      dir.shadow.bias = -0.0003;
+    }
     this.scene.add(dir);
-    // Single warm fill — two point lights doubled the fragment-shader
-    // light-loop cost across every lit pixel. One fill is enough rim.
-    const fill = new THREE.PointLight(0xffaa88, 0.7, 40);
-    fill.position.set(0, 8, 4);
-    this.scene.add(fill);
+    if (lowQ) {
+      const fill = new THREE.PointLight(0xffaa88, 0.7, 40);
+      fill.position.set(0, 8, 4);
+      this.scene.add(fill);
+    } else {
+      const fill = new THREE.PointLight(0xff77aa, 0.6, 40);
+      fill.position.set(-10, 8, 4);
+      this.scene.add(fill);
+      const fill2 = new THREE.PointLight(0x77aaff, 0.5, 40);
+      fill2.position.set(10, 8, 4);
+      this.scene.add(fill2);
+    }
   }
 
   _addSkyDome() {
