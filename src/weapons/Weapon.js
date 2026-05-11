@@ -36,7 +36,7 @@ export class Weapon {
   _buildMesh() {
     // override
     const g = new THREE.BoxGeometry(0.6, 0.15, 0.15);
-    this.mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x888888 }));
+    this.mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: 0x888888 }));
   }
 
   // Spawn into world as pickup

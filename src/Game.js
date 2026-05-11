@@ -30,11 +30,13 @@ export class Game {
     // and is the single biggest GPU win on HiDPI Windows laptops.
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.shadowMap.enabled = true;
-    // BasicShadowMap on every platform: PCFSoft does 9 taps per fragment
-    // in the shadow lookup. Stick figures + chunky tiles don't need soft
-    // edges. Saves ~8× the shadow-sample fragment cost on lit surfaces.
-    this.renderer.shadowMap.type = THREE.BasicShadowMap;
+    // Shadows entirely OFF. The shadow pass was a full second render of
+    // every castShadow object every frame, plus a per-pixel sample on
+    // every lit surface in the main pass. Stick-figure silhouettes read
+    // fine without grounded shadows. Single biggest GPU lever after all
+    // the earlier trims didn't move user-reported FPS off ~10 (HUD floor
+    // displays as 20 due to sim-dt clamp).
+    this.renderer.shadowMap.enabled = false;
     // Linear tone mapping skips the ACES curve eval per pixel. With flat
     // pixel-art palette the tonemap was decorative excess.
     this.renderer.toneMapping = THREE.NoToneMapping;
@@ -581,10 +583,14 @@ export class Game {
   // === Main loop ===
   _tick(now) {
     requestAnimationFrame(this._tick);
-    const dt = Math.min(0.05, ((now - (this._last || now)) / 1000));
+    const rawElapsed = (now - (this._last || now)) / 1000;
+    // Sim step is clamped to 50ms so physics doesn't tunnel after a hitch.
+    // The FPS counter must use the RAW elapsed — otherwise it floors at
+    // 20 FPS regardless of how slow the frame actually was.
+    const dt = Math.min(0.05, rawElapsed);
     this._last = now;
 
-    this._fpsAcc += dt; this._fpsN++;
+    this._fpsAcc += rawElapsed; this._fpsN++;
     if (this._fpsAcc > 0.5) {
       this.hud.setFPS(this._fpsN / this._fpsAcc);
       this._fpsAcc = 0; this._fpsN = 0;
@@ -594,9 +600,30 @@ export class Game {
       if (this.running && this.input.consumeGamepadPause?.()) this._togglePause();
     // Gamepad menu nav when not in active gameplay.
     if (!this.running || this.paused) this._gamepadMenuNav();
+      // Per-section perf probe — exposed via window.__perf for diagnostics.
+      // Only the most-recent sample is kept so accumulation is O(1).
+      const tA = performance.now();
       if (this.running && !this.paused) this._update(dt);
+      const tB = performance.now();
       this.gameCam.update(dt);
+      const tC = performance.now();
       this.renderer.render(this.scene, this.camera);
+      const tD = performance.now();
+      const probe = this._perfProbe || (this._perfProbe = { update: 0, cam: 0, render: 0, frame: 0, frames: 0, sumU: 0, sumC: 0, sumR: 0, sumF: 0 });
+      probe.update = tB - tA;
+      probe.cam = tC - tB;
+      probe.render = tD - tC;
+      probe.frame = rawElapsed * 1000;
+      probe.frames++;
+      probe.sumU += probe.update; probe.sumC += probe.cam; probe.sumR += probe.render; probe.sumF += probe.frame;
+      if (probe.frames >= 60) {
+        probe.avgUpdate = probe.sumU / probe.frames;
+        probe.avgCam = probe.sumC / probe.frames;
+        probe.avgRender = probe.sumR / probe.frames;
+        probe.avgFrame = probe.sumF / probe.frames;
+        probe.frames = 0; probe.sumU = 0; probe.sumC = 0; probe.sumR = 0; probe.sumF = 0;
+      }
+      window.__perf = probe;
     } catch (err) {
       if (this._lastTickErr !== String(err)) {
         console.error('Tick error:', err);

@@ -86,7 +86,7 @@ export class Planet {
   _buildCore(scene, world) {
     const r = this.coreRadius;
     const geo = new THREE.SphereGeometry(r, 24, 18);
-    const mat = new THREE.MeshStandardMaterial({
+    const mat = new THREE.MeshLambertMaterial({
       color: this.coreColor,
       emissive: this.coreColor,
       emissiveIntensity: 1.4,
@@ -174,7 +174,7 @@ export class Planet {
     shape.closePath();
     const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.5, bevelEnabled: false });
     geo.translate(0, 0, -0.25);
-    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.85 });
+    const mat = new THREE.MeshLambertMaterial({ color, roughness: 0.85 });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(this.cx, this.cy, 0);
     mesh.updateMatrix();
