@@ -1141,7 +1141,12 @@ export class StickmanRig {
       const armSw = Math.sin(phase + Math.PI) * stepAmp * swingDir;
       const fwdBoost = Math.max(0, armSw);
       const runBlend = clamp(stepAmp * 1.6, 0, 1);
-      const baseUp = lerp(-0.55, -0.18, runBlend);
+      // Idle baseline at -0.88 (was -0.55): with arms 0.45+0.45 = 0.90m, a
+      // -0.55 hang sits at 61 % extension → elbow bent 52°, which reads as
+      // "always crouched and braced." Dropping to -0.88 puts the hand at
+      // ~98 % extension → ~10° residual bend, i.e. arms hang straight at
+      // the sides. Run baseline stays at -0.18 so the pump arc is unchanged.
+      const baseUp = lerp(-0.88, -0.18, runBlend);
       const idleForward = lerp(0, 0.06, runBlend);
       const armForward = idleForward + armSw * 0.34 + fwdBoost * 0.10;
       const armUp = baseUp + armSw * 0.08 + fwdBoost * 0.34;
@@ -1186,7 +1191,12 @@ export class StickmanRig {
       const armSw = Math.sin(phase) * stepAmp * swingDir;
       const fwdBoost = Math.max(0, armSw);
       const runBlend = clamp(stepAmp * 1.6, 0, 1);
-      const baseUp = lerp(-0.55, -0.18, runBlend);
+      // Idle baseline at -0.88 (was -0.55): with arms 0.45+0.45 = 0.90m, a
+      // -0.55 hang sits at 61 % extension → elbow bent 52°, which reads as
+      // "always crouched and braced." Dropping to -0.88 puts the hand at
+      // ~98 % extension → ~10° residual bend, i.e. arms hang straight at
+      // the sides. Run baseline stays at -0.18 so the pump arc is unchanged.
+      const baseUp = lerp(-0.88, -0.18, runBlend);
       const idleForward = lerp(0, 0.06, runBlend);
       const armForward = idleForward + armSw * 0.34 + fwdBoost * 0.10;
       const armUp = baseUp + armSw * 0.08 + fwdBoost * 0.34;
@@ -1252,7 +1262,10 @@ export class StickmanRig {
         // Limbs whip with body angular velocity for trail-behind-rotation feel.
         const r = totalRag;
         const av = (params.angVz || 0) * 0.04;
-        const sag = -0.55 - Math.sin(this.t * 4) * 0.05;
+        // Sag matches the new idle baseUp (-0.88). Old -0.55 was tuned for
+        // 0.34+0.34 arms and pulled idle hands UP from the relaxed-straight
+        // hang we want with the new 0.45+0.45 limbs.
+        const sag = -0.88 - Math.sin(this.t * 4) * 0.05;
         handLX = lerp(handLX, sLX + av,  r);
         handLY = lerp(handLY, sLY + sag, r);
         handRX = lerp(handRX, sRX + av,  r);

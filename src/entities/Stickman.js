@@ -1258,15 +1258,23 @@ export class Stickman {
         p.rig?.hitImpact(tier);
 
         if (!this._feedbackFiredThisSwing && this.game) {
-          const stopMs = tier === 'launcher' ? 0.10 : tier === 'heavy' ? 0.06 : 0.03;
-          this.game.hitStop?.(stopMs);
-          if (this.game.fx?.camera?.punch) {
-            const punch = tier === 'launcher' ? 0.18 : tier === 'heavy' ? 0.12 : 0.05;
+          // Hitstop: lights are skipped (PR #32 lesson — per-strike pauses
+          // stacked through chains feel like FPS drops). Heavies and
+          // launchers keep meaningful but short pauses.
+          const stopMs = tier === 'launcher' ? 0.08 : tier === 'heavy' ? 0.04 : 0;
+          if (stopMs > 0) this.game.hitStop?.(stopMs);
+          // Camera punch: lights skip entirely (PR #32 again). Heavies and
+          // launchers get a single small kick that fx.camera.punch already
+          // clamps at 1.2 so chains can't blow it out.
+          if ((tier === 'heavy' || tier === 'launcher') && this.game.fx?.camera?.punch) {
+            const punch = tier === 'launcher' ? 0.14 : 0.08;
             this.game.fx.camera.punch(punch);
           }
+          // Particles: lower counts so chain bursts stay cheap. The hit
+          // squash + flash on the rig sells contact even without sparks.
           if (this.game.fx?.particles) {
-            const count = tier === 'launcher' ? 12 : tier === 'heavy' ? 9 : 6;
-            const speed = tier === 'launcher' ? 9 : tier === 'heavy' ? 7 : 5;
+            const count = tier === 'launcher' ? 8 : tier === 'heavy' ? 5 : 3;
+            const speed = tier === 'launcher' ? 8 : tier === 'heavy' ? 6 : 4;
             // Burst at impact point (between attacker fist and victim center)
             // so the spark reads as the hit, not as ambient body dust.
             this.game.fx.particles.burst(
