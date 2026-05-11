@@ -28,27 +28,32 @@ export const STATE = {
 // heightOffset adjusts hitbox Y from body center (negative = low, positive = high).
 // launch=true means the hit triggers ragdoll on the victim.
 // kbX is multiplied by attacker.facing in the hitbox loop.
+// Move durations + active windows tuned for "real anticipation" feel:
+// windup phase is meaningfully longer than the strike pulse itself, so a
+// strike reads as a deliberate commitment (with a counter window for the
+// opponent) rather than an instant flick. Hitboxes were also rescaled so
+// the active-frame reach matches the new visible fist (arms 0.45+0.45).
 const MOVE_TABLE = {
   // Ground lights — chain step 0..4
-  jab:          { type:'light', dur:0.22, activeStart:0.25, activeEnd:0.70, reach:0.95, radius:1.0, dmg:6,  kbX:5,  kbY:1, stun:0.15, launch:false, heightOffset:0.15, recovery:0.10 },
-  cross:        { type:'light', dur:0.24, activeStart:0.30, activeEnd:0.75, reach:1.00, radius:1.0, dmg:8,  kbX:7,  kbY:1, stun:0.20, launch:false, heightOffset:0.15, recovery:0.12 },
-  hook:         { type:'light', dur:0.26, activeStart:0.30, activeEnd:0.75, reach:0.90, radius:1.0, dmg:10, kbX:6,  kbY:2, stun:0.25, launch:false, heightOffset:0.15, recovery:0.14 },
-  knee:         { type:'light', dur:0.28, activeStart:0.35, activeEnd:0.70, reach:0.70, radius:1.0, dmg:11, kbX:5,  kbY:4, stun:0.30, launch:false, heightOffset:0.00, recovery:0.16 },
-  spinBack:     { type:'light', dur:0.32, activeStart:0.40, activeEnd:0.75, reach:1.10, radius:1.0, dmg:14, kbX:12, kbY:3, stun:0.35, launch:false, heightOffset:0.20, recovery:0.20 },
-  // Ground heavies — direction at release
-  heavyNeutral: { type:'heavy', dur:0.45, activeStart:0.40, activeEnd:0.75, reach:1.10, radius:1.1, dmg:22, kbX:18, kbY:4, stun:0.40, launch:true,  heightOffset:0.15, recovery:0.45 },
-  heavyUp:      { type:'heavy', dur:0.45, activeStart:0.40, activeEnd:0.78, reach:0.85, radius:1.0, dmg:18, kbX:4,  kbY:14,stun:0.40, launch:true,  heightOffset:0.40, recovery:0.45 },
-  heavyDown:    { type:'heavy', dur:0.50, activeStart:0.45, activeEnd:0.80, reach:0.90, radius:1.1, dmg:25, kbX:6,  kbY:-8,stun:0.45, launch:true,  heightOffset:-0.20,recovery:0.50 },
-  heavyForward: { type:'heavy', dur:0.40, activeStart:0.30, activeEnd:0.70, reach:1.30, radius:1.0, dmg:20, kbX:16, kbY:5, stun:0.40, launch:true,  heightOffset:0.15, recovery:0.40 },
+  jab:          { type:'light', dur:0.26, activeStart:0.32, activeEnd:0.62, reach:1.00, radius:1.0, dmg:6,  kbX:5,  kbY:1, stun:0.15, launch:false, heightOffset:0.15, recovery:0.12 },
+  cross:        { type:'light', dur:0.30, activeStart:0.38, activeEnd:0.68, reach:1.10, radius:1.0, dmg:8,  kbX:7,  kbY:1, stun:0.20, launch:false, heightOffset:0.15, recovery:0.15 },
+  hook:         { type:'light', dur:0.32, activeStart:0.40, activeEnd:0.68, reach:1.00, radius:1.05,dmg:10, kbX:6,  kbY:2, stun:0.25, launch:false, heightOffset:0.15, recovery:0.18 },
+  knee:         { type:'light', dur:0.34, activeStart:0.42, activeEnd:0.68, reach:0.80, radius:1.0, dmg:11, kbX:5,  kbY:4, stun:0.30, launch:false, heightOffset:0.00, recovery:0.20 },
+  spinBack:     { type:'light', dur:0.40, activeStart:0.48, activeEnd:0.72, reach:1.20, radius:1.0, dmg:14, kbX:12, kbY:3, stun:0.35, launch:false, heightOffset:0.20, recovery:0.25 },
+  // Ground heavies — direction at release. Long windup, snap strike, long recover.
+  heavyNeutral: { type:'heavy', dur:0.60, activeStart:0.50, activeEnd:0.70, reach:1.20, radius:1.1, dmg:22, kbX:18, kbY:4, stun:0.40, launch:true,  heightOffset:0.15, recovery:0.55 },
+  heavyUp:      { type:'heavy', dur:0.60, activeStart:0.55, activeEnd:0.75, reach:0.95, radius:1.0, dmg:18, kbX:4,  kbY:14,stun:0.40, launch:true,  heightOffset:0.40, recovery:0.55 },
+  heavyDown:    { type:'heavy', dur:0.65, activeStart:0.55, activeEnd:0.75, reach:1.00, radius:1.1, dmg:25, kbX:6,  kbY:-8,stun:0.45, launch:true,  heightOffset:-0.20,recovery:0.60 },
+  heavyForward: { type:'heavy', dur:0.52, activeStart:0.42, activeEnd:0.65, reach:1.40, radius:1.0, dmg:20, kbX:16, kbY:5, stun:0.40, launch:true,  heightOffset:0.15, recovery:0.48 },
   heavyBack:    { type:'heavy', dur:0.55, activeStart:0.00, activeEnd:0.00, reach:0,    radius:0,   dmg:0,  kbX:0,  kbY:0, stun:0,    launch:false, heightOffset:0,    recovery:0.55 },
   // Aerials — air chain step 0..1
-  airJab:       { type:'airLight', dur:0.20, activeStart:0.30, activeEnd:0.75, reach:0.85, radius:1.0, dmg:9,  kbX:8, kbY:2,  stun:0.20, launch:false, heightOffset:0.05, recovery:0.18 },
-  airHook:      { type:'airLight', dur:0.22, activeStart:0.30, activeEnd:0.75, reach:0.95, radius:1.0, dmg:11, kbX:9, kbY:2,  stun:0.25, launch:false, heightOffset:0.10, recovery:0.20 },
-  airHeavyN:    { type:'airHeavy', dur:0.45, activeStart:0.40, activeEnd:0.80, reach:1.05, radius:1.1, dmg:20, kbX:10,kbY:3,  stun:0.40, launch:true,  heightOffset:0.10, recovery:0.40 },
-  airHeavyU:    { type:'airHeavy', dur:0.40, activeStart:0.35, activeEnd:0.75, reach:0.80, radius:1.0, dmg:16, kbX:3, kbY:15, stun:0.40, launch:true,  heightOffset:0.30, recovery:0.40 },
-  airHeavyD:    { type:'airHeavy', dur:0.40, activeStart:0.35, activeEnd:0.80, reach:0.90, radius:1.0, dmg:22, kbX:8, kbY:-10,stun:0.45, launch:true,  heightOffset:-0.30,recovery:0.40 },
+  airJab:       { type:'airLight', dur:0.24, activeStart:0.38, activeEnd:0.68, reach:0.95, radius:1.0, dmg:9,  kbX:8, kbY:2,  stun:0.20, launch:false, heightOffset:0.05, recovery:0.22 },
+  airHook:      { type:'airLight', dur:0.28, activeStart:0.40, activeEnd:0.68, reach:1.05, radius:1.0, dmg:11, kbX:9, kbY:2,  stun:0.25, launch:false, heightOffset:0.10, recovery:0.24 },
+  airHeavyN:    { type:'airHeavy', dur:0.58, activeStart:0.50, activeEnd:0.72, reach:1.15, radius:1.1, dmg:20, kbX:10,kbY:3,  stun:0.40, launch:true,  heightOffset:0.10, recovery:0.50 },
+  airHeavyU:    { type:'airHeavy', dur:0.52, activeStart:0.50, activeEnd:0.72, reach:0.90, radius:1.0, dmg:16, kbX:3, kbY:15, stun:0.40, launch:true,  heightOffset:0.30, recovery:0.50 },
+  airHeavyD:    { type:'airHeavy', dur:0.50, activeStart:0.45, activeEnd:0.78, reach:1.00, radius:1.0, dmg:22, kbX:8, kbY:-10,stun:0.45, launch:true,  heightOffset:-0.30,recovery:0.48 },
   // Special
-  slideKick:    { type:'special', dur:0.32, activeStart:0.20, activeEnd:0.85, reach:1.25, radius:1.0, dmg:14, kbX:8, kbY:1.5,stun:0.35, launch:true,  heightOffset:-0.35, recovery:0.30 },
+  slideKick:    { type:'special', dur:0.36, activeStart:0.25, activeEnd:0.85, reach:1.35, radius:1.0, dmg:14, kbX:8, kbY:1.5,stun:0.35, launch:true,  heightOffset:-0.35, recovery:0.32 },
 };
 
 // Ground light chain order.
@@ -1067,6 +1072,7 @@ export class Stickman {
     this.attackTimer = m.dur;
     this.attackCooldown = m.recovery;
     this.attackHits.clear();
+    this._feedbackFiredThisSwing = false;
     // Legacy rig flags so old rig code paths render reasonable poses until
     // the rig is rewritten in Task 11–13.
     this.kicking = (id === 'knee'
@@ -1091,10 +1097,10 @@ export class Stickman {
     }
 
     audio.swing();
-    // Brief whole-rig flash so the player can tell the press registered
-    // even when the pose itself is hard to read. Camera punch removed —
-    // it stacked across the chain and contributed to fight-time FPS dips.
-    this.flashAmount = Math.max(this.flashAmount, 0.35);
+    // Subtle press cue — used to be 0.35 which read as a "hit" flash even on
+    // whiffs. The bright contact flash (0.55+) now fires on actual connect,
+    // so whiff feedback only needs a soft pulse for input registration.
+    this.flashAmount = Math.max(this.flashAmount, 0.15);
   }
 
   _attackTick(dt, players) {
@@ -1234,6 +1240,43 @@ export class Stickman {
             (p.juggleStartedAt || performance.now()) + JUGGLE_MAX_MS,
             p.juggledUntil + JUGGLE_HIT_EXTEND_MS
           );
+        }
+      }
+
+      // Contact feedback — fires once per fresh hit, tiered by move class.
+      // Capped per _attackTick by tracking which feedback already fired this
+      // call so chained hits (rare; same swing rarely hits 2 targets) don't
+      // stack hitstop or camera punch on top of each other.
+      if (!superPunch) {
+        const tier = m.launch ? 'launcher' : (m.type === 'heavy' || m.type === 'airHeavy') ? 'heavy' : 'light';
+        // Bright contact flash on both attacker and victim — the "I just
+        // connected" cue that the press flash can't sell on its own.
+        const flashLvl = tier === 'launcher' ? 0.70 : tier === 'heavy' ? 0.60 : 0.45;
+        this.flashAmount = Math.max(this.flashAmount, flashLvl * 0.7);
+        p.flashAmount = Math.max(p.flashAmount, flashLvl);
+        this.rig?.hitImpact(tier);
+        p.rig?.hitImpact(tier);
+
+        if (!this._feedbackFiredThisSwing && this.game) {
+          const stopMs = tier === 'launcher' ? 0.10 : tier === 'heavy' ? 0.06 : 0.03;
+          this.game.hitStop?.(stopMs);
+          if (this.game.fx?.camera?.punch) {
+            const punch = tier === 'launcher' ? 0.18 : tier === 'heavy' ? 0.12 : 0.05;
+            this.game.fx.camera.punch(punch);
+          }
+          if (this.game.fx?.particles) {
+            const count = tier === 'launcher' ? 12 : tier === 'heavy' ? 9 : 6;
+            const speed = tier === 'launcher' ? 9 : tier === 'heavy' ? 7 : 5;
+            // Burst at impact point (between attacker fist and victim center)
+            // so the spark reads as the hit, not as ambient body dust.
+            this.game.fx.particles.burst(
+              cx + (p.position.x - cx) * 0.4,
+              cy + (p.position.y - cy) * 0.4,
+              0,
+              { count, speed, color: 0xffeecc }
+            );
+          }
+          this._feedbackFiredThisSwing = true;
         }
       }
 
