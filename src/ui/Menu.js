@@ -41,10 +41,38 @@ export class Menu {
     };
     sync();
     b.onclick = async () => {
+      const probe = (msg) => {
+        let d = document.getElementById('fs-probe');
+        if (!d) {
+          d = document.createElement('div');
+          d.id = 'fs-probe';
+          d.style.cssText = 'position:fixed;left:8px;bottom:8px;max-width:90vw;padding:8px 12px;background:rgba(0,0,0,0.85);color:#ffcc33;font:12px monospace;border:1px solid #ffcc33;border-radius:6px;z-index:9999;white-space:pre-wrap;word-break:break-word;';
+          document.body.appendChild(d);
+        }
+        d.textContent = msg;
+        clearTimeout(d._t);
+        d._t = setTimeout(() => d.remove(), 8000);
+      };
+      const ua = navigator.userAgent;
+      const before = !!document.fullscreenElement;
+      const supportsOpts = (() => {
+        // Detect whether requestFullscreen accepts an options arg by feature inspection.
+        // Chromium passes through; Safari ignores. No definitive feature detect — best effort.
+        return typeof document.documentElement.requestFullscreen === 'function';
+      })();
       try {
-        if (document.fullscreenElement) await document.exitFullscreen();
-        else await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
-      } catch (_) { /* iOS Safari + permissions edge — non-critical */ }
+        if (before) {
+          await document.exitFullscreen();
+        } else {
+          await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+        }
+        const after = !!document.fullscreenElement;
+        const sw = screen.width, sh = screen.height;
+        const iw = innerWidth, ih = innerHeight;
+        probe(`fs ${before?'exit':'enter'} OK | navUI:hide passed | before=${before} after=${after}\nscreen=${sw}x${sh} inner=${iw}x${ih}\nUA: ${ua.slice(0,120)}`);
+      } catch (e) {
+        probe(`fs ERROR: ${e?.message ?? e}\nbefore=${before} supportsAPI=${supportsOpts}\nUA: ${ua.slice(0,120)}`);
+      }
     };
     document.addEventListener('fullscreenchange', sync);
     document.body.appendChild(b);
