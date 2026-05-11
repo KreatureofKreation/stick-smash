@@ -1239,6 +1239,11 @@ export class Stickman {
     const frozen = performance.now() < this._frozenUntil;
     now.jumpPressed = !frozen && now.jump && !this._prev.jump;
     now.attackPressed = !frozen && now.attack && !this._prev.attack;
+    now.attackReleased = !frozen && !now.attack && this._prev.attack;
+    if (now.attackPressed) this._attackPressedAt = performance.now();
+    now.attackHeldFor = now.attack
+      ? (performance.now() - this._attackPressedAt) / 1000
+      : 0;
     now.grabPressed = !frozen && now.grab && !this._prev.grab;
     now.specialPressed = !frozen && now.special && !this._prev.special;
     now.throwPressed = !frozen && now.throw && !this._prev.throw;
