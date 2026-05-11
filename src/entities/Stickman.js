@@ -967,7 +967,28 @@ export class Stickman {
     if (!this.charging) return;
     // Cancel on jump, hit, ragdoll, etc. (Those branches clear this.charging
     // elsewhere — here we only resolve on release.)
-    if (!this.input.attackReleased) return;
+    if (!this.input.attackReleased) {
+      // Charge tell — emit one glow particle every ~5 frames on the
+      // striking limb. Direction at current stick gives a hint of which
+      // heavy will fire on release.
+      if (this.charging && this.game?.fx?.particles) {
+        this._chargeTellTick = (this._chargeTellTick || 0) + 1;
+        if (this._chargeTellTick % 5 === 0) {
+          const dir = this.input;
+          const id = this._heavyForDir({ x: dir.moveX, y: dir.moveY }, !this.grounded);
+          const useFoot = (id === 'heavyDown' || id === 'airHeavyD' || id === 'airHeavyN');
+          const cx = this.position.x + this.facing * (useFoot ? 0.25 : 0.55);
+          const cy = this.position.y + (useFoot ? -0.30 : 0.30);
+          this.game.fx.particles.spark?.spawn?.({
+            x: cx, y: cy, z: 0,
+            vx: (Math.random() - 0.5) * 1, vy: useFoot ? -0.5 : 0.5,
+            life: 0.25, size: 0.18,
+            color: 0xffd866, gravity: 0, drag: 0.8, shrink: 1.5,
+          });
+        }
+      }
+      return;
+    }
     const heldS = (performance.now() - this.chargeStartedAt) / 1000;
     this.charging = false;
     const liveDir = { x: this.input.moveX, y: this.input.moveY };
