@@ -1091,13 +1091,10 @@ export class Stickman {
     }
 
     audio.swing();
-    // Visible feedback for every strike — brief whole-rig flash + small
-    // camera nudge for the local player. Guarantees the user can tell
-    // their press registered even if the rig pose is hard to read.
-    this.flashAmount = Math.max(this.flashAmount, 0.45);
-    if (this.isLocal && this.game?.fx?.camera?.punch) {
-      this.game.fx.camera.punch(0.03);
-    }
+    // Brief whole-rig flash so the player can tell the press registered
+    // even when the pose itself is hard to read. Camera punch removed —
+    // it stacked across the chain and contributed to fight-time FPS dips.
+    this.flashAmount = Math.max(this.flashAmount, 0.35);
   }
 
   _attackTick(dt, players) {

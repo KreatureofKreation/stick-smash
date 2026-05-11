@@ -1273,10 +1273,23 @@ export class StickmanRig {
 
   setFlash(amount) {
     if (amount < 0.02) {
-      this.material.color.setHex(this.primary);
+      if (this._flashWasActive) {
+        this.material.color.setHex(this.primary);
+        this._flashWasActive = false;
+      }
       return;
     }
-    const c = new THREE.Color(this.primary).lerp(new THREE.Color(0xffffff), Math.min(1, amount));
-    this.material.color.copy(c);
+    // Reuse cached THREE.Color objects — previous impl allocated two new
+    // Colors every frame during the ~0.5s flash decay, multiplied by N
+    // stickmen, all simultaneously when chains land. GC pressure showed
+    // up as FPS dips during fights.
+    if (!this._flashBaseColor) {
+      this._flashBaseColor = new THREE.Color(this.primary);
+      this._flashWhite = new THREE.Color(0xffffff);
+      this._flashScratch = new THREE.Color();
+    }
+    this._flashScratch.copy(this._flashBaseColor).lerp(this._flashWhite, Math.min(1, amount));
+    this.material.color.copy(this._flashScratch);
+    this._flashWasActive = true;
   }
 }
