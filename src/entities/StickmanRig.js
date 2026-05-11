@@ -52,20 +52,20 @@ function poseJab(rig, params) {
   let armX, armY, leanZ;
   if (t < 0.25) {
     const w = t / 0.25;
-    armX = lerp(0.30, -0.10, w);   // chamber back
-    armY = lerp(0.15, 0.20, w);
-    leanZ = lerp(0, -0.10, w);
-  } else if (t < 0.70) {
-    const w = (t - 0.25) / 0.45;
+    armX = lerp(0.20, -0.45, w);   // chamber back behind shoulder
+    armY = lerp(-0.40, 0.55, w);   // arm rears UP from hip to above shoulder
+    leanZ = lerp(0, -0.20, w);
+  } else if (t < 0.65) {
+    const w = (t - 0.25) / 0.40;
     const e = w * w * (3 - 2 * w);
-    armX = lerp(-0.10, 0.90, e);   // straight out
-    armY = lerp(0.20, 0.15, e);
-    leanZ = lerp(-0.10, 0.20, e);
+    armX = lerp(-0.45, 1.05, e);   // whip forward past full reach
+    armY = lerp(0.55, -0.15, e);   // sweep down-and-out — chop forward
+    leanZ = lerp(-0.20, 0.35, e);
   } else {
-    const w = (t - 0.70) / 0.30;
-    armX = lerp(0.90, 0.30, w);
-    armY = lerp(0.15, 0.15, w);
-    leanZ = lerp(0.20, 0, w);
+    const w = (t - 0.65) / 0.35;
+    armX = lerp(1.05, 0.20, w);
+    armY = lerp(-0.15, -0.40, w);
+    leanZ = lerp(0.35, 0, w);
   }
   return { armRX: armX, armRY: armY, leanZ };
 }
@@ -73,22 +73,22 @@ function poseJab(rig, params) {
 function poseCross(rig, params) {
   const t = clamp(params.attackProgress ?? 0, 0, 1);
   let armX, armY, leanZ;
-  if (t < 0.30) {
-    const w = t / 0.30;
-    armX = lerp(0.20, -0.20, w);   // deeper chamber + opposite arm
-    armY = lerp(0.15, 0.25, w);
-    leanZ = lerp(0, -0.15, w);
-  } else if (t < 0.75) {
-    const w = (t - 0.30) / 0.45;
+  if (t < 0.28) {
+    const w = t / 0.28;
+    armX = lerp(0.20, -0.55, w);   // deeper chamber over the shoulder
+    armY = lerp(-0.40, 0.65, w);   // arm rears up high
+    leanZ = lerp(0, -0.30, w);
+  } else if (t < 0.65) {
+    const w = (t - 0.28) / 0.37;
     const e = w * w * (3 - 2 * w);
-    armX = lerp(-0.20, 1.00, e);
-    armY = lerp(0.25, 0.15, e);
-    leanZ = lerp(-0.15, 0.30, e);   // full hip rotation
+    armX = lerp(-0.55, 1.15, e);   // long extension from hip-twist
+    armY = lerp(0.65, -0.10, e);
+    leanZ = lerp(-0.30, 0.45, e);   // full hip rotation
   } else {
-    const w = (t - 0.75) / 0.25;
-    armX = lerp(1.00, 0.30, w);
-    armY = lerp(0.15, 0.15, w);
-    leanZ = lerp(0.30, 0, w);
+    const w = (t - 0.65) / 0.35;
+    armX = lerp(1.15, 0.20, w);
+    armY = lerp(-0.10, -0.40, w);
+    leanZ = lerp(0.45, 0, w);
   }
   return { armRX: armX, armRY: armY, leanZ };
 }
@@ -96,23 +96,23 @@ function poseCross(rig, params) {
 function poseHook(rig, params) {
   const t = clamp(params.attackProgress ?? 0, 0, 1);
   let armX, armY, leanZ;
-  if (t < 0.30) {
-    const w = t / 0.30;
-    armX = lerp(0.20, 0.40, w);     // arm wide to the side
-    armY = lerp(0.15, 0.30, w);
-    leanZ = lerp(0, 0.10, w);
-  } else if (t < 0.75) {
-    const w = (t - 0.30) / 0.45;
+  if (t < 0.28) {
+    const w = t / 0.28;
+    armX = lerp(0.20, 0.55, w);     // arm wide to the side
+    armY = lerp(-0.40, 0.55, w);   // raised — winds up across body
+    leanZ = lerp(0, 0.20, w);
+  } else if (t < 0.65) {
+    const w = (t - 0.28) / 0.37;
     const e = w * w * (3 - 2 * w);
     // Hook curves from wide to centerline.
-    armX = lerp(0.40, 0.85, e);
-    armY = lerp(0.30, 0.10, e);
-    leanZ = lerp(0.10, 0.35, e);
+    armX = lerp(0.55, 1.05, e);
+    armY = lerp(0.55, -0.10, e);   // sweep down-through to chin-level
+    leanZ = lerp(0.20, 0.55, e);
   } else {
-    const w = (t - 0.75) / 0.25;
-    armX = lerp(0.85, 0.30, w);
-    armY = lerp(0.10, 0.15, w);
-    leanZ = lerp(0.35, 0, w);
+    const w = (t - 0.65) / 0.35;
+    armX = lerp(1.05, 0.20, w);
+    armY = lerp(-0.10, -0.40, w);
+    leanZ = lerp(0.55, 0, w);
   }
   return { armRX: armX, armRY: armY, leanZ };
 }
@@ -147,20 +147,20 @@ function poseSpinBack(rig, params) {
   let armX, armY, leanZ;
   if (t < 0.40) {
     const w = t / 0.40;
-    armX = lerp(0.20, -0.40, w);
-    armY = lerp(0.15, 0.20, w);
-    leanZ = lerp(0, -0.50, w);    // wind up full 180° twist
-  } else if (t < 0.75) {
-    const w = (t - 0.40) / 0.35;
+    armX = lerp(0.20, -0.65, w);
+    armY = lerp(-0.40, 0.55, w);   // sweep arm up-and-back overhead
+    leanZ = lerp(0, -0.80, w);    // wind up full 180° twist
+  } else if (t < 0.72) {
+    const w = (t - 0.40) / 0.32;
     const e = w * w * (3 - 2 * w);
-    armX = lerp(-0.40, 1.10, e);
-    armY = lerp(0.20, 0.30, e);
-    leanZ = lerp(-0.50, 0.60, e);
+    armX = lerp(-0.65, 1.20, e);  // whip through huge horizontal arc
+    armY = lerp(0.55, 0.05, e);
+    leanZ = lerp(-0.80, 0.90, e);
   } else {
-    const w = (t - 0.75) / 0.25;
-    armX = lerp(1.10, 0.30, w);
-    armY = lerp(0.30, 0.15, w);
-    leanZ = lerp(0.60, 0, w);
+    const w = (t - 0.72) / 0.28;
+    armX = lerp(1.20, 0.20, w);
+    armY = lerp(0.05, -0.40, w);
+    leanZ = lerp(0.90, 0, w);
   }
   return { armRX: armX, armRY: armY, leanZ };
 }
@@ -168,28 +168,28 @@ function poseSpinBack(rig, params) {
 function poseBlowAway(rig, params) {
   const t = clamp(params.attackProgress ?? 0, 0, 1);
   let armX, armY, leanZ, armLX, armLY;
-  if (t < 0.40) {
-    const w = t / 0.40;
-    armX = lerp(0.20, -0.15, w);
-    armY = lerp(0.15, 0.25, w);
-    armLX = lerp(-0.20, -0.10, w);
-    armLY = lerp(0.15, 0.25, w);
-    leanZ = lerp(0, -0.20, w);
-  } else if (t < 0.75) {
-    const w = (t - 0.40) / 0.35;
+  if (t < 0.38) {
+    const w = t / 0.38;
+    armX = lerp(0.20, -0.30, w);
+    armY = lerp(-0.40, 0.50, w);
+    armLX = lerp(-0.20, -0.25, w);
+    armLY = lerp(-0.40, 0.50, w);
+    leanZ = lerp(0, -0.40, w);
+  } else if (t < 0.70) {
+    const w = (t - 0.38) / 0.32;
     const e = w * w * (3 - 2 * w);
-    armX = lerp(-0.15, 1.15, e);
-    armY = lerp(0.25, 0.10, e);
-    armLX = lerp(-0.10, 0.95, e);   // both palms forward, stacked
-    armLY = lerp(0.25, 0.15, e);
-    leanZ = lerp(-0.20, 0.40, e);
+    armX = lerp(-0.30, 1.25, e);
+    armY = lerp(0.50, -0.05, e);
+    armLX = lerp(-0.25, 1.05, e);   // both palms forward, stacked
+    armLY = lerp(0.50, -0.05, e);
+    leanZ = lerp(-0.40, 0.60, e);
   } else {
-    const w = (t - 0.75) / 0.25;
-    armX = lerp(1.15, 0.30, w);
-    armY = lerp(0.10, 0.15, w);
-    armLX = lerp(0.95, -0.20, w);
-    armLY = lerp(0.15, 0.15, w);
-    leanZ = lerp(0.40, 0, w);
+    const w = (t - 0.70) / 0.30;
+    armX = lerp(1.25, 0.20, w);
+    armY = lerp(-0.05, -0.40, w);
+    armLX = lerp(1.05, -0.20, w);
+    armLY = lerp(-0.05, -0.40, w);
+    leanZ = lerp(0.60, 0, w);
   }
   return { armRX: armX, armRY: armY, armLX, armLY, leanZ };
 }
@@ -197,22 +197,22 @@ function poseBlowAway(rig, params) {
 function poseUppercut(rig, params) {
   const t = clamp(params.attackProgress ?? 0, 0, 1);
   let armX, armY, leanZ;
-  if (t < 0.40) {
-    const w = t / 0.40;
-    armX = lerp(0.20, 0.10, w);
-    armY = lerp(0.15, -0.30, w);   // drop to hip
-    leanZ = lerp(0, -0.30, w);      // deep knee bend
+  if (t < 0.38) {
+    const w = t / 0.38;
+    armX = lerp(0.20, 0.05, w);
+    armY = lerp(-0.40, -0.70, w);  // drop down to hip-deep windup
+    leanZ = lerp(0, -0.45, w);      // deep knee bend
   } else if (t < 0.78) {
-    const w = (t - 0.40) / 0.38;
+    const w = (t - 0.38) / 0.40;
     const e = w * w * (3 - 2 * w);
-    armX = lerp(0.10, 0.40, e);
-    armY = lerp(-0.30, 0.95, e);   // rise straight up overhead
-    leanZ = lerp(-0.30, 0.10, e);
+    armX = lerp(0.05, 0.55, e);
+    armY = lerp(-0.70, 1.20, e);   // huge arc rise to overhead
+    leanZ = lerp(-0.45, 0.20, e);
   } else {
     const w = (t - 0.78) / 0.22;
-    armX = lerp(0.40, 0.30, w);
-    armY = lerp(0.95, 0.15, w);
-    leanZ = lerp(0.10, 0, w);
+    armX = lerp(0.55, 0.20, w);
+    armY = lerp(1.20, -0.40, w);
+    leanZ = lerp(0.20, 0, w);
   }
   return { armRX: armX, armRY: armY, leanZ };
 }
@@ -249,22 +249,22 @@ function poseAxe(rig, params) {
 function poseCharge(rig, params) {
   const t = clamp(params.attackProgress ?? 0, 0, 1);
   let armX, armY, leanZ;
-  if (t < 0.30) {
-    const w = t / 0.30;
-    armX = lerp(0.20, -0.10, w);
-    armY = lerp(0.15, 0.20, w);
-    leanZ = lerp(0, 0.40, w);      // body lunges forward
-  } else if (t < 0.70) {
-    const w = (t - 0.30) / 0.40;
+  if (t < 0.28) {
+    const w = t / 0.28;
+    armX = lerp(0.20, -0.35, w);
+    armY = lerp(-0.40, 0.35, w);   // arm rears up before charge
+    leanZ = lerp(0, 0.55, w);      // body lunges forward hard
+  } else if (t < 0.68) {
+    const w = (t - 0.28) / 0.40;
     const e = w * w * (3 - 2 * w);
-    armX = lerp(-0.10, 0.95, e);
-    armY = lerp(0.20, 0.15, e);
-    leanZ = lerp(0.40, 0.55, e);   // shoulder/elbow leads
+    armX = lerp(-0.35, 1.15, e);
+    armY = lerp(0.35, -0.10, e);   // shoulder/elbow rams forward
+    leanZ = lerp(0.55, 0.75, e);
   } else {
-    const w = (t - 0.70) / 0.30;
-    armX = lerp(0.95, 0.30, w);
-    armY = lerp(0.15, 0.15, w);
-    leanZ = lerp(0.55, 0, w);
+    const w = (t - 0.68) / 0.32;
+    armX = lerp(1.15, 0.20, w);
+    armY = lerp(-0.10, -0.40, w);
+    leanZ = lerp(0.75, 0, w);
   }
   return { armRX: armX, armRY: armY, leanZ };
 }
