@@ -37,7 +37,7 @@ export class Projectile {
       this.mesh = opts.mesh;
     } else {
       const geo = opts.mesh?.geometry ?? new THREE.SphereGeometry(r, 8, 6);
-      const mat = opts.mesh?.material ?? new THREE.MeshStandardMaterial({ color: opts.color ?? 0xffcc33, emissive: opts.emissive ?? 0x442200 });
+      const mat = opts.mesh?.material ?? new THREE.MeshLambertMaterial({ color: opts.color ?? 0xffcc33, emissive: opts.emissive ?? 0x442200 });
       this.mesh = new THREE.Mesh(geo, mat);
     }
     game.scene.add(this.mesh);
