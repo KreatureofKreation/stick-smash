@@ -1170,8 +1170,25 @@ export class StickmanRig {
       // Snap to target if drift gets huge (post-teleport safety).
       if (Math.hypot(tx - pos.x, ty - pos.y) > 4) { pos.x = tx; pos.y = ty; vel.x = 0; vel.y = 0; }
     };
-    stepSpring(this._handLPos, this._handLVel, handLX, handLY, handK, handD);
-    stepSpring(this._handRPos, this._handRVel, handRX, handRY, handK, handD);
+    // During strike poses, snap directly to target — pose math already
+    // provides the in/out curve over the move duration; spring smoothing
+    // here just delays the visible motion past the move's end and makes
+    // strikes look like they're barely firing.
+    if (params.armPoseR === 'strikePosed') {
+      this._handRPos.set(handRX, handRY, hipZ);
+      this._handRVel.set(0, 0, 0);
+      // Left arm: snap only if the strike pose itself overrides the left
+      // arm (two-handed moves). Otherwise spring through the walk pose.
+      if (strikePose && strikePose.armLX !== undefined) {
+        this._handLPos.set(handLX, handLY, hipZ);
+        this._handLVel.set(0, 0, 0);
+      } else {
+        stepSpring(this._handLPos, this._handLVel, handLX, handLY, handK, handD);
+      }
+    } else {
+      stepSpring(this._handLPos, this._handLVel, handLX, handLY, handK, handD);
+      stepSpring(this._handRPos, this._handRVel, handRX, handRY, handK, handD);
+    }
 
     // Feet: when grounded and not ragdolled, render plant+swing targets
     // DIRECTLY. Spring chase here was filtering the yArc lift into a smoothed
