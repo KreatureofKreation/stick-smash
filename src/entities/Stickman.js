@@ -204,10 +204,6 @@ export class Stickman {
 
     this._chargeTellTick = 0;    // charge tell particle counter
 
-    // Legacy combo fields — kept for any remaining references
-    this.comboStep = 0;
-    this.comboTimer = 0;
-
     this.invuln = 0;
     this.flashAmount = 0;
     this.lastDamager = null;
@@ -362,6 +358,14 @@ export class Stickman {
     }
     this.health -= amount;
     this.flashAmount = Math.min(1, this.flashAmount + Math.min(1, amount / 10));
+    this.lastDamageWeapon = opts.weapon ?? null;
+    // Skip sound for tiny continuous DoT (lava, burn).
+    const quiet = opts.weapon === 'lava' || opts.weapon === 'flame';
+    if (amount >= 3 && !quiet) audio.hit();
+    if (opts.kb) {
+      this.applyKnockback(opts.kb.x, opts.kb.y, opts.stun ?? 0.25);
+      this.rig.flinch?.(opts.kb.x, clamp(amount / 25, 0.4, 1.5));
+    }
     // Launch flag from combat MOVE_TABLE — heavy/launcher hits ragdoll the
     // victim regardless of remaining HP. Pure stagger lights leave the
     // victim upright.
@@ -376,14 +380,6 @@ export class Stickman {
       this.flashAmount = 1;
     }
     this.lastDamager = opts.attacker ?? null;
-    this.lastDamageWeapon = opts.weapon ?? null;
-    // Skip sound for tiny continuous DoT (lava, burn).
-    const quiet = opts.weapon === 'lava' || opts.weapon === 'flame';
-    if (amount >= 3 && !quiet) audio.hit();
-    if (opts.kb) {
-      this.applyKnockback(opts.kb.x, opts.kb.y, opts.stun ?? 0.25);
-      this.rig.flinch?.(opts.kb.x, clamp(amount / 25, 0.4, 1.5));
-    }
 
     // Visual feedback: blood, hit-stop, screenshake, briefly tilt body.
     const game = this.game ?? opts.attacker?.game;
