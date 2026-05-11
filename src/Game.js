@@ -767,12 +767,16 @@ export class Game {
     }
 
     // Client-side interpolation toward last received target.
+    // dt-scaled linear catch-up at 30/s — converges inside one 30Hz
+    // snap window, scales naturally for mobile's slower frame rate
+    // (bigger dt → bigger step → faster catch-up there too).
+    // Pre-fix was k=0.0008 damp → ~11%/frame, ~0.4s behind host.
     if (this.net.role === 'client') {
       for (const p of this.players) {
         if (!p || p._netTargetX == null) continue;
-        const k = 0.0008;
-        p.body.position.x = lerp(p.body.position.x, p._netTargetX, 1 - Math.pow(k, dt));
-        p.body.position.y = lerp(p.body.position.y, p._netTargetY, 1 - Math.pow(k, dt));
+        const t = Math.min(1, dt * 30);
+        p.body.position.x = lerp(p.body.position.x, p._netTargetX, t);
+        p.body.position.y = lerp(p.body.position.y, p._netTargetY, t);
         p._syncRig(dt, p.state === STATE.DEAD);
         p._updateNameTag();
       }
@@ -792,7 +796,7 @@ export class Game {
     if (this.net.role === 'host') {
       this._netBroadcastTimer = (this._netBroadcastTimer || 0) - dt;
       if (this._netBroadcastTimer <= 0) {
-        this._netBroadcastTimer = 1 / 20; // 20 Hz
+        this._netBroadcastTimer = 1 / 30; // 30 Hz — tighter sync for mobile↔PC
         this.net.broadcast({ t: 'snap', snap: this._snapshot() });
       }
     }
@@ -875,8 +879,25 @@ export class Game {
         s: p.state, hp: p.health, l: p.lives, sc: p.score,
         wp: p.weapon ? p.weapon.name : null,
         at: p.attackTimer, gr: p.grabbing ? 1 : 0,
+        // Strike pose state — client needs these to render the right
+        // animation for net players. Pre-fix, only attackTimer was sent
+        // and net players fell back to the legacy single-arc attack.
+        mid: p.moveId || null,
+        cs: p.chainStep | 0,
+        acs: p.airChainStep | 0,
+        kk: p.kicking ? 1 : 0,
+        as: p._attackStep | 0,
+        gd: p.grounded ? 1 : 0,
+        sl: p.sliding ? 1 : 0,
+        cr: p.crouching ? 1 : 0,
       } : null),
-      tiles: [...this.level.tiles.values()].map(t => [t.gx, t.gy, t.hp]),
+      // Only ship damaged tiles (hp < maxHp) instead of every tile.
+      // Cuts payload from ~hundreds of entries to whatever is broken.
+      // Clients only need to know the delta from the level's initial
+      // state for collision/render diffs.
+      tiles: [...this.level.tiles.values()]
+        .filter(t => t.hp < (t.maxHp ?? Infinity))
+        .map(t => [t.gx, t.gy, t.hp]),
     };
     // Curved-gravity levels also ship player rotation + wedge HP. Meteors
     // are host-only render in v1 (clients don't simulate them yet).
@@ -936,7 +957,16 @@ export class Game {
       p.lives = sp.l;
       p.score = sp.sc;
       p.attackTimer = sp.at;
-      p.grounded = Math.abs(sp.vy) < 0.5;
+      // Drive net-player rig from authoritative state. Strike-pose
+      // dispatcher reads moveId; legacy paths read kicking + _attackStep.
+      p.moveId = sp.mid ?? null;
+      p.chainStep = sp.cs | 0;
+      p.airChainStep = sp.acs | 0;
+      p.kicking = !!sp.kk;
+      p._attackStep = sp.as | 0;
+      p.sliding = !!sp.sl;
+      p.crouching = !!sp.cr;
+      p.grounded = sp.gd != null ? !!sp.gd : Math.abs(sp.vy) < 0.5;
     }
     // Tile HP updates -> destroy locally
     for (const [gx, gy, hp] of snap.tiles) {
