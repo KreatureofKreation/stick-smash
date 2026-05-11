@@ -380,7 +380,7 @@ function poseSlideKick(rig, params) {
   legX = 0.20 + arc * 1.10;       // lead leg extends forward
   legY = -0.45 + arc * 0.10;       // stays low, foot-height
   leanZ = -Math.PI / 3 + arc * 0.15;
-  return { legRX: legX, legRY: legY, leanZ, armRX: -0.30, armRY: 0.10 };
+  return { legRX: legX, legRY: legY, legLX: -0.20, legLY: -0.10, leanZ, armRX: -0.30, armRY: 0.10 };
 }
 
 // Strike pose functions keyed on moveId.
@@ -1088,7 +1088,7 @@ export class StickmanRig {
 
     // Prone loose limbs — drop pose blend weight for off-arm + both legs.
     // The aim arm stays stiff and tracks params.aim even while prone.
-    if (this._proneLooseLimbs && !params.aim && params.armPoseR !== 'strikePosed') {
+    if (this._proneLooseLimbs && params.armPoseR !== 'strikePosed') {
       // Slacken off-arm target toward neutral hanging position.
       handLX = lerp(handLX, sLX, 0.85);
       handLY = lerp(handLY, sLY - 0.20, 0.85);
