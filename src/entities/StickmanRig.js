@@ -494,6 +494,19 @@ export class StickmanRig {
     // Throw windup arm rear-back amount, 0..1. Driven by Stickman via params.
     this._throwAnticipation = 0;
 
+    // Head pitch — extra rotation.x applied on top of aim.y.
+    // Used by slide (looking forward despite pitched body).
+    this.headPitch = 0;
+    this.headPitchTarget = 0;
+
+    // Slide pose state — set each frame when sliding, cleared after use.
+    this._slideArmDrift = false;
+    this._slideLeadX = 0;
+    this._slideTrailX = 0;
+
+    // Prone loose-limb gate — set true on prone tick, cleared at end of frame.
+    this._proneLooseLimbs = false;
+
     // Reused vectors / state
     this._hip = new THREE.Vector3();
     this._headLagX = 0; this._headLagY = 0;
@@ -575,6 +588,27 @@ export class StickmanRig {
       this.bodyTiltTarget += this.facing * attackLean;
     }
     this.bodyTiltTarget += this.hitTilt;
+
+    // Slide pose — body pitches forward, head looks forward, arms trail.
+    // Activates whenever params.sliding is true and not in a strike-pose
+    // that already drives the body (slideKick uses its own leg arc on top
+    // of this).
+    if (params.sliding) {
+      this.bodyTiltTarget = this.facing * (-Math.PI / 3);
+      // Lead leg extends forward (1.3 reach from hip).
+      const lead = 1.30 * this.facing;
+      // Trail leg tucks under (knee toward chest).
+      const trail = -0.20 * this.facing;
+      // Arms drift back + slightly up (override walk targets later).
+      this._slideArmDrift = true;
+      this._slideLeadX = lead;
+      this._slideTrailX = trail;
+      // Head looks forward despite body pitch.
+      this.headPitchTarget = 0.25;
+    } else {
+      this._slideArmDrift = false;
+    }
+
     this.bodyTilt = damp(this.bodyTilt, this.bodyTiltTarget, 0.0001, dt);
     this.hitTilt = damp(this.hitTilt, 0, 0.001, dt);
 
@@ -691,7 +725,9 @@ export class StickmanRig {
     this._headLagX = damp(this._headLagX, targetLagX, 0.0008, dt);
     this._headLagY = damp(this._headLagY, targetLagY, 0.0008, dt);
     this.head.position.set(headX + this._headLagX, headY + this._headLagY, hipZ);
-    this.head.rotation.set((params.aim?.y ?? 0) * 0.4, this.facing < 0 ? Math.PI : 0, this.bodyTilt * 0.5);
+    this.headPitch = damp(this.headPitch, this.headPitchTarget, 0.0008, dt);
+    this.headPitchTarget = 0; // reset each frame — callers set it before the head render
+    this.head.rotation.set((params.aim?.y ?? 0) * 0.4 + this.headPitch, this.facing < 0 ? Math.PI : 0, this.bodyTilt * 0.5);
 
     if (this.chestArmor.visible) {
       const cx = hipX + torsoUpX * (0.35 * this.squash);
@@ -834,6 +870,14 @@ export class StickmanRig {
       footLY = baseFootY;
       this._plantRX = hipX + this.facing * 0.20; // reset plant for after kick
       this._plantLX = footLX;
+    }
+
+    // Slide foot stance — lock foot poses to slide stance.
+    if (params.sliding && !params.moveId) {
+      footRX = hipX + this._slideLeadX;
+      footRY = baseFootY - 0.15;
+      footLX = hipX + this._slideTrailX;
+      footLY = baseFootY - 0.10;
     }
 
     // Strike pose leg overrides (e.g. knee, flying-knee, dive, slide-kick).
@@ -1022,6 +1066,14 @@ export class StickmanRig {
     if (strikePose && strikePose.armLX !== undefined) {
       handLX = sLX + this.facing * strikePose.armLX;
       handLY = sLY + strikePose.armLY;
+    }
+
+    // Slide arm drift — both arms trail behind body.
+    if (params.sliding && this._slideArmDrift && !params.moveId) {
+      handRX = sRX - this.facing * 0.50;   // arm trails behind
+      handRY = sRY + 0.20;                  // slightly up (wind drag)
+      handLX = sLX - this.facing * 0.40;   // mirror left arm trailing
+      handLY = sLY + 0.15;
     }
 
     // Idle baseline ragdoll droop on arms (only in walk pose)
