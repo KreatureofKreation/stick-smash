@@ -280,12 +280,108 @@ function poseCounterStance(rig, params) {
   const leanZ = lerp(0, -0.30, settle);
   return { armRX: armX, armRY: armY, leanZ };
 }
-function poseFlyingKnee(rig, params)    { return poseJab(rig, params); } // stub — Task 12
-function poseAirHook(rig, params)       { return poseJab(rig, params); } // stub — Task 12
-function poseSomersault(rig, params)    { return poseJab(rig, params); } // stub — Task 12
-function poseRisingKnee(rig, params)    { return poseJab(rig, params); } // stub — Task 12
-function poseDive(rig, params)          { return poseJab(rig, params); } // stub — Task 12
-function poseSlideKick(rig, params)     { return poseJab(rig, params); } // stub — Task 12
+function poseFlyingKnee(rig, params) {
+  const t = clamp(params.attackProgress ?? 0, 0, 1);
+  let legX, legY, leanZ;
+  if (t < 0.30) {
+    const w = t / 0.30;
+    legX = lerp(0.20, 0.10, w);
+    legY = lerp(0, 0.25, w);
+    leanZ = lerp(0, 0.15, w);
+  } else if (t < 0.75) {
+    const w = (t - 0.30) / 0.45;
+    const e = w * w * (3 - 2 * w);
+    legX = lerp(0.10, 0.55, e);
+    legY = lerp(0.25, 0.40, e);
+    leanZ = lerp(0.15, 0.10, e);
+  } else {
+    const w = (t - 0.75) / 0.25;
+    legX = lerp(0.55, 0.20, w);
+    legY = lerp(0.40, 0, w);
+    leanZ = lerp(0.10, 0, w);
+  }
+  return { legRX: legX, legRY: legY, leanZ, armRX: 0.10, armRY: 0.20 };
+}
+
+function poseAirHook(rig, params) {
+  // Same as poseHook but with airborne lean cue.
+  const base = poseHook(rig, params);
+  return { ...base, leanZ: (base.leanZ ?? 0) + 0.10 };
+}
+
+function poseSomersault(rig, params) {
+  const t = clamp(params.attackProgress ?? 0, 0, 1);
+  // Full body rotation around bodyTilt.
+  const rotation = Math.PI * 2 * t;       // one full spin over duration
+  let legX, legY;
+  // At peak rotation (~t=0.5-0.7) leg extends overhead for axe contact.
+  const peak = clamp((t - 0.40) / 0.35, 0, 1);
+  const axe = Math.sin(peak * Math.PI);
+  legX = 0.20 + axe * 0.30;
+  legY = 0.00 + axe * 1.10;
+  return { legRX: legX, legRY: legY, leanZ: rotation, armRX: 0.10, armRY: 0.10 };
+}
+
+function poseRisingKnee(rig, params) {
+  const t = clamp(params.attackProgress ?? 0, 0, 1);
+  // Body curls into tuck on windup, knee leads up at strike.
+  let legX, legY, leanZ;
+  if (t < 0.35) {
+    const w = t / 0.35;
+    legX = lerp(0.20, 0.05, w);
+    legY = lerp(0, 0.35, w);
+    leanZ = lerp(0, 0.30, w);       // tuck forward
+  } else if (t < 0.75) {
+    const w = (t - 0.35) / 0.40;
+    const e = w * w * (3 - 2 * w);
+    legX = lerp(0.05, 0.10, e);
+    legY = lerp(0.35, 0.70, e);    // knee high
+    leanZ = lerp(0.30, -0.10, e);   // body uncurls upward
+  } else {
+    const w = (t - 0.75) / 0.25;
+    legX = lerp(0.10, 0.20, w);
+    legY = lerp(0.70, 0, w);
+    leanZ = lerp(-0.10, 0, w);
+  }
+  return { legRX: legX, legRY: legY, leanZ, armRX: 0.05, armRY: 0.05 };
+}
+
+function poseDive(rig, params) {
+  const t = clamp(params.attackProgress ?? 0, 0, 1);
+  // Body angles 45° downward, both legs extend point-first.
+  let legX, legY, legLX, legLY, leanZ;
+  if (t < 0.35) {
+    const w = t / 0.35;
+    legX = lerp(0.20, 0.30, w);
+    legY = lerp(0, -0.10, w);
+    legLX = lerp(-0.20, 0.25, w);
+    legLY = lerp(0, -0.10, w);
+    leanZ = lerp(0, 0.45, w);       // dive angle
+  } else if (t < 0.80) {
+    legX = 0.30; legY = -0.10;
+    legLX = 0.25; legLY = -0.10;
+    leanZ = 0.45;
+  } else {
+    const w = (t - 0.80) / 0.20;
+    legX = lerp(0.30, 0.20, w);
+    legY = lerp(-0.10, 0, w);
+    legLX = lerp(0.25, -0.20, w);
+    legLY = lerp(-0.10, 0, w);
+    leanZ = lerp(0.45, 0, w);
+  }
+  return { legRX: legX, legRY: legY, legLX, legLY, leanZ, armRX: -0.10, armRY: 0.05 };
+}
+
+function poseSlideKick(rig, params) {
+  const t = clamp(params.attackProgress ?? 0, 0, 1);
+  // Body already in horizontal slide pose; foot snap-extends mid.
+  let legX, legY, leanZ;
+  const arc = Math.sin(Math.PI * clamp((t - 0.10) / 0.80, 0, 1));
+  legX = 0.20 + arc * 1.10;       // lead leg extends forward
+  legY = -0.45 + arc * 0.10;       // stays low, foot-height
+  leanZ = -Math.PI / 3 + arc * 0.15;
+  return { legRX: legX, legRY: legY, leanZ, armRX: -0.30, armRY: 0.10 };
+}
 
 // Strike pose functions keyed on moveId.
 const STRIKE_POSES = {
