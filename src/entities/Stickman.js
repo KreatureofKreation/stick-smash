@@ -1010,90 +1010,149 @@ export class Stickman {
 
   _attackTick(dt, players) {
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
-    // Tick combo window — once it expires the next press starts a fresh combo.
-    if (this.comboTimer > 0) {
-      this.comboTimer -= dt;
-      if (this.comboTimer <= 0) this.comboStep = 0;
+    if (this.attackTimer <= 0) {
+      if (this.moveId) {
+        this.moveId = null;
+        this.kicking = false;
+      }
+      return;
     }
-    if (this.attackTimer > 0) {
-      this.attackTimer -= dt;
-      if (this.attackTimer <= 0) this.kicking = false;
-      // Weapons handle their own hit detection in worldTick — skip unarmed hit-box.
-      if (this.weapon) return;
-      // Use the duration set by the combo step so phase reads 0..1 correctly.
-      const stepDur = this._attackStep === 0 ? 0.18 : this._attackStep === 1 ? 0.22 : 0.30;
-      const phase = 1 - this.attackTimer / stepDur;
-      if (phase > 0.25 && phase < 0.85) {
-        const tNow = performance.now();
-        const gumGum = tNow < this.gumGumUntil;
-        const isKick = this.kicking;
-        // Kick has bigger reach + lower hit-box (foot height).
-        const reach = gumGum ? 4.8 : (isKick ? 1.25 : 0.95);
-        const radius = gumGum ? 0.8 : (isKick ? 1.1 : 1.0);
-        const cx = this.position.x + this.facing * reach;
-        const cy = this.position.y + (isKick ? -0.20 : 0.15);
-        const superPunch = tNow < this.superPunchUntil;
-        // Combo damage curve: jab(8) → cross(13) → kick(22). Super-punch and
-        // gum-gum override.
-        const comboBase = this._attackStep === 0 ? 8 : this._attackStep === 1 ? 13 : 22;
-        const dmg = superPunch ? 60 : (gumGum ? 22 : comboBase);
-        const comboKb = this._attackStep === 0 ? 9 : this._attackStep === 1 ? 14 : 19;
-        const comboKbY = this._attackStep === 0 ? 4 : this._attackStep === 1 ? 6 : 9;
-        const kbMul = superPunch ? 3.5 : (gumGum ? 1.6 : 1);
-        const kbX = (superPunch || gumGum) ? this.facing * 11 * kbMul : this.facing * comboKb;
-        const kbY = (superPunch || gumGum) ? 5 * kbMul : comboKbY;
-        for (const p of players) {
-          if (!p || p === this || !p.alive || p.invuln > 0) continue;
-          if (this.attackHits.has(p.id)) continue;
-          const dx = p.position.x - cx, dy = p.position.y - cy;
-          if (dx * dx + dy * dy < radius * radius) {
-            p.takeDamage(dmg, {
-              attacker: this, weapon: superPunch ? 'super' : (gumGum ? 'gumgum' : 'fist'),
-              kb: { x: kbX, y: kbY }, stun: superPunch ? 0.5 : (isKick ? 0.35 : 0.2),
-            });
-            this.attackHits.add(p.id);
-            if (superPunch && this.game?.fx) {
-              this.game.fx.particles.burst(p.position.x, p.position.y, 0, { count: 22, speed: 12, color: 0xffcc33 });
-              this.game.fx.camera.punch(0.45);
-              this.game.hitStop?.(0.1);
-            }
-          }
+    this.attackTimer -= dt;
+    if (this.attackTimer <= 0) {
+      this.moveId = null;
+      this.kicking = false;
+      return;
+    }
+    // Weapons handle their own hit detection.
+    if (this.weapon) return;
+    const id = this.moveId;
+    if (!id) return;
+    const m = MOVE_TABLE[id];
+    if (!m) return;
+    // heavyBack is parry-only — no hitbox.
+    if (m.radius <= 0 || m.dmg === 0) return;
+
+    const phase = 1 - this.attackTimer / m.dur;
+    if (phase < m.activeStart || phase > m.activeEnd) return;
+
+    const tNow = performance.now();
+    const gumGum = tNow < this.gumGumUntil;
+    const superPunch = tNow < this.superPunchUntil;
+
+    // Reach is amplified by gumGum (rubber stretch).
+    const reach = gumGum ? Math.max(m.reach, 4.8) : m.reach;
+    const radius = gumGum ? 0.8 : m.radius;
+    const cx = this.position.x + this.facing * reach;
+    const cy = this.position.y + m.heightOffset;
+
+    // Damage / kb base from move table, overridden by super/gumGum.
+    let baseDmg = m.dmg;
+    let baseKbX = this.facing * m.kbX;
+    let baseKbY = m.kbY;
+    let baseStun = m.stun;
+    if (superPunch) {
+      baseDmg = 60;
+      baseKbX = this.facing * 38;
+      baseKbY = 17;
+      baseStun = 0.5;
+    } else if (gumGum) {
+      baseDmg = 22;
+      baseKbX = this.facing * 17;
+      baseKbY = 8;
+      baseStun = 0.35;
+    }
+
+    for (const p of players) {
+      if (!p || p === this || !p.alive || p.invuln > 0) continue;
+      if (this.attackHits.has(p.id)) continue;
+      const dx = p.position.x - cx;
+      const dy = p.position.y - cy;
+      if (dx * dx + dy * dy >= radius * radius) continue;
+
+      let dmg = baseDmg;
+      let kbX = baseKbX;
+      let kbY = baseKbY;
+      let stun = baseStun;
+
+      // Counter-hit: victim is in their own attack startup.
+      if (p.attackTimer > 0 && p.moveId && MOVE_TABLE[p.moveId]) {
+        const pDur = MOVE_TABLE[p.moveId].dur;
+        const pPhase = 1 - p.attackTimer / pDur;
+        if (pPhase < 0.5) {
+          dmg *= 1.3;
+          stun *= 1.3;
         }
-        // Punches reflect projectiles (smaller arc).
-        if (this.game?.projectiles) {
-          for (const pr of this.game.projectiles) {
-            if (pr.dead || pr.owner === this) continue;
-            // Stuck projectiles have no body — they're cosmetic at this point.
-            if (!pr.body || pr.stuck) continue;
-            const dx = pr.body.position.x - cx, dy = pr.body.position.y - cy;
-            if (dx * dx + dy * dy < 0.9 * 0.9) {
-              pr.body.velocity.x = -pr.body.velocity.x * 1.2 + this.facing * 4;
-              pr.body.velocity.y = Math.abs(pr.body.velocity.y) * 0.6 + 4;
-              pr.owner = this;
-              this.game.fx.particles.burst(pr.body.position.x, pr.body.position.y, 0, { count: 8, speed: 6, color: 0xffffff });
-              this.game.fx.camera.punch(0.06);
-            }
-          }
+      }
+
+      // Juggle scaling: air-light hits onto launched victim do less.
+      if (p.juggled && m.type === 'airLight') {
+        dmg *= 0.6;
+        kbX *= 0.5;
+        kbY *= 0.5;
+      }
+
+      const launch = !!m.launch && !superPunch;  // super already mega-launches
+      p.takeDamage(dmg, {
+        attacker: this,
+        weapon: superPunch ? 'super' : (gumGum ? 'gumgum' : 'fist'),
+        kb: { x: kbX, y: kbY },
+        stun,
+        launch: launch || superPunch,
+      });
+      this.attackHits.add(p.id);
+
+      // Upward-launcher → start juggle on victim.
+      if (m.launch && (id === 'heavyUp' || id === 'airHeavyU')) {
+        p.juggled = true;
+        p.juggledUntil = performance.now() + 1200;
+        p.juggleHits = 0;
+      }
+      if (p.juggled) {
+        p.juggleHits++;
+        if (p.juggleHits >= 4) p.juggled = false;
+        else p.juggledUntil = Math.min(performance.now() + 400 + 800, p.juggledUntil + 400);
+      }
+
+      if (superPunch && this.game?.fx) {
+        this.game.fx.particles.burst(p.position.x, p.position.y, 0, { count: 22, speed: 12, color: 0xffcc33 });
+        this.game.fx.camera.punch(0.45);
+        this.game.hitStop?.(0.1);
+      }
+    }
+
+    // Projectile reflection (was in old _attackTick — preserve).
+    if (this.game?.projectiles) {
+      for (const pr of this.game.projectiles) {
+        if (pr.dead || pr.owner === this) continue;
+        if (!pr.body || pr.stuck) continue;
+        const dx = pr.body.position.x - cx;
+        const dy = pr.body.position.y - cy;
+        if (dx * dx + dy * dy < 0.9 * 0.9) {
+          pr.body.velocity.x = -pr.body.velocity.x * 1.2 + this.facing * 4;
+          pr.body.velocity.y = Math.abs(pr.body.velocity.y) * 0.6 + 4;
+          pr.owner = this;
+          this.game.fx.particles.burst(pr.body.position.x, pr.body.position.y, 0, { count: 8, speed: 6, color: 0xffffff });
+          this.game.fx.camera.punch(0.06);
         }
-        // Punches sever physics chains (pendulum links + hanging-platform
-        // suspensions). Per-swing dedupe via attackHits with a chain_<id> key.
-        const chainSegs = this.game?.level?._chainSegs;
-        if (chainSegs?.size) {
-          for (const seg of [...chainSegs]) {
-            if (!seg || seg.dead || !seg.body) continue;
-            const body = seg.body;
-            if (!body.velocity || !body.position) continue;
-            const key = `chain_${body.id}`;
-            if (this.attackHits.has(key)) continue;
-            const dxs = body.position.x - cx;
-            const dys = body.position.y - cy;
-            if (dxs * dxs + dys * dys >= radius * radius) continue;
-            this.attackHits.add(key);
-            body.velocity.x += this.facing * 4;
-            body.velocity.y += 2;
-            seg.damage(dmg * 0.5, this);
-          }
-        }
+      }
+    }
+
+    // Chain severance (preserve).
+    const chainSegs = this.game?.level?._chainSegs;
+    if (chainSegs?.size) {
+      for (const seg of [...chainSegs]) {
+        if (!seg || seg.dead || !seg.body) continue;
+        const body = seg.body;
+        if (!body.velocity || !body.position) continue;
+        const key = `chain_${body.id}`;
+        if (this.attackHits.has(key)) continue;
+        const dxs = body.position.x - cx;
+        const dys = body.position.y - cy;
+        if (dxs * dxs + dys * dys >= radius * radius) continue;
+        this.attackHits.add(key);
+        body.velocity.x += this.facing * 4;
+        body.velocity.y += 2;
+        seg.damage(baseDmg * 0.5, this);
       }
     }
   }
