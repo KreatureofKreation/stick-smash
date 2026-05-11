@@ -134,8 +134,8 @@ export class Stickman {
     this._jumpLockUntil = 0;
     this._jumpInputCooldown = 0;
     this._dustTimer = 0;
-    this.airJumps = 2; // 1 ground + 2 air = up to triple jump per landing
-    this.airJumpsLeft = 2;
+    this.airJumps = 1; // 1 ground + 1 air = double jump
+    this.airJumpsLeft = 1;
     this.facing = 1;
     this.aimDir = new THREE.Vector2(1, 0);
     this.crouching = false;
