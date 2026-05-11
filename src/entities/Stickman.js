@@ -30,11 +30,11 @@ export const STATE = {
 // kbX is multiplied by attacker.facing in the hitbox loop.
 const MOVE_TABLE = {
   // Ground lights — chain step 0..4
-  jab:          { type:'light', dur:0.14, activeStart:0.25, activeEnd:0.70, reach:0.95, radius:1.0, dmg:6,  kbX:5,  kbY:1, stun:0.15, launch:false, heightOffset:0.15, recovery:0.18 },
-  cross:        { type:'light', dur:0.16, activeStart:0.30, activeEnd:0.75, reach:1.00, radius:1.0, dmg:8,  kbX:7,  kbY:1, stun:0.20, launch:false, heightOffset:0.15, recovery:0.20 },
-  hook:         { type:'light', dur:0.18, activeStart:0.30, activeEnd:0.75, reach:0.90, radius:1.0, dmg:10, kbX:6,  kbY:2, stun:0.25, launch:false, heightOffset:0.15, recovery:0.22 },
-  knee:         { type:'light', dur:0.18, activeStart:0.35, activeEnd:0.70, reach:0.70, radius:1.0, dmg:11, kbX:5,  kbY:4, stun:0.30, launch:false, heightOffset:0.00, recovery:0.22 },
-  spinBack:     { type:'light', dur:0.24, activeStart:0.40, activeEnd:0.75, reach:1.10, radius:1.0, dmg:14, kbX:12, kbY:3, stun:0.35, launch:false, heightOffset:0.20, recovery:0.30 },
+  jab:          { type:'light', dur:0.22, activeStart:0.25, activeEnd:0.70, reach:0.95, radius:1.0, dmg:6,  kbX:5,  kbY:1, stun:0.15, launch:false, heightOffset:0.15, recovery:0.22 },
+  cross:        { type:'light', dur:0.24, activeStart:0.30, activeEnd:0.75, reach:1.00, radius:1.0, dmg:8,  kbX:7,  kbY:1, stun:0.20, launch:false, heightOffset:0.15, recovery:0.24 },
+  hook:         { type:'light', dur:0.26, activeStart:0.30, activeEnd:0.75, reach:0.90, radius:1.0, dmg:10, kbX:6,  kbY:2, stun:0.25, launch:false, heightOffset:0.15, recovery:0.26 },
+  knee:         { type:'light', dur:0.28, activeStart:0.35, activeEnd:0.70, reach:0.70, radius:1.0, dmg:11, kbX:5,  kbY:4, stun:0.30, launch:false, heightOffset:0.00, recovery:0.26 },
+  spinBack:     { type:'light', dur:0.32, activeStart:0.40, activeEnd:0.75, reach:1.10, radius:1.0, dmg:14, kbX:12, kbY:3, stun:0.35, launch:false, heightOffset:0.20, recovery:0.34 },
   // Ground heavies — direction at release
   heavyNeutral: { type:'heavy', dur:0.45, activeStart:0.40, activeEnd:0.75, reach:1.10, radius:1.1, dmg:22, kbX:18, kbY:4, stun:0.40, launch:true,  heightOffset:0.15, recovery:0.45 },
   heavyUp:      { type:'heavy', dur:0.45, activeStart:0.40, activeEnd:0.78, reach:0.85, radius:1.0, dmg:18, kbX:4,  kbY:14,stun:0.40, launch:true,  heightOffset:0.40, recovery:0.45 },
@@ -1057,7 +1057,7 @@ export class Stickman {
     this.attackHits.clear();
     // Legacy rig flags so old rig code paths render reasonable poses until
     // the rig is rewritten in Task 11–13.
-    this.kicking = (id === 'knee' || id === 'spinBack'
+    this.kicking = (id === 'knee'
                     || id === 'airHeavyN' || id === 'airHeavyD' || id === 'slideKick');
     this._attackStep = (id === 'jab') ? 0 : (id === 'cross') ? 1 : 2;
 
