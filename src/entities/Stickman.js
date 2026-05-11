@@ -1814,11 +1814,15 @@ export class Stickman {
     else if (this.hitstun > 0) ragAmt = clamp(this.hitstun * 1.5, 0, 0.6);
 
     const gumGum = performance.now() < this.gumGumUntil;
-    // When dead OR on a curved-gravity level, draw limbs in LOCAL space
-    // (origin) — group transform carries world pos+rot so the rig follows
-    // the capsule's planet-aligned rotation. Flat levels keep the
-    // existing world-space rig path (`identity` group + absolute coords).
-    const rigInLocal = this.state === STATE.DEAD || !!this.game?.level?.curvedGravity;
+    // Somersault (airHeavyN) spins the whole rig around Z — only meaningful
+    // while attackTimer is live (rotation snaps back to 0 after the move).
+    const somersaulting = this.moveId === 'airHeavyN' && this.attackTimer > 0;
+    // When dead OR on a curved-gravity level OR mid-somersault, draw limbs
+    // in LOCAL space (origin) — group transform carries world pos+rot so
+    // the rig follows the capsule's planet-aligned rotation (or the
+    // somersault spin). Flat levels keep the existing world-space rig path
+    // (`identity` group + absolute coords) when no spin/curve is active.
+    const rigInLocal = this.state === STATE.DEAD || !!this.game?.level?.curvedGravity || somersaulting;
     const rigPos = rigInLocal ? { x: 0, y: 0, z: 0 } : this.body.position;
     const stepDur = this.moveId && MOVE_TABLE[this.moveId]
       ? MOVE_TABLE[this.moveId].dur
@@ -1859,7 +1863,14 @@ export class Stickman {
         const q = this.body.quaternion;
         this.rig.group.quaternion.set(q.x, q.y, q.z, q.w);
       } else {
-        this.rig.group.quaternion.setFromAxisAngle(_RIG_Z_AXIS, this._visualAngle ?? 0);
+        let angle = this._visualAngle ?? 0;
+        if (somersaulting) {
+          const dur = MOVE_TABLE.airHeavyN?.dur ?? 0.58;
+          const t = clamp(1 - this.attackTimer / dur, 0, 1);
+          const e = t * t * (3 - 2 * t);
+          angle += this.facing * Math.PI * 2 * e;
+        }
+        this.rig.group.quaternion.setFromAxisAngle(_RIG_Z_AXIS, angle);
       }
     } else {
       this.rig.group.quaternion.identity();

@@ -380,19 +380,16 @@ function poseAirHook(rig, params) {
 }
 
 function poseSomersault(rig, params) {
+  // Whole-body Z-axis spin is applied at the rig.group level (see
+  // Stickman._syncRig). Pose only contributes the axe-leg sweep so the
+  // limbs don't hang loose during the rotation.
   const t = clamp(params.attackProgress ?? 0, 0, 1);
-  // bodyAngle is an absolute override on bodyTilt (no damp), so the spin
-  // actually completes inside the move duration. Ease-in-out so the spin
-  // accelerates through the peak.
-  const e = t * t * (3 - 2 * t);
-  const bodyAngle = Math.PI * 2 * e;
-  // Leg sweeps overhead at peak rotation for the axe contact.
   const peak = clamp((t - 0.40) / 0.35, 0, 1);
   const axe = Math.sin(peak * Math.PI);
   const legRX = 0.20 + axe * 0.35;
   const legRY = 0.00 + axe * 0.85;
   return {
-    legRX, legRY, bodyAngle,
+    legRX, legRY,
     armRX: 0.05, armRY: 0.05,
     armLX: -0.05, armLY: 0.05,
   };
@@ -727,14 +724,9 @@ export class StickmanRig {
     // Strike-driven lean snaps directly so the rear-back / lunge / follow-through
     // arc actually arrives inside the move's duration. Damp at 0.0001 closes ~14%
     // of the gap per 60 fps frame; a 0.22 s jab ends before lean catches up.
-    if (strikePose && (strikePose.leanZ !== undefined || strikePose.bodyAngle !== undefined)) {
-      if (strikePose.bodyAngle !== undefined) {
-        // Full rotation override (somersault). Caller hands us absolute angle.
-        this.bodyTilt = this.facing * strikePose.bodyAngle;
-      } else {
-        // Pose contributes leanZ — apply on top of base lean, snap directly.
-        this.bodyTilt = this.bodyTiltTarget + this.facing * strikePose.leanZ;
-      }
+    if (strikePose && strikePose.leanZ !== undefined) {
+      // Pose contributes leanZ — apply on top of base lean, snap directly.
+      this.bodyTilt = this.bodyTiltTarget + this.facing * strikePose.leanZ;
     } else {
       this.bodyTilt = damp(this.bodyTilt, this.bodyTiltTarget, 0.0001, dt);
     }
