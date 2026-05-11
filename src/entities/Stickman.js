@@ -30,11 +30,11 @@ export const STATE = {
 // kbX is multiplied by attacker.facing in the hitbox loop.
 const MOVE_TABLE = {
   // Ground lights — chain step 0..4
-  jab:          { type:'light', dur:0.22, activeStart:0.25, activeEnd:0.70, reach:0.95, radius:1.0, dmg:6,  kbX:5,  kbY:1, stun:0.15, launch:false, heightOffset:0.15, recovery:0.22 },
-  cross:        { type:'light', dur:0.24, activeStart:0.30, activeEnd:0.75, reach:1.00, radius:1.0, dmg:8,  kbX:7,  kbY:1, stun:0.20, launch:false, heightOffset:0.15, recovery:0.24 },
-  hook:         { type:'light', dur:0.26, activeStart:0.30, activeEnd:0.75, reach:0.90, radius:1.0, dmg:10, kbX:6,  kbY:2, stun:0.25, launch:false, heightOffset:0.15, recovery:0.26 },
-  knee:         { type:'light', dur:0.28, activeStart:0.35, activeEnd:0.70, reach:0.70, radius:1.0, dmg:11, kbX:5,  kbY:4, stun:0.30, launch:false, heightOffset:0.00, recovery:0.26 },
-  spinBack:     { type:'light', dur:0.32, activeStart:0.40, activeEnd:0.75, reach:1.10, radius:1.0, dmg:14, kbX:12, kbY:3, stun:0.35, launch:false, heightOffset:0.20, recovery:0.34 },
+  jab:          { type:'light', dur:0.22, activeStart:0.25, activeEnd:0.70, reach:0.95, radius:1.0, dmg:6,  kbX:5,  kbY:1, stun:0.15, launch:false, heightOffset:0.15, recovery:0.10 },
+  cross:        { type:'light', dur:0.24, activeStart:0.30, activeEnd:0.75, reach:1.00, radius:1.0, dmg:8,  kbX:7,  kbY:1, stun:0.20, launch:false, heightOffset:0.15, recovery:0.12 },
+  hook:         { type:'light', dur:0.26, activeStart:0.30, activeEnd:0.75, reach:0.90, radius:1.0, dmg:10, kbX:6,  kbY:2, stun:0.25, launch:false, heightOffset:0.15, recovery:0.14 },
+  knee:         { type:'light', dur:0.28, activeStart:0.35, activeEnd:0.70, reach:0.70, radius:1.0, dmg:11, kbX:5,  kbY:4, stun:0.30, launch:false, heightOffset:0.00, recovery:0.16 },
+  spinBack:     { type:'light', dur:0.32, activeStart:0.40, activeEnd:0.75, reach:1.10, radius:1.0, dmg:14, kbX:12, kbY:3, stun:0.35, launch:false, heightOffset:0.20, recovery:0.20 },
   // Ground heavies — direction at release
   heavyNeutral: { type:'heavy', dur:0.45, activeStart:0.40, activeEnd:0.75, reach:1.10, radius:1.1, dmg:22, kbX:18, kbY:4, stun:0.40, launch:true,  heightOffset:0.15, recovery:0.45 },
   heavyUp:      { type:'heavy', dur:0.45, activeStart:0.40, activeEnd:0.78, reach:0.85, radius:1.0, dmg:18, kbX:4,  kbY:14,stun:0.40, launch:true,  heightOffset:0.40, recovery:0.45 },
@@ -200,6 +200,7 @@ export class Stickman {
     this.juggledUntil = 0;       // ms
     this.juggleHits = 0;         // count of launched hits this window
     this.juggleStartedAt = 0;    // ms — when launcher hit landed (juggle ceiling anchor)
+    this._attackBuffer = 0;      // ms deadline — buffered press, drained by _attackTick
 
     // Back-compat aliases for legacy code paths (rig reads, weapons, etc.).
     // Keep these as derived flags so renders + bot AI continue working unchanged
@@ -948,15 +949,24 @@ export class Stickman {
   _doAttack() {
     // Compatibility entry-point — still called from tick() on attackPressed.
     // Routes to weapon path if armed, otherwise enters the unarmed FSM.
-    if (this.attackCooldown > 0) return;
     if (this.weapon) { this.weapon.tryFire(this); return; }
     // Slide-kick short-circuit — committed even mid-slide.
     if (this.sliding && this.grounded) {
       this._fireMove('slideKick');
       return;
     }
-    if (performance.now() < this.parryRecoverUntil) return;
-    if (this.charging || this.moveId) return;
+    // Buffer the press if the FSM can't accept it right now — replayed by
+    // _attackTick when the current move/cooldown ends. 200ms window covers
+    // mash + chain rhythm without producing ghost presses long after.
+    const blocked =
+      this.attackCooldown > 0
+      || performance.now() < this.parryRecoverUntil
+      || this.charging
+      || this.moveId;
+    if (blocked) {
+      this._attackBuffer = performance.now() + 200;
+      return;
+    }
     this.charging = true;
     this.chargeStartedAt = performance.now();
     this._pressDir = { x: this.input.moveX, y: this.input.moveY };
@@ -1046,6 +1056,8 @@ export class Stickman {
     this.juggleHits = 0;
     this.parryUntil = 0;
     this.parryRecoverUntil = 0;
+    this._attackBuffer = 0;
+    this.attackCooldown = 0;
   }
 
   _fireMove(id) {
@@ -1079,10 +1091,31 @@ export class Stickman {
     }
 
     audio.swing();
+    // Visible feedback for every strike — brief whole-rig flash + small
+    // camera nudge for the local player. Guarantees the user can tell
+    // their press registered even if the rig pose is hard to read.
+    this.flashAmount = Math.max(this.flashAmount, 0.45);
+    if (this.isLocal && this.game?.fx?.camera?.punch) {
+      this.game.fx.camera.punch(0.03);
+    }
   }
 
   _attackTick(dt, players) {
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
+    // Drain a buffered press once the FSM is ready to accept input again.
+    // Lets a mash-press during recovery turn into the next chain hit.
+    if (this._attackBuffer
+        && performance.now() < this._attackBuffer
+        && this.attackCooldown <= 0
+        && !this.charging
+        && !this.moveId
+        && !this.weapon
+        && performance.now() >= this.parryRecoverUntil) {
+      this._attackBuffer = 0;
+      this._doAttack();
+    } else if (this._attackBuffer && performance.now() >= this._attackBuffer) {
+      this._attackBuffer = 0;
+    }
     if (this.attackTimer <= 0) {
       if (this.moveId) {
         this.moveId = null;
