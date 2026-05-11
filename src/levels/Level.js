@@ -106,7 +106,10 @@ export class Tile {
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(x, y, 0);
     if (this.rotZ) mesh.rotation.z = this.rotZ;
-    mesh.castShadow = true;
+    // Only DYNAMIC tiles cast — static platforms casting onto each other
+    // doubled the shadow-pass scene (100+ tiles per level). Static still
+    // receive shadows from chars + dynamics, which is what reads visually.
+    mesh.castShadow = dyn;
     mesh.receiveShadow = true;
     // Static tiles never move — bake the matrix once and skip per-frame
     // updateMatrix() in the renderer's traverse. Saves N matrix multiplies

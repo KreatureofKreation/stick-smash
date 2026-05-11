@@ -21,15 +21,23 @@ export class Game {
     // Renderer
     const canvas = document.getElementById('game');
     const isCoarse = matchMedia('(pointer: coarse)').matches;
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !isCoarse, powerPreference: 'high-performance' });
-    // Pixel ratio: previously 2 desktop / 1.4 coarse ate fillrate on Retina/dense panels.
-    // 1.5 / 1.25 keeps text crisp without quadrupling fragment work for AA.
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, isCoarse ? 1.25 : 1.5));
+    // Antialias OFF everywhere — MSAA at native res was the dominant
+    // fragment-shader cost on integrated GPUs (20 FPS in-game while a
+    // synchronous CPU probe reported 290 FPS = pure GPU bottleneck).
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+    // Pixel ratio: clamp at 1.0 — a 1080p panel at 1.5× = 2.4M frag/pass,
+    // and we run two passes (shadow + main). 1.0 cuts fragment count 56%
+    // and is the single biggest GPU win on HiDPI Windows laptops.
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = isCoarse ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.35;
+    // BasicShadowMap on every platform: PCFSoft does 9 taps per fragment
+    // in the shadow lookup. Stick figures + chunky tiles don't need soft
+    // edges. Saves ~8× the shadow-sample fragment cost on lit surfaces.
+    this.renderer.shadowMap.type = THREE.BasicShadowMap;
+    // Linear tone mapping skips the ACES curve eval per pixel. With flat
+    // pixel-art palette the tonemap was decorative excess.
+    this.renderer.toneMapping = THREE.NoToneMapping;
     this._isCoarse = isCoarse;
     this._resize = this._resize.bind(this);
     addEventListener('resize', this._resize);

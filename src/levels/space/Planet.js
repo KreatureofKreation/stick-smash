@@ -179,7 +179,9 @@ export class Planet {
     mesh.position.set(this.cx, this.cy, 0);
     mesh.updateMatrix();
     mesh.matrixAutoUpdate = false;
-    mesh.castShadow = true;
+    // Planet wedges are static + always at scene-scale silhouette — drop
+    // cast to match the flat-level static-tile cut.
+    mesh.castShadow = false;
     mesh.receiveShadow = true;
 
     // Collider: single Box at the radial midpoint of the wedge.
