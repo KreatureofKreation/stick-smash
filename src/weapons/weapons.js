@@ -729,6 +729,76 @@ export class Revolver extends Weapon {
   }
 }
 
+export class Crossbow extends Weapon {
+  constructor(game) {
+    super(game);
+    this.name = 'Crossbow';
+    this.icon = '🏹';
+    this.fireDelay = 0.9;
+    this.aimWeapon = true;
+    this.poseRight = 'aim';
+    this.poseLeft = 'support';   // 2H
+    this.ammo = 8;
+    this.length = 0.85;
+    this._postFireTimer = 0;
+  }
+  _buildMesh() {
+    const grp = new THREE.Group();
+    const stock = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.08, 0.07), new THREE.MeshLambertMaterial({ color: 0x3a2410 }));
+    stock.position.x = 0.1;
+    // Horizontal limbs (NOT a vertical bow arc)
+    const limbU = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.36, 0.04), new THREE.MeshLambertMaterial({ color: 0x4a2a14 }));
+    limbU.position.set(0.18, 0.05, 0); limbU.rotation.z = 0.5;
+    const limbD = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.36, 0.04), new THREE.MeshLambertMaterial({ color: 0x4a2a14 }));
+    limbD.position.set(0.18, -0.05, 0); limbD.rotation.z = -0.5;
+    const string = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.008, 0.008), new THREE.MeshLambertMaterial({ color: 0xddd8c8 }));
+    string.position.set(0.0, 0, 0);
+    const bolt = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.02, 0.02), new THREE.MeshLambertMaterial({ color: 0x202024 }));
+    bolt.position.set(0.18, 0.04, 0);
+    grp.add(stock, limbU, limbD, string, bolt);
+    this.mesh = grp;
+    this._stringMesh = string;
+    this._boltMesh = bolt;
+  }
+  fire(player) {
+    const aim = this.effectiveAimDir ?? player.aimDir;
+    const sp = 48;  // 1.6× the old bow's 30
+    const boltMesh = (() => {
+      const g = new THREE.Group();
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.42, 6), new THREE.MeshLambertMaterial({ color: 0x202024 }));
+      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.08, 6), new THREE.MeshLambertMaterial({ color: 0x666674 }));
+      tip.position.y = 0.25;
+      const fletch = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.005), new THREE.MeshLambertMaterial({ color: 0xddccaa }));
+      fletch.position.y = -0.18;
+      g.add(shaft, tip, fletch);
+      return g;
+    })();
+    const proj = new Projectile(this.game, {
+      x: player.position.x + aim.x * 0.95, y: player.position.y + 0.7 + aim.y * 0.3,
+      vx: aim.x * sp, vy: aim.y * sp,
+      damage: 28, owner: player, mesh: boltMesh,
+      gravity: true, gravityScale: 0.5,
+      life: 4, radius: 0.05,
+      sticky: true, stickLife: 5,
+    });
+    proj._orientToVel = true;
+    audio.shoot();
+    this.game.fx.camera.punch(0.12);
+    if (this._stringMesh) this._stringMesh.scale.x = 0.85;
+    if (this._boltMesh) this._boltMesh.visible = false;
+    this._postFireTimer = 0.3;
+  }
+  heldTick(dt, player) {
+    if (this._postFireTimer > 0) {
+      this._postFireTimer -= dt;
+      if (this._postFireTimer <= 0) {
+        if (this._stringMesh) this._stringMesh.scale.x = 1;
+        if (this._boltMesh) this._boltMesh.visible = true;
+      }
+    }
+  }
+}
+
 // === EXPLOSIVES ===
 
 export class Grenade extends Weapon {
@@ -2540,7 +2610,7 @@ export class ForceChokePower {
 
 // Catalog of all weapons and weighted pool for spawns.
 export const WEAPON_CLASSES = [
-  Sword, Bat, Pistol, Shotgun, Minigun, SMG, AssaultRifle, Revolver, Grenade, RPG, RubberChicken, Boomerang, FishSlap,
+  Sword, Bat, Pistol, Shotgun, Minigun, SMG, AssaultRifle, Revolver, Crossbow, Grenade, RPG, RubberChicken, Boomerang, FishSlap,
   FlameSword, IceSword, Kamehameha, Nuke, LightningStaff, Lightsaber,
   Longsword, Mace, WarHammer, Halberd,
   SniperRifle, ThrowingKnives, StickyBomb,

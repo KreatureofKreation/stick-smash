@@ -371,6 +371,28 @@ window.__test_revolver_heavy_single_shot = function () {
   if (sm.weapon === w) { w.destroy(); sm.weapon = null; }
 };
 
+window.__test_crossbow_flat_arc = function () {
+  const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
+  window.__weaponTest.assert(sm, 'need local live player');
+  const reg = window.game.weaponRegistry || {};
+  const Cb = reg.Crossbow;
+  window.__weaponTest.assert(Cb, 'Crossbow class missing');
+  const w = new Cb(window.game);
+  w.attachTo(sm); sm.weapon = w;
+  sm.aimDir = { x: 1, y: 0 };
+  const before = window.game.projectiles.length;
+  w.tryFire(sm);
+  const after = window.game.projectiles.length;
+  window.__weaponTest.assert(after - before === 1, 'Crossbow should spawn one bolt per click');
+  const bolt = window.game.projectiles[after - 1];
+  window.__weaponTest.assert(bolt.body.velocity.x > 40, 'Crossbow bolt should be fast (got vx=' + bolt.body.velocity.x + ')');
+  window.__weaponTest.assertNear(bolt.gravityScale, 0.5, 0.01, 'Crossbow bolt gravityScale should be 0.5 (got ' + bolt.gravityScale + ')');
+  window.__weaponTest.assert(bolt.sticky, 'Crossbow bolt should be sticky');
+  window.__weaponTest.assert(bolt.damage === 28, 'Crossbow bolt damage should be 28 (got ' + bolt.damage + ')');
+  bolt.destroy();
+  if (sm.weapon === w) { w.destroy(); sm.weapon = null; }
+};
+
 window.__test_ar_three_burst = function () {
   const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
   window.__weaponTest.assert(sm, 'need local live player');
