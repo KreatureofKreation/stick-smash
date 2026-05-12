@@ -686,9 +686,12 @@ window.__test_recoilJump = function () {
 window.__test_standableWeapon = function () {
   const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
   window.__weaponTest.assert(sm, 'need local live player');
+  // Probe DOWNWARD from just below the player capsule to find the floor
+  // the player is resting on (or would fall onto). Starting above the
+  // player can falsely hit a platform above them in stratified levels.
   const probe = window.game.physics.raycast(
-    { x: sm.body.position.x, y: sm.body.position.y + 4, z: 0 },
-    { x: sm.body.position.x, y: sm.body.position.y - 4, z: 0 },
+    { x: sm.body.position.x, y: sm.body.position.y - 0.8, z: 0 },
+    { x: sm.body.position.x, y: sm.body.position.y - 10, z: 0 },
     { mask: 0x0001 },
   );
   if (!probe) return 'SKIP: no floor under player';
