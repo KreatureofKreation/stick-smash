@@ -1422,33 +1422,60 @@ export class Shurikens extends Weapon {
     this.ammo = 8;
   }
   _buildMesh() {
+    // 6-pointed throwing star with center hub + circular hole. Built via
+    // Shape (12 vertices: alternating outer-tip + inner-cleft) extruded
+    // thin, with a center hole punched through.
     const grp = new THREE.Group();
-    const mat = new THREE.MeshLambertMaterial({ color: 0x888899, emissive: 0x222233 });
-    const armA = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.06, 0.06), mat);
-    const armB = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.45, 0.06), mat);
-    armA.position.x = 0.25; armB.position.x = 0.25;
-    grp.add(armA, armB);
+    grp.add(_buildShurikenMesh(0.14, 0.04, 0.025));
     this.mesh = grp;
+    // Anchor offset so it visually centers in hand.
+    grp.position.x = 0.14;
   }
   fire(player) {
     const ax = player.aimDir.x, ay = player.aimDir.y;
-    // 4-pointed throwing star: two crossed thin boxes (2.5x size, slower).
-    const mat = new THREE.MeshLambertMaterial({ color: 0x888899, emissive: 0x222233 });
-    const armA = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.075, 0.075), mat);
-    const armB = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.55, 0.075), mat);
-    const grp = new THREE.Group();
-    grp.add(armA, armB);
+    const mesh = _buildShurikenMesh(0.16, 0.045, 0.03);
     const proj = new Projectile(this.game, {
       x: player.position.x + ax * 0.7, y: player.position.y + 0.7 + ay * 0.3,
-      vx: ax * 30, vy: ay * 30, damage: 22, owner: player,
-      gravity: true, gravityScale: 0.2, life: 2.0, radius: 0.12,
-      sticky: true, stickLife: 5, mesh: grp, color: 0x888899,
+      vx: ax * 26, vy: ay * 26, damage: 22, owner: player,
+      gravity: true, gravityScale: 0.2, life: 2.2, radius: 0.10,
+      sticky: true, stickLife: 5, mesh, color: 0x888899,
     });
     // Spin freely as it flies — do NOT orient to velocity.
     proj.body.angularVelocity.set(0, 0, 25);
     audio.beep(900, 0.05, 'square', 0.18);
     audio.swing();
   }
+}
+
+// Build a 6-pointed shuriken mesh: thin extruded star with center hole.
+// outerR = blade-tip radius, innerR = cleft radius, depth = thickness.
+function _buildShurikenMesh(outerR, innerR, depth) {
+  const points = 6;
+  const shape = new THREE.Shape();
+  for (let i = 0; i < points * 2; i++) {
+    const ang = (i / (points * 2)) * Math.PI * 2 - Math.PI / 2;
+    const r = (i % 2 === 0) ? outerR : innerR;
+    const px = Math.cos(ang) * r;
+    const py = Math.sin(ang) * r;
+    if (i === 0) shape.moveTo(px, py);
+    else shape.lineTo(px, py);
+  }
+  shape.closePath();
+  // Center hole — small circle subtracted.
+  const hole = new THREE.Path();
+  const holeR = innerR * 0.35;
+  for (let i = 0; i <= 16; i++) {
+    const ang = (i / 16) * Math.PI * 2;
+    const px = Math.cos(ang) * holeR;
+    const py = Math.sin(ang) * holeR;
+    if (i === 0) hole.moveTo(px, py);
+    else hole.lineTo(px, py);
+  }
+  shape.holes.push(hole);
+  const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, steps: 1 });
+  geo.translate(0, 0, -depth / 2);
+  const mat = new THREE.MeshLambertMaterial({ color: 0x888899, emissive: 0x222233 });
+  return new THREE.Mesh(geo, mat);
 }
 
 // Sticky bomb — thrown adhesive. Sticks to first surface (player or terrain),
