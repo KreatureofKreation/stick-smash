@@ -167,3 +167,25 @@ window.__test_pose_left_respects_flag = function () {
 
   sm.weapon = null;
 };
+
+window.__test_weapon_pose_flags = function () {
+  const reg = window.game?.weaponRegistry || {};
+  window.__weaponTest.assert(Object.keys(reg).length > 0, 'weaponRegistry should be populated');
+  const expected = [
+    ['Pistol',      'aim', null],
+    ['Shotgun',     'aim', 'support'],
+    ['SniperRifle', 'aim', 'support'],
+    ['Minigun',     'aim', 'support'],
+    ['RPG',         'aim', 'support'],
+  ];
+  for (const [name, right, left] of expected) {
+    const W = reg[name];
+    if (!W) continue;  // weapon not in this build (e.g., not yet added)
+    const inst = new W(window.game);
+    window.__weaponTest.assert(inst.poseRight === right,
+      name + '.poseRight should be ' + JSON.stringify(right) + ' (got ' + JSON.stringify(inst.poseRight) + ')');
+    window.__weaponTest.assert(inst.poseLeft === left,
+      name + '.poseLeft should be ' + JSON.stringify(left) + ' (got ' + JSON.stringify(inst.poseLeft) + ')');
+    inst.destroy?.();
+  }
+};

@@ -8,7 +8,7 @@ import { rosterById, ROSTER } from './characters/roster.js';
 import { Bot } from './ai/Bot.js';
 import { Level } from './levels/Level.js';
 import { getLevel, LEVELS } from './levels/definitions.js';
-import { pickRandomSpawn, PICKUP_CLASSES, setDisabledWeapons } from './weapons/weapons.js';
+import { pickRandomSpawn, PICKUP_CLASSES, setDisabledWeapons, WEAPON_CLASSES } from './weapons/weapons.js';
 import { audio } from './audio/Audio.js';
 import { HUD } from './ui/HUD.js';
 import { Menu } from './ui/Menu.js';
@@ -71,6 +71,9 @@ export class Game {
 
     this.input = new InputManager();
     this.players = [];        // dense list, includes nulls when removed
+    // Class-name-keyed registry so dev-time harness tests (and any future
+    // tooling) can construct weapons by name without touching imports.
+    this.weaponRegistry = Object.fromEntries(WEAPON_CLASSES.map(c => [c.name, c]));
     this.weapons = [];        // active weapon instances (held + free)
     this.pickups = [];        // health/speed/shield etc
     this.projectiles = [];    // tracked for update (Projectile updates itself but we need to remove dead ones)

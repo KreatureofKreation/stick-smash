@@ -411,6 +411,7 @@ export class Shotgun extends Weapon {
     this.fireDelay = 0.6;
     this.aimWeapon = true;
     this.poseRight = 'aim';
+    this.poseLeft = 'support';
     this.ammo = 4;
   }
   _buildMesh() {
@@ -452,6 +453,7 @@ export class Minigun extends Weapon {
     this.fireDelay = 0.05;
     this.aimWeapon = true;
     this.poseRight = 'aim';
+    this.poseLeft = 'support';
     this.ammo = 60;
   }
   _buildMesh() {
@@ -608,6 +610,7 @@ export class RPG extends Weapon {
     this.fireDelay = 1.2;
     this.aimWeapon = true;
     this.poseRight = 'aim';
+    this.poseLeft = 'support';
     this.ammo = 1;
   }
   _buildMesh() {
@@ -648,6 +651,7 @@ export class SniperRifle extends Weapon {
     this.fireDelay = 1.0;
     this.aimWeapon = true;
     this.poseRight = 'aim';
+    this.poseLeft = 'support';
     this.ammo = 3;
     this._laser = null;
     this._laserDot = null;
