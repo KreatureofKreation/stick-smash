@@ -110,19 +110,20 @@ window.__test_weapon_wall_reorient = function () {
     dir = -sm.facing;
   }
   if (!probe) return 'SKIP: no wall in 30m of player in test scene';
-  // Teleport: handR sits at body.x + facing*0.4 (rig offset). Place body so
-  // handR is 0.3m short of the wall — well within weapon length 0.6.
+  // Teleport so handR (which sits ~0.55m forward in the aim pose) ends up
+  // ~0.3m short of the wall — comfortably outside the wall's collider but
+  // well within the weapon length 0.6 raycast. body→handR offset for aim
+  // pose: shoulder ~0.18 + aimDist 0.7 = ~0.88. So body must be at
+  // wall - 1.18 (gives 0.3m clearance from handR to wall surface).
   const wallX = probe.hitPointWorld.x;
   sm.facing = dir;
-  sm.body.position.x = wallX - dir * 0.7;
+  sm.body.position.x = wallX - dir * 1.2;
   sm.body.position.y = Math.max(probe.hitPointWorld.y - 0.55, 1.0);
-  // Step physics + sync rig so handR follows the teleported body. Without
-  // this the rig (and thus updateMesh's raycast origin) keeps the pre-
-  // teleport hand position.
+  // Step physics + sync rig many times so the (PR-X-softer) aim-pose spring
+  // settles to the new body position. One sync isn't enough at K=200/D=14.
   sm.aimDir = { x: dir, y: 0 };
   sm.input = { ...sm.input, aimActive: true };
-  window.game.physics.step(1 / 60);
-  sm._syncRig(1 / 60, false);
+  for (let i = 0; i < 30; i++) { window.game.physics.step(1 / 60); sm._syncRig(1 / 60, false); }
   const handR = sm.rig?.handR?.position;
   const handX = handR?.x ?? (sm.body.position.x + dir * 0.4);
   const handY = handR?.y ?? (sm.body.position.y + 0.55);
@@ -311,12 +312,23 @@ window.__test_sniper_muzzle_under_barrel = function () {
   const SR = reg.SniperRifle;
   window.__weaponTest.assert(SR, 'SniperRifle class missing');
   const w = new SR(window.game);
+  w.attachTo(sm); sm.weapon = w;
+  // Set a known aim and let rig settle to aim pose so handR is at the
+  // expected aim-pose anchor, not the prior idle position.
+  sm.aimDir = { x: sm.facing, y: 0 };
+  sm.input = { ...sm.input, aimActive: true };
+  for (let i = 0; i < 30; i++) { window.game.physics.step(1 / 60); sm._syncRig(1 / 60, false); }
+  // Force the same effectiveAimDir _muzzleWorld will read.
+  w.effectiveAimDir = { x: sm.facing, y: 0 };
   const mz = w._muzzleWorld(sm);
-  const expectedX = sm.position.x + sm.facing * 0.55;
-  const expectedY = sm.position.y + 0.45;
-  window.__weaponTest.assertNear(mz.x, expectedX, 0.001, 'sniper muzzle x should be at barrel tip (' + expectedX + ', got ' + mz.x + ')');
-  window.__weaponTest.assertNear(mz.y, expectedY, 0.001, 'sniper muzzle y should be just under barrel (' + expectedY + ', got ' + mz.y + ')');
-  w.destroy();
+  // New contract: muzzle = handR + aimDir × 1.27 (barrel-tip local distance).
+  const handR = sm.rig?.handR?.position;
+  window.__weaponTest.assert(handR, 'rig handR should exist after sync');
+  const expectedX = handR.x + sm.facing * 1.27;
+  const expectedY = handR.y + 0 * 1.27;
+  window.__weaponTest.assertNear(mz.x, expectedX, 0.05, 'sniper muzzle x should track barrel tip from hand');
+  window.__weaponTest.assertNear(mz.y, expectedY, 0.05, 'sniper muzzle y should track barrel tip from hand');
+  if (sm.weapon === w) { w.destroy(); sm.weapon = null; }
 };
 
 window.__test_bow_removed = function () {

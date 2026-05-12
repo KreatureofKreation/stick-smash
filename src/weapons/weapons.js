@@ -1139,14 +1139,21 @@ export class SniperRifle extends Weapon {
     this.mesh = grp;
   }
   _muzzleWorld(player) {
-    // Anchor the laser/raycast origin under the barrel tip so the red dot
-    // visibly emits from the gun rather than the shooter's shoulder.
-    // Decoupled from aimDir.y so straight-down aim doesn't sink the origin
-    // into the floor.
+    // Anchor laser/raycast origin to the actual rendered barrel tip:
+    // hand world position + aim direction × local muzzle distance. This
+    // way the red dot follows the gun mesh as the hand sways/recoils,
+    // not a fixed body-relative point that drifts away from the visual.
+    // Mesh layout: barrel cylinder centered at local x=0.78 with length
+    // 0.95 → tip at local x ≈ 1.27 (matches the muzzle puff mesh).
+    const aim = this.effectiveAimDir ?? player.aimDir;
+    const handR = player.rig?.handR?.position;
+    if (handR) {
+      const tipDist = 1.27;
+      return { x: handR.x + aim.x * tipDist, y: handR.y + aim.y * tipDist };
+    }
+    // Fallback before rig is ready: shoulder-anchored approximation.
     const facing = player.facing || 1;
-    const baseX = player.position.x + facing * 0.55;
-    const baseY = player.position.y + 0.45;
-    return { x: baseX, y: baseY };
+    return { x: player.position.x + facing * 0.55, y: player.position.y + 0.45 };
   }
   _castShot(player, maxRange = 60) {
     // Two-ray approach because the cannon-shim Rapier raycast doesn't return
