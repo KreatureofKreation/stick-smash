@@ -1394,8 +1394,8 @@ export class StickmanRig {
     const aimBend = -(this.facing >= 0 ? 1 : -1);
     const aimBendR = (params.armPoseR === 'aim') ? aimBend : undefined;
     const aimBendL = (params.armPoseL === 'aim') ? aimBend : undefined;
-    this._drawArm(sLX, sLY, this._handLPos.x, this._handLPos.y, zL, this.upperArmL, this.lowerArmL, this.handL, this.shoulderL, this.elbowL, false, false, aimBendL);
-    this._drawArm(sRX, sRY, this._handRPos.x, this._handRPos.y, zR, this.upperArmR, this.lowerArmR, this.handR, this.shoulderR, this.elbowR, true, !!params.gumGumPunch, aimBendR);
+    this._drawArm(sLX, sLY, this._handLPos.x, this._handLPos.y, zL, this.upperArmL, this.lowerArmL, this.handL, this.shoulderL, this.elbowL, false, false, aimBendL, params);
+    this._drawArm(sRX, sRY, this._handRPos.x, this._handRPos.y, zR, this.upperArmR, this.lowerArmR, this.handR, this.shoulderR, this.elbowR, true, !!params.gumGumPunch, aimBendR, params);
     this._drawLeg(hipLX, hipLY, this._footLPos.x, this._footLPos.y, zL, this.upperLegL, this.lowerLegL, this.footL, this.hipL, this.kneeL, false);
     this._drawLeg(hipRX, hipRY, this._footRPos.x, this._footRPos.y, zR, this.upperLegR, this.lowerLegR, this.footR, this.hipR, this.kneeR, true);
 
@@ -1457,13 +1457,19 @@ export class StickmanRig {
     // requested hand position. Already initialized at function entry.
   }
 
-  _drawArm(sx, sy, hx, hy, z, upper, lower, handMesh, shoulderJoint, elbowJoint, isRight, stretched, bendOverride) {
+  _drawArm(sx, sy, hx, hy, z, upper, lower, handMesh, shoulderJoint, elbowJoint, isRight, stretched, bendOverride, params) {
     shoulderJoint.position.set(sx, sy, z);
     if (stretched) {
-      orientLimb(upper, sx, sy, z, hx, hy, z);
+      let sxh = hx, syh = hy;
+      if (params) {
+        this._sweepClamp(sx, sy, hx, hy, params, this._sweepOut);
+        sxh = this._sweepOut.x;
+        syh = this._sweepOut.y;
+      }
+      orientLimb(upper, sx, sy, z, sxh, syh, z);
       lower.visible = false;
       elbowJoint.visible = false;
-      handMesh.position.set(hx, hy, z);
+      handMesh.position.set(sxh, syh, z);
       return;
     }
     if (!lower.visible) lower.visible = true;
@@ -1477,6 +1483,14 @@ export class StickmanRig {
     if (d > maxReach) {
       const f = maxReach / d;
       chx = sx + dx * f; chy = sy + dy * f;
+    }
+    // World-collision clamp — if shoulder→hand crosses a wall, pull the
+    // hand back to LIMB_PAD short of the surface. IK below auto-folds the
+    // arm with the shortened reach (cartoon squish).
+    if (params) {
+      this._sweepClamp(sx, sy, chx, chy, params, this._sweepOut);
+      chx = this._sweepOut.x;
+      chy = this._sweepOut.y;
     }
     // bendOverride: explicit -1 forces elbow below the shoulder→hand line
     // (natural for aiming a gun — the elbow tucks down). Default uses
