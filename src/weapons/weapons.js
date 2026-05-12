@@ -5,6 +5,7 @@ import { Projectile } from './Projectile.js';
 import { audio } from '../audio/Audio.js';
 import { rand, TAU } from '../util/math.js';
 import { COL_GROUPS } from '../physics/PhysicsWorld.js';
+import { spawnFirePatch } from './fx/FirePatch.js';
 
 // === MELEE ===
 
@@ -726,6 +727,261 @@ export class Revolver extends Weapon {
       this._hammerCock = Math.max(0, this._hammerCock - dt * 4);
       if (this._hammerMesh) this._hammerMesh.rotation.z = -0.4 * this._hammerCock;
     }
+  }
+}
+
+export class Crossbow extends Weapon {
+  constructor(game) {
+    super(game);
+    this.name = 'Crossbow';
+    this.icon = '🏹';
+    this.fireDelay = 0.9;
+    this.aimWeapon = true;
+    this.poseRight = 'aim';
+    this.poseLeft = 'support';   // 2H
+    this.ammo = 8;
+    this.length = 0.85;
+    this._postFireTimer = 0;
+  }
+  _buildMesh() {
+    const grp = new THREE.Group();
+    const stock = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.08, 0.07), new THREE.MeshLambertMaterial({ color: 0x3a2410 }));
+    stock.position.x = 0.1;
+    // Horizontal limbs (NOT a vertical bow arc)
+    const limbU = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.36, 0.04), new THREE.MeshLambertMaterial({ color: 0x4a2a14 }));
+    limbU.position.set(0.18, 0.05, 0); limbU.rotation.z = 0.5;
+    const limbD = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.36, 0.04), new THREE.MeshLambertMaterial({ color: 0x4a2a14 }));
+    limbD.position.set(0.18, -0.05, 0); limbD.rotation.z = -0.5;
+    const string = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.008, 0.008), new THREE.MeshLambertMaterial({ color: 0xddd8c8 }));
+    string.position.set(0.0, 0, 0);
+    const bolt = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.02, 0.02), new THREE.MeshLambertMaterial({ color: 0x202024 }));
+    bolt.position.set(0.18, 0.04, 0);
+    grp.add(stock, limbU, limbD, string, bolt);
+    this.mesh = grp;
+    this._stringMesh = string;
+    this._boltMesh = bolt;
+  }
+  fire(player) {
+    const aim = this.effectiveAimDir ?? player.aimDir;
+    const sp = 48;  // 1.6× the old bow's 30
+    const boltMesh = (() => {
+      const g = new THREE.Group();
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.42, 6), new THREE.MeshLambertMaterial({ color: 0x202024 }));
+      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.08, 6), new THREE.MeshLambertMaterial({ color: 0x666674 }));
+      tip.position.y = 0.25;
+      const fletch = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.005), new THREE.MeshLambertMaterial({ color: 0xddccaa }));
+      fletch.position.y = -0.18;
+      g.add(shaft, tip, fletch);
+      return g;
+    })();
+    const proj = new Projectile(this.game, {
+      x: player.position.x + aim.x * 0.95, y: player.position.y + 0.7 + aim.y * 0.3,
+      vx: aim.x * sp, vy: aim.y * sp,
+      damage: 28, owner: player, mesh: boltMesh,
+      gravity: true, gravityScale: 0.5,
+      life: 4, radius: 0.05,
+      sticky: true, stickLife: 5,
+    });
+    proj._orientToVel = true;
+    audio.shoot();
+    this.game.fx.camera.punch(0.12);
+    if (this._stringMesh) this._stringMesh.scale.x = 0.85;
+    if (this._boltMesh) this._boltMesh.visible = false;
+    this._postFireTimer = 0.3;
+  }
+  heldTick(dt, player) {
+    if (this._postFireTimer > 0) {
+      this._postFireTimer -= dt;
+      if (this._postFireTimer <= 0) {
+        if (this._stringMesh) this._stringMesh.scale.x = 1;
+        if (this._boltMesh) this._boltMesh.visible = true;
+      }
+    }
+  }
+}
+
+export class Flamethrower extends Weapon {
+  constructor(game) {
+    super(game);
+    this.name = 'Flamethrower';
+    this.icon = '🔥';
+    this.fireDelay = 0;
+    this.aimWeapon = true;
+    this.poseRight = 'aim';
+    this.poseLeft = 'support';
+    this.ammo = 100;
+    this.length = 0.75;
+    this._held = false;
+    this._tickAccum = 0;
+    this._tickDur = 1 / 30;
+    this._range = 5;
+    this._coneRad = 25 * Math.PI / 180;  // half-angle
+    this._burnDur = 3;
+    this._burnDmgPerSec = 3;
+    this._coneVisual = null;
+  }
+  _buildMesh() {
+    const grp = new THREE.Group();
+    const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.32, 8), new THREE.MeshLambertMaterial({ color: 0x553311 }));
+    tank.rotation.z = Math.PI / 2; tank.position.set(0.0, -0.05, 0);
+    const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.4, 8), new THREE.MeshLambertMaterial({ color: 0x222226 }));
+    nozzle.rotation.z = Math.PI / 2; nozzle.position.set(0.5, 0.05, 0);
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.18, 0.08), new THREE.MeshLambertMaterial({ color: 0x222222 }));
+    grip.position.set(0.18, -0.18, 0); grip.rotation.z = -0.15;
+    grp.add(tank, nozzle, grip);
+    this.mesh = grp;
+  }
+  tryFire(player) {
+    this._held = true;
+    if (!this._coneVisual) this._buildConeVisual();
+    if (this._coneVisual) this._coneVisual.visible = true;
+  }
+  releaseFire(player) {
+    this._held = false;
+    if (this._coneVisual) this._coneVisual.visible = false;
+  }
+  _buildConeVisual() {
+    const geo = new THREE.ConeGeometry(this._range * Math.tan(this._coneRad), this._range, 8, 1, true);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xff7733, transparent: true, opacity: 0.6, side: THREE.DoubleSide });
+    const cone = new THREE.Mesh(geo, mat);
+    cone.visible = false;
+    this.game.scene.add(cone);
+    this._coneVisual = cone;
+  }
+  heldTick(dt, player) {
+    if (!this._held) return;
+    this._tickAccum += dt;
+    while (this._tickAccum >= this._tickDur && this.ammo > 0) {
+      this._tickAccum -= this._tickDur;
+      this._fireOneCone(player);
+      this.ammo--;
+      if (this.ammo <= 0) {
+        this._held = false;
+        if (this._coneVisual) this._coneVisual.visible = false;
+        player.weapon = null;
+        this.destroy();
+        return;
+      }
+    }
+    if (this._coneVisual && this._held) {
+      const aim = this.effectiveAimDir ?? player.aimDir;
+      const ang = Math.atan2(aim.y, aim.x);
+      const cx = player.position.x + aim.x * (this._range / 2);
+      const cy = player.position.y + 0.6 + aim.y * (this._range / 2);
+      this._coneVisual.position.set(cx, cy, 0);
+      this._coneVisual.rotation.set(0, 0, ang - Math.PI / 2);
+    }
+    if (this._held) this.game.fx.camera.punch(0.005);
+  }
+  _fireOneCone(player) {
+    const aim = this.effectiveAimDir ?? player.aimDir;
+    const aimAng = Math.atan2(aim.y, aim.x);
+    const halfArc = this._coneRad;
+    const r2 = this._range * this._range;
+    const ox = player.position.x, oy = player.position.y + 0.6;
+    for (const p of this.game.players) {
+      if (!p || !p.alive || p === player || p.invuln > 0) continue;
+      const dx = p.position.x - ox, dy = p.position.y - oy;
+      if (dx * dx + dy * dy > r2) continue;
+      const ang = Math.atan2(dy, dx);
+      let delta = ang - aimAng;
+      while (delta > Math.PI) delta -= Math.PI * 2;
+      while (delta < -Math.PI) delta += Math.PI * 2;
+      if (Math.abs(delta) > halfArc) continue;
+      p.applyBurn?.(this._burnDur, this._burnDmgPerSec, player);
+    }
+    // World fire patches on cone end-arc — sample 3 points.
+    for (let i = 0; i < 3; i++) {
+      const sampleAng = aimAng + (i - 1) * (halfArc * 0.6);
+      const sx = ox + Math.cos(sampleAng) * this._range * 0.95;
+      const sy = oy + Math.sin(sampleAng) * this._range * 0.95;
+      const hit = this.game.physics.raycast(
+        { x: sx, y: sy + 0.3, z: 0 },
+        { x: sx, y: sy - 0.6, z: 0 },
+        { mask: COL_GROUPS.WORLD },
+      );
+      if (hit) {
+        const hx = hit.hitPointWorld.x;
+        const hy = hit.hitPointWorld.y + 0.02;
+        spawnFirePatch(this.game, { x: hx, y: hy, owner: player });
+      }
+    }
+  }
+  destroy() {
+    if (this._coneVisual?.parent) this._coneVisual.parent.remove(this._coneVisual);
+    super.destroy?.();
+  }
+}
+
+export class DualPistols extends Weapon {
+  constructor(game) {
+    super(game);
+    this.name = 'DualPistols';
+    this.icon = '🔫🔫';
+    this.fireDelay = 0.18;
+    this.aimWeapon = true;
+    this.poseRight = 'aim';
+    this.poseLeft = 'aim';        // dual — both arms aim independently
+    this.ammo = 24;
+    this.length = 0.55;
+    this._nextHand = 'R';
+  }
+  _buildMesh() {
+    const buildOne = (color = 0x333344) => {
+      const grp = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.13, 0.08), new THREE.MeshLambertMaterial({ color }));
+      body.position.x = 0.2;
+      const grip = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.18, 0.08), new THREE.MeshLambertMaterial({ color: 0x222222 }));
+      grip.position.set(0.04, -0.15, 0); grip.rotation.z = -0.18;
+      grp.add(body, grip);
+      return grp;
+    };
+    this._meshR = buildOne(0x333344);
+    this._meshL = buildOne(0x333344);
+    const grp = new THREE.Group();
+    grp.add(this._meshR);
+    grp.add(this._meshL);
+    this.mesh = grp;
+  }
+  updateMesh(player) {
+    // Override: don't run base wall-reorient (would conflict with two
+    // independent muzzle anchors). Position each pistol at its respective
+    // hand bone, rotate to aim direction.
+    if (!player) return;
+    const handR = player.rig?.handR?.position;
+    const handL = player.rig?.handL?.position;
+    const aim = player.aimDir;
+    const ang = Math.atan2(aim.y, aim.x);
+    const facing = player.facing;
+    if (handR && this._meshR) {
+      this._meshR.position.set(handR.x, handR.y, 0);
+      this._meshR.rotation.set(0, 0, ang);
+      this._meshR.scale.set(1, facing >= 0 ? 1 : -1, 1);
+    }
+    if (handL && this._meshL) {
+      this._meshL.position.set(handL.x, handL.y, 0);
+      this._meshL.rotation.set(0, 0, ang);
+      this._meshL.scale.set(1, facing >= 0 ? 1 : -1, 1);
+    }
+    this.effectiveAimDir = { x: aim.x, y: aim.y };
+    this.aimAdjusted = false;
+  }
+  fire(player) {
+    const aim = this.effectiveAimDir ?? player.aimDir;
+    const a = Math.atan2(aim.y, aim.x) + rand(-0.018, 0.018);
+    const sp = 38;
+    const handBone = (this._nextHand === 'R') ? player.rig?.handR : player.rig?.handL;
+    const mx = handBone?.position?.x ?? (player.position.x + aim.x * 0.7);
+    const my = handBone?.position?.y ?? (player.position.y + 0.7);
+    new Projectile(this.game, {
+      x: mx + aim.x * 0.3, y: my + aim.y * 0.3,
+      vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+      damage: 12, owner: player, gravity: false, life: 1.5, radius: 0.07,
+      color: 0xffcc55, emissive: 0xffaa22, tracer: true,
+    });
+    audio.shoot();
+    this.game.fx.camera.punch(0.07);
+    this._nextHand = (this._nextHand === 'R') ? 'L' : 'R';
   }
 }
 
@@ -2540,7 +2796,7 @@ export class ForceChokePower {
 
 // Catalog of all weapons and weighted pool for spawns.
 export const WEAPON_CLASSES = [
-  Sword, Bat, Pistol, Shotgun, Minigun, SMG, AssaultRifle, Revolver, Grenade, RPG, RubberChicken, Boomerang, FishSlap,
+  Sword, Bat, Pistol, Shotgun, Minigun, SMG, AssaultRifle, Revolver, Crossbow, Flamethrower, DualPistols, Grenade, RPG, RubberChicken, Boomerang, FishSlap,
   FlameSword, IceSword, Kamehameha, Nuke, LightningStaff, Lightsaber,
   Longsword, Mace, WarHammer, Halberd,
   SniperRifle, ThrowingKnives, StickyBomb,

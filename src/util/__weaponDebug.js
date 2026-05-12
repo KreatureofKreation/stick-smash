@@ -14,11 +14,11 @@ function assertNear(actual, expected, eps, msg) {
 
 window.__weaponTest = { assert, assertNear, results: [] };
 
-window.__weaponTest.run = function (name) {
+window.__weaponTest.run = async function (name) {
   const fn = window['__test_' + name];
   if (typeof fn !== 'function') throw new Error('No test named __test_' + name);
   try {
-    fn();
+    await fn();
     window.__weaponTest.results.push({ name, ok: true });
     return 'PASS: ' + name;
   } catch (e) {
@@ -371,6 +371,28 @@ window.__test_revolver_heavy_single_shot = function () {
   if (sm.weapon === w) { w.destroy(); sm.weapon = null; }
 };
 
+window.__test_crossbow_flat_arc = function () {
+  const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
+  window.__weaponTest.assert(sm, 'need local live player');
+  const reg = window.game.weaponRegistry || {};
+  const Cb = reg.Crossbow;
+  window.__weaponTest.assert(Cb, 'Crossbow class missing');
+  const w = new Cb(window.game);
+  w.attachTo(sm); sm.weapon = w;
+  sm.aimDir = { x: 1, y: 0 };
+  const before = window.game.projectiles.length;
+  w.tryFire(sm);
+  const after = window.game.projectiles.length;
+  window.__weaponTest.assert(after - before === 1, 'Crossbow should spawn one bolt per click');
+  const bolt = window.game.projectiles[after - 1];
+  window.__weaponTest.assert(bolt.body.velocity.x > 40, 'Crossbow bolt should be fast (got vx=' + bolt.body.velocity.x + ')');
+  window.__weaponTest.assertNear(bolt.gravityScale, 0.5, 0.01, 'Crossbow bolt gravityScale should be 0.5 (got ' + bolt.gravityScale + ')');
+  window.__weaponTest.assert(bolt.sticky, 'Crossbow bolt should be sticky');
+  window.__weaponTest.assert(bolt.damage === 28, 'Crossbow bolt damage should be 28 (got ' + bolt.damage + ')');
+  bolt.destroy();
+  if (sm.weapon === w) { w.destroy(); sm.weapon = null; }
+};
+
 window.__test_ar_three_burst = function () {
   const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
   window.__weaponTest.assert(sm, 'need local live player');
@@ -401,4 +423,65 @@ window.__test_ar_three_burst = function () {
   window.__weaponTest.assert(second - sustained === 3, 'AR second tap after cooldown should fire 3 (got ' + (second - sustained) + ')');
   while (window.game.projectiles.length) window.game.projectiles.pop().destroy?.();
   if (sm.weapon === w) { w.destroy(); sm.weapon = null; }
+};
+
+window.__test_dual_pistols_alt_fire = function () {
+  const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
+  window.__weaponTest.assert(sm, 'need local live player');
+  const reg = window.game.weaponRegistry || {};
+  const DP = reg.DualPistols;
+  window.__weaponTest.assert(DP, 'DualPistols class missing');
+  const w = new DP(window.game);
+  w.attachTo(sm); sm.weapon = w;
+  window.__weaponTest.assert(w.poseRight === 'aim', 'poseRight should be aim');
+  window.__weaponTest.assert(w.poseLeft === 'aim', 'poseLeft should be aim (dual)');
+  sm.input = { ...sm.input, aimActive: true };
+  sm.aimDir = { x: 1, y: 0 };
+  sm._syncRig(1 / 60, false);
+  window.__weaponTest.assert(sm._lastArmPoseR === 'aim', 'right arm should aim (got ' + sm._lastArmPoseR + ')');
+  window.__weaponTest.assert(sm._lastArmPoseL === 'aim', 'left arm should aim (got ' + sm._lastArmPoseL + ')');
+  // Fire 4 shots — should alternate hand.
+  const seen = [];
+  const origFire = w.fire.bind(w);
+  w.fire = function (player) { seen.push(this._nextHand); origFire(player); };
+  w.tryFire(sm); w.cooldown = 0;
+  w.tryFire(sm); w.cooldown = 0;
+  w.tryFire(sm); w.cooldown = 0;
+  w.tryFire(sm);
+  window.__weaponTest.assert(seen.length === 4, 'should record 4 shots (got ' + seen.length + ')');
+  const alt = (seen[0] !== seen[1]) && (seen[1] !== seen[2]) && (seen[2] !== seen[3]);
+  window.__weaponTest.assert(alt, 'fire should alternate hand each click (got ' + seen.join(',') + ')');
+  while (window.game.projectiles.length) window.game.projectiles.pop().destroy?.();
+  if (sm.weapon === w) { w.destroy(); sm.weapon = null; }
+};
+
+window.__test_flamethrower_cone_ignites = async function () {
+  const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
+  const target = window.game?.players?.find(p => p && p.alive && !p.isLocal);
+  window.__weaponTest.assert(sm && target, 'need local + non-local players');
+  const reg = window.game.weaponRegistry || {};
+  const FT = reg.Flamethrower;
+  window.__weaponTest.assert(FT, 'Flamethrower class missing');
+  const w = new FT(window.game);
+  w.attachTo(sm); sm.weapon = w;
+  // Place target 3m forward
+  target.body.position.x = sm.body.position.x + sm.facing * 3;
+  target.body.position.y = sm.body.position.y;
+  sm.aimDir = { x: sm.facing, y: 0 };
+  w.tryFire(sm);
+  for (let i = 0; i < 10; i++) w.heldTick(1 / 60, sm);
+  window.__weaponTest.assert(target._burnDoT, 'target should be ignited (got _burnDoT=' + target._burnDoT + ')');
+  w.releaseFire(sm);
+  if (sm.weapon === w) { w.destroy(); sm.weapon = null; }
+};
+
+window.__test_fire_patch_cap = async function () {
+  const mod = await import('../weapons/fx/FirePatch.js');
+  const { spawnFirePatch, getActivePatches, clearAllPatches } = mod;
+  clearAllPatches();
+  for (let i = 0; i < 25; i++) spawnFirePatch(window.game, { x: i * 0.5, y: 0, owner: null });
+  const active = getActivePatches();
+  window.__weaponTest.assert(active.length === 16, 'fire patches should cap at 16 (got ' + active.length + ')');
+  window.__weaponTest.assert(active[0].x >= 4.5, 'oldest patches should be evicted (got x=' + active[0].x + ')');
+  clearAllPatches();
 };

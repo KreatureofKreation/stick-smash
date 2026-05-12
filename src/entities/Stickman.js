@@ -161,6 +161,7 @@ export class Stickman {
     // State
     this.state = STATE.ACTIVE;
     this.health = 100;
+    this._burnDoT = null;  // {remaining, dmgPerSec, attacker} | null
     this.maxHealth = 100;
     this.armor = 0;
     this.maxArmor = 60;
@@ -429,6 +430,20 @@ export class Stickman {
   headSnap(ix, iy) {
     if (!this.alive) return;
     this.rig?.kickHead?.(ix, iy);
+  }
+
+  // Apply or refresh a burn DoT. If already burning, take the longer
+  // remaining duration and the higher dmg/sec — refreshing on continued
+  // contact, not stacking.
+  applyBurn(durSec, dmgPerSec, attacker) {
+    if (!this.alive) return;
+    if (!this._burnDoT) {
+      this._burnDoT = { remaining: durSec, dmgPerSec, attacker };
+    } else {
+      if (durSec > this._burnDoT.remaining) this._burnDoT.remaining = durSec;
+      if (dmgPerSec > this._burnDoT.dmgPerSec) this._burnDoT.dmgPerSec = dmgPerSec;
+      this._burnDoT.attacker = attacker;
+    }
   }
 
   die(reason = 'ko') {
@@ -1587,6 +1602,18 @@ export class Stickman {
     if (this.state === STATE.GRABBED) {
       // Struggle handled by grabber — body driven by constraint.
       return;
+    }
+
+    // Burn DoT — applied by Flamethrower cone or FirePatch ground fire.
+    if (this._burnDoT && this.alive) {
+      this._burnDoT.remaining -= dt;
+      this.takeDamage(this._burnDoT.dmgPerSec * dt, {
+        attacker: this._burnDoT.attacker,
+        weapon: 'fire',
+        kb: { x: 0, y: 0 },
+        stun: 0,
+      });
+      if (this._burnDoT.remaining <= 0) this._burnDoT = null;
     }
 
     // Fire one-shot edges (suppressed when frozen).
