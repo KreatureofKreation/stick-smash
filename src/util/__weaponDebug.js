@@ -571,14 +571,15 @@ window.__test_rigClipsFloorOnLunge = function () {
   if (!probe) return 'SKIP: no floor under player';
   const floorY = probe.hitPointWorld.y;
 
-  // Drive the body sub-floor so the rig's natural head position
-  // (~0.95m above body) lands within the clamp's 0.54m down-ray range.
-  // We never call physics.step in this test, so the artificially-low
-  // body position holds for the single _syncRig call.
-  // Body at floorY - 0.5 → head world ~ floorY + 0.45, ray reaches
-  // floorY - 0.09 (well past the floor surface). Clamp must fire.
+  // Drive the body deep sub-floor so the rig's natural head position
+  // (hip + ~0.95m) lands BELOW the clamp's lift threshold of
+  // floor + HEAD_RADIUS + LIMB_PAD = floor + 0.40m. We never call
+  // physics.step in this test, so the artificially-low body position
+  // holds for the single _syncRig call.
+  // Body at floorY - 1.0 → head natural world ~ floorY - 0.05 (below
+  // floor). Clamp must lift it to floor + 0.40m.
   const savedY = sm.body.position.y;
-  sm.body.position.y = floorY - 0.5;
+  sm.body.position.y = floorY - 1.0;
   try {
     sm._syncRig(1 / 60, false);
     const headLocalY = sm.rig.head.position.y;
