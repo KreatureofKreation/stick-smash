@@ -415,15 +415,32 @@ export class Shotgun extends Weapon {
     this.poseRight = 'aim';
     this.poseLeft = 'support';
     this.ammo = 4;
-    this.barrelOffset = 0.85;
+    this.barrelOffset = 0.90;
   }
   _buildMesh() {
-    const g = new THREE.BoxGeometry(0.85, 0.16, 0.12);
-    const m = new THREE.MeshLambertMaterial({ color: 0x553322 });
-    const main = new THREE.Mesh(g, m); main.position.x = 0.4;
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.85, 10), new THREE.MeshLambertMaterial({ color: 0x222233 }));
-    barrel.rotation.z = Math.PI / 2; barrel.position.x = 0.4; barrel.position.y = 0.05;
-    const grp = new THREE.Group(); grp.add(main, barrel);
+    const grp = new THREE.Group();
+    // Pump-action style: receiver + double barrels + wood furniture
+    const recv = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.13, 0.09), new THREE.MeshLambertMaterial({ color: 0x2a2226 }));
+    recv.position.x = 0.18;
+    // Twin barrels stacked
+    const barrelMat = new THREE.MeshLambertMaterial({ color: 0x14141a });
+    const barrelTop = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.65, 10), barrelMat);
+    barrelTop.rotation.z = Math.PI / 2; barrelTop.position.set(0.55, 0.045, 0);
+    const barrelBot = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.65, 10), barrelMat);
+    barrelBot.rotation.z = Math.PI / 2; barrelBot.position.set(0.55, -0.045, 0);
+    // Pump handle (forearm) — wood
+    const pump = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.09, 0.11), new THREE.MeshLambertMaterial({ color: 0x4a2818 }));
+    pump.position.set(0.45, -0.08, 0);
+    // Stock — wood, slight downward angle
+    const stock = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.13, 0.09), new THREE.MeshLambertMaterial({ color: 0x3a2010 }));
+    stock.position.set(-0.15, -0.06, 0); stock.rotation.z = -0.12;
+    // Trigger guard arc
+    const guard = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.012, 6, 12, Math.PI), new THREE.MeshLambertMaterial({ color: 0x2a2226 }));
+    guard.rotation.z = -Math.PI / 2; guard.position.set(0.14, -0.08, 0);
+    // Front bead sight
+    const sight = new THREE.Mesh(new THREE.SphereGeometry(0.012, 6, 5), new THREE.MeshLambertMaterial({ color: 0xddccaa }));
+    sight.position.set(0.85, 0.085, 0);
+    grp.add(recv, barrelTop, barrelBot, pump, stock, guard, sight);
     this.mesh = grp;
   }
   fire(player) {
