@@ -20,6 +20,8 @@ export class Sword extends Weapon {
     this.swingTimer = 0;
     this.hits = new Set();
     this.tileSwingDmg = 12;
+    this.throwImpulse = 4;
+    this.meleeRecoilImpulse = 5;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -77,6 +79,8 @@ export class Bat extends Weapon {
     this.swingTimer = 0;
     this.hits = new Set();
     this.tileSwingDmg = 10;
+    this.throwImpulse = 4;
+    this.meleeRecoilImpulse = 5;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -132,6 +136,9 @@ export class Longsword extends Weapon {
     this.swingTimer = 0;
     this.hits = new Set();
     this.tileSwingDmg = 18;
+    this.throwImpulse = 5;
+    this.meleeRecoilImpulse = 7;
+    this.hitKnockback = 1.2;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -191,6 +198,9 @@ export class Mace extends Weapon {
     this.swingTimer = 0;
     this.hits = new Set();
     this.tileSwingDmg = 16;
+    this.throwImpulse = 6;
+    this.meleeRecoilImpulse = 9;
+    this.hitKnockback = 1.6;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -254,6 +264,9 @@ export class WarHammer extends Weapon {
     this.swingTimer = 0;
     this.hits = new Set();
     this.tileSwingDmg = 25;
+    this.throwImpulse = 6;
+    this.meleeRecoilImpulse = 9;
+    this.hitKnockback = 1.6;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -314,6 +327,9 @@ export class Halberd extends Weapon {
     this.swingTimer = 0;
     this.hits = new Set();
     this.tileSwingDmg = 16;
+    this.throwImpulse = 6;
+    this.meleeRecoilImpulse = 9;
+    this.hitKnockback = 1.6;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -378,6 +394,8 @@ export class Pistol extends Weapon {
     this.poseRight = 'aim';
     this.ammo = 12;
     this.barrelOffset = 0.55;
+    this.recoilImpulse = 2;
+    this.throwImpulse = 4;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -416,6 +434,9 @@ export class Shotgun extends Weapon {
     this.poseLeft = null;
     this.ammo = 4;
     this.barrelOffset = 0.90;
+    this.recoilImpulse = 14;
+    this.throwImpulse = 5;
+    this.hitKnockback = 2.0;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -485,6 +506,9 @@ export class Minigun extends Weapon {
     this._barrelAngle = 0;
     this._spinUpDur = 0.3;
     this._spinDownDur = 0.5;
+    this.recoilImpulse = 0.8;
+    this.throwImpulse = 6;
+    this.hitKnockback = 0.9;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -606,6 +630,9 @@ export class SMG extends Weapon {
     this.barrelOffset = 0.55;
     this._held = false;
     this._fireAccum = 0;
+    this.recoilImpulse = 1.2;
+    this.throwImpulse = 4;
+    this.hitKnockback = 0.8;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -672,6 +699,9 @@ export class AssaultRifle extends Weapon {
     this._burstRemaining = 0;
     this._burstAccum = 0;
     this._burstShotIndex = 0;
+    this.recoilImpulse = 3;
+    this.throwImpulse = 4;
+    this.hitKnockback = 1.1;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -739,6 +769,9 @@ export class Revolver extends Weapon {
     this.length = 0.55;
     this.barrelOffset = 0.65;
     this._hammerCock = 0;
+    this.recoilImpulse = 5;
+    this.throwImpulse = 4;
+    this.hitKnockback = 1.4;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -823,6 +856,9 @@ export class Crossbow extends Weapon {
     this.length = 1.6;
     this.barrelOffset = 1.1;
     this._postFireTimer = 0;
+    this.recoilImpulse = 3;
+    this.throwImpulse = 4;
+    this.hitKnockback = 1.1;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -896,6 +932,9 @@ export class Flamethrower extends Weapon {
     this.barrelOffset = 0.55;
     this._held = false;
     this._fireAccum = 0;
+    this.recoilImpulse = 0.4;
+    this.throwImpulse = 4;
+    this.hitKnockback = 0.4;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -984,6 +1023,8 @@ export class DualPistols extends Weapon {
     this.length = 0.55;
     this.barrelOffset = 0.55;
     this._nextHand = 'R';
+    this.recoilImpulse = 2;
+    this.throwImpulse = 3;
   }
   _buildMesh() {
     const buildOne = (color = 0x333344) => {
@@ -1085,6 +1126,8 @@ export class Grenade extends Weapon {
     this.fireDelay = 0.5;
     this.aimWeapon = true;
     this.ammo = 3;
+    this.throwImpulse = 5;
+    this.hitKnockback = 1.5;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -1164,6 +1207,9 @@ export class RPG extends Weapon {
     this.poseLeft = null;
     this.ammo = 1;
     this.barrelOffset = 0.85;
+    this.recoilImpulse = 18;
+    this.throwImpulse = 12;
+    this.hitKnockback = 3.0;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -1211,6 +1257,9 @@ export class SniperRifle extends Weapon {
     this._laser = null;
     this._laserDot = null;
     this._tracerTime = 0;
+    this.recoilImpulse = 8;
+    this.throwImpulse = 5;
+    this.hitKnockback = 2.4;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -1420,6 +1469,8 @@ export class Shurikens extends Weapon {
     this.aimWeapon = true;
     this.poseRight = 'aim';
     this.ammo = 8;
+    this.throwImpulse = 2;
+    this.hitKnockback = 0.5;
   }
   _buildMesh() {
     // 6-pointed throwing star with center hub + circular hole. Built via
@@ -1489,6 +1540,8 @@ export class StickyBomb extends Weapon {
     this.fireDelay = 0.7;
     this.aimWeapon = true;
     this.ammo = 2;
+    this.throwImpulse = 5;
+    this.hitKnockback = 1.5;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -1677,6 +1730,9 @@ export class HulkHands extends Weapon {
     this._poundCooldown = 0;
     // Track whether we hid the rig hands so detach() can restore.
     this._hidRigHands = false;
+    this.throwImpulse = 5;
+    this.meleeRecoilImpulse = 7;
+    this.hitKnockback = 1.3;
   }
 
   _buildMesh() {
@@ -1927,6 +1983,9 @@ export class RubberChicken extends Weapon {
     this.swingTimer = 0;
     this.hits = new Set();
     this.tileSwingDmg = 5;
+    this.throwImpulse = 3;
+    this.meleeRecoilImpulse = 3;
+    this.hitKnockback = 0.6;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -1984,6 +2043,9 @@ export class Boomerang extends Weapon {
     this.fireDelay = 0.8;
     this.aimWeapon = true;
     this.ammo = 5;
+    this.throwImpulse = 4;
+    this.meleeRecoilImpulse = 4;
+    this.hitKnockback = 0.9;
   }
   _buildMesh() {
     const shape = new THREE.Shape();
@@ -2016,6 +2078,9 @@ export class FishSlap extends Weapon {
     this.swingTimer = 0;
     this.hits = new Set();
     this.tileSwingDmg = 6;
+    this.throwImpulse = 3;
+    this.meleeRecoilImpulse = 3;
+    this.hitKnockback = 0.6;
   }
   _buildMesh() {
     const g = new THREE.SphereGeometry(0.18, 10, 8);
@@ -2222,6 +2287,9 @@ export class Lightsaber extends Weapon {
     if (this._blade) this._blade.material.emissive.setHex(this.bladeColor);
     this._thrownProj = null;
     this._thrownCooldown = 0;
+    this.throwImpulse = 5;
+    this.meleeRecoilImpulse = 7;
+    this.hitKnockback = 1.3;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -2339,6 +2407,9 @@ export class FlameSword extends Weapon {
     this.swingTimer = 0;
     this.hits = new Set();
     this.tileSwingDmg = 20;
+    this.throwImpulse = 5;
+    this.meleeRecoilImpulse = 7;
+    this.hitKnockback = 1.3;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -2413,6 +2484,9 @@ export class IceSword extends Weapon {
     this.swingTimer = 0;
     this.hits = new Set();
     this.tileSwingDmg = 20;
+    this.throwImpulse = 5;
+    this.meleeRecoilImpulse = 7;
+    this.hitKnockback = 1.3;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -2498,6 +2572,9 @@ export class Kamehameha extends Weapon {
     this._lockedAim = null;
     this._chargeMesh = null;
     this._haloMesh = null;
+    this.throwImpulse = 4;
+    this.recoilImpulse = 3;
+    this.hitKnockback = 1.2;
   }
   _buildMesh() {
     // Idle pickup mesh — small inert orb the carrier holds.
@@ -2731,6 +2808,8 @@ export class Nuke extends Weapon {
     this.fireDelay = 1.0;
     this.aimWeapon = true;
     this.ammo = 1;
+    this.throwImpulse = 5;
+    this.hitKnockback = 1.5;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -2801,6 +2880,9 @@ export class LightningStaff extends Weapon {
     this.aimWeapon = true;
     this.poseRight = 'aim';
     this.ammo = 6;
+    this.throwImpulse = 4;
+    this.recoilImpulse = 3;
+    this.hitKnockback = 1.2;
   }
   _buildMesh() {
     const grp = new THREE.Group();

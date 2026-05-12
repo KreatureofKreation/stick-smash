@@ -26,6 +26,12 @@ export class Weapon {
     this.cooldown = 0;
     this.fireDelay = 0.3;
     this.dropCooldown = 0;
+    // Sub-B impulse tuning — defaults 0 = no force. Per-weapon overrides
+    // in weapons.js.
+    this.recoilImpulse = 0;       // firearm recoil magnitude
+    this.throwImpulse = 0;        // self-impulse when thrown
+    this.meleeRecoilImpulse = 0;  // self-impulse on melee strike
+    this.hitKnockback = 1.0;      // multiplier for victim knockback on damage
     this.life = 30;          // seconds before world body removed
     this.gravity = true;
     // Swing state (set by melee subclass fire()) — base inits so updateMesh
