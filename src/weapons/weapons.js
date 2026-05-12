@@ -543,51 +543,6 @@ export class Minigun extends Weapon {
   }
 }
 
-export class Bow extends Weapon {
-  constructor(game) {
-    super(game);
-    this.name = 'Bow';
-    this.icon = '🏹';
-    this.fireDelay = 0.7;
-    this.aimWeapon = true;
-    this.poseRight = 'aim';
-    this.ammo = 10;
-  }
-  _buildMesh() {
-    const grp = new THREE.Group();
-    const arc = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.025, 6, 16, Math.PI), new THREE.MeshLambertMaterial({ color: 0x6a3a18 }));
-    arc.rotation.z = Math.PI / 2; arc.position.x = 0.1;
-    const string = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.01, 0.01), new THREE.MeshLambertMaterial({ color: 0xddd8c8 }));
-    string.position.x = 0.1;
-    grp.add(arc, string);
-    this.mesh = grp;
-  }
-  fire(player) {
-    // Arrow with mild bullet drop — gravity on, scaled down so arc is gentle.
-    // Sticks into terrain or victims on hit (lifecycle handled by Projectile).
-    // Build a slightly more arrow-shaped mesh: shaft + fletching cone.
-    const arrowMat = new THREE.MeshLambertMaterial({ color: 0xc8a85c });
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.7, 6), arrowMat);
-    const head = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.12, 6), new THREE.MeshLambertMaterial({ color: 0x666666 }));
-    head.position.y = 0.4;
-    const fletch = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.06, 0.01), new THREE.MeshLambertMaterial({ color: 0xff4d6d }));
-    fletch.position.y = -0.32;
-    const arrowGrp = new THREE.Group();
-    arrowGrp.add(shaft, head, fletch);
-    const proj = new Projectile(this.game, {
-      x: player.position.x + player.aimDir.x * 0.9, y: player.position.y + 0.7 + player.aimDir.y * 0.4,
-      vx: player.aimDir.x * 34, vy: player.aimDir.y * 34, damage: 36, owner: player,
-      gravity: true, gravityScale: 0.45, life: 3, radius: 0.06, color: 0xc8a85c, tracer: true,
-      tracerColor: 0xeed28c,
-      sticky: true, stickLife: 7,
-      mesh: arrowGrp,
-    });
-    // Spin so visual arrow aligns with velocity each frame.
-    proj._orientToVel = true;
-    audio.shoot();
-  }
-}
-
 // === EXPLOSIVES ===
 
 export class Grenade extends Weapon {
@@ -2399,7 +2354,7 @@ export class ForceChokePower {
 
 // Catalog of all weapons and weighted pool for spawns.
 export const WEAPON_CLASSES = [
-  Sword, Bat, Pistol, Shotgun, Minigun, Bow, Grenade, RPG, RubberChicken, Boomerang, FishSlap,
+  Sword, Bat, Pistol, Shotgun, Minigun, Grenade, RPG, RubberChicken, Boomerang, FishSlap,
   FlameSword, IceSword, Kamehameha, Nuke, LightningStaff, Lightsaber,
   Longsword, Mace, WarHammer, Halberd,
   SniperRifle, ThrowingKnives, StickyBomb,
@@ -2427,7 +2382,6 @@ export const SPAWN_TABLE = [
   { cls: Pistol,        w: 14,  id: 'pistol',       label: 'Pistol',        cat: 'ranged' },
   { cls: Shotgun,       w: 9,   id: 'shotgun',      label: 'Shotgun',       cat: 'ranged' },
   { cls: Minigun,       w: 5,   id: 'minigun',      label: 'Minigun',       cat: 'ranged' },
-  { cls: Bow,           w: 8,   id: 'bow',          label: 'Bow',           cat: 'ranged' },
   { cls: Grenade,       w: 8,   id: 'grenade',      label: 'Grenade',       cat: 'ranged' },
   { cls: RPG,           w: 4,   id: 'rpg',          label: 'RPG',           cat: 'ranged' },
   { cls: SniperRifle,   w: 4,   id: 'sniper',       label: 'Sniper Rifle',  cat: 'ranged' },

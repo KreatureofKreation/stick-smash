@@ -221,8 +221,8 @@ export class Bot {
     if (this.target && sm.weapon?.aimWeapon) {
       let ax = this.target.position.x - sm.position.x;
       let ay = (this.target.position.y + 0.5) - (sm.position.y + 0.6);
-      // gravity-compensate for arc weapons (Bow, Grenade)
-      if (['Bow', 'Grenade'].includes(sm.weapon.name)) {
+      // gravity-compensate for arc weapons (Grenade)
+      if (['Grenade'].includes(sm.weapon.name)) {
         const dist = Math.hypot(ax, ay);
         ay += dist * 0.18; // lead upward
       }

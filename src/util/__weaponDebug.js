@@ -266,3 +266,8 @@ window.__test_sniper_muzzle_under_barrel = function () {
   window.__weaponTest.assertNear(mz.y, expectedY, 0.001, 'sniper muzzle y should be just under barrel (' + expectedY + ', got ' + mz.y + ')');
   w.destroy();
 };
+
+window.__test_bow_removed = function () {
+  const reg = window.game?.weaponRegistry || {};
+  window.__weaponTest.assert(!reg.Bow, 'Bow should be removed from weapon registry (got ' + reg.Bow + ')');
+};
