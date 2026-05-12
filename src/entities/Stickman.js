@@ -1906,6 +1906,9 @@ export class Stickman {
     params.angVz = this.body.angularVelocity?.z || 0;
     params.spinning = somersaulting;
     params.dt = dt;
+    params.physics = this.world;
+    params.worldOriginX = this.body.position.x;
+    params.worldOriginY = this.body.position.y;
     this.rig.update(rigPos, params);
 
     if (rigInLocal) {
