@@ -1372,11 +1372,16 @@ export class StickmanRig {
     // Render limbs via IK using the spring-chased extremity positions.
     const zL = hipZ - Z_STAGGER;
     const zR = hipZ + Z_STAGGER;
-    // During aim pose: elbow tucks down (bend = -1) for both arms — natural
-    // gun-shoulder posture. Default melee bend (facing sign) is wrong here
-    // because the IK's "default" places elbow up for windup arcs.
-    const aimBendR = (params.armPoseR === 'aim') ? -1 : undefined;
-    const aimBendL = (params.armPoseL === 'aim') ? -1 : undefined;
+    // During aim pose: elbow tucks DOWN for both arms — natural gun-shoulder
+    // posture. solveIK's elbowAngle = a + b * bend; for the elbow to land
+    // below the shoulder→hand line the bend has to FLIP with facing:
+    //   facing right (a≈0):  bend=-1 → elbowAngle = -b → below.
+    //   facing left  (a≈π):  bend=+1 → elbowAngle = π+b → below (mirror).
+    // Default melee bend uses +facingSign which puts elbow ABOVE for windup
+    // arcs — wrong for aim. Aim flips it.
+    const aimBend = -(this.facing >= 0 ? 1 : -1);
+    const aimBendR = (params.armPoseR === 'aim') ? aimBend : undefined;
+    const aimBendL = (params.armPoseL === 'aim') ? aimBend : undefined;
     this._drawArm(sLX, sLY, this._handLPos.x, this._handLPos.y, zL, this.upperArmL, this.lowerArmL, this.handL, this.shoulderL, this.elbowL, false, false, aimBendL);
     this._drawArm(sRX, sRY, this._handRPos.x, this._handRPos.y, zR, this.upperArmR, this.lowerArmR, this.handR, this.shoulderR, this.elbowR, true, !!params.gumGumPunch, aimBendR);
     this._drawLeg(hipLX, hipLY, this._footLPos.x, this._footLPos.y, zL, this.upperLegL, this.lowerLegL, this.footL, this.hipL, this.kneeL, false);
