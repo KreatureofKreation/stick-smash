@@ -7,6 +7,14 @@ import { lerp, damp, clamp } from '../util/math.js';
 const _v = new THREE.Vector3();
 const _yAxis = new THREE.Vector3(0, 1, 0);
 const Z_STAGGER = 0.08;
+// Minimum distance from limb endpoint to wall surface after clamp.
+// 0.06m clears cylinder radius (~0.04) plus a small visual margin so
+// the mesh doesn't poke into the tile at glancing angles.
+const LIMB_PAD = 0.06;
+// Mask for world geometry only. Equals COL_GROUPS.WORLD = 0x0001 (see
+// src/physics/PhysicsWorld.js). Hardcoded here to avoid importing the
+// physics module into the rig — rig stays display-only.
+const WORLD_MASK = 0x0001;
 
 function makeLimb(radius, length, mat) {
   const g = new THREE.CylinderGeometry(radius, radius, length, 8, 1, false);
@@ -622,6 +630,7 @@ export class StickmanRig {
 
     // Scratch
     this._tmpKnee = { x: 0, y: 0 };
+    this._sweepOut = { x: 0, y: 0 };
   }
 
   resetSprings() {
@@ -1396,6 +1405,56 @@ export class StickmanRig {
     } else {
       this.handR.rotation.z = 0;
     }
+  }
+
+  _sweepClamp(sxLocal, syLocal, hxLocal, hyLocal, params, out) {
+    out.x = hxLocal;
+    out.y = hyLocal;
+    const phys = params.physics;
+    if (!phys || !phys.raycast) return;
+    const ox = params.worldOriginX ?? 0;
+    const oy = params.worldOriginY ?? 0;
+    const sxW = ox + sxLocal, syW = oy + syLocal;
+    const hxW = ox + hxLocal, hyW = oy + hyLocal;
+    const dxW = hxW - sxW, dyW = hyW - syW;
+    const segLen = Math.hypot(dxW, dyW);
+    if (segLen < 0.02) return;
+    // Forward ray: shoulder → hand. Project z to 0 (rig lives near z=0,
+    // colliders are at z=0).
+    const fwd = phys.raycast(
+      { x: sxW, y: syW, z: 0 },
+      { x: hxW, y: hyW, z: 0 },
+      { mask: WORLD_MASK },
+    );
+    if (fwd && fwd.hitPointWorld) {
+      const hx = fwd.hitPointWorld.x, hy = fwd.hitPointWorld.y;
+      // Pull back along ray by LIMB_PAD.
+      const inv = 1 / segLen;
+      const ux = dxW * inv, uy = dyW * inv;
+      out.x = (hx - ux * LIMB_PAD) - ox;
+      out.y = (hy - uy * LIMB_PAD) - oy;
+      return;
+    }
+    // Back-ray fallback — hand may already be inside a wall (prior frame
+    // penetration). Cast hand → shoulder; a hit means hand is on the
+    // wrong side of geometry.
+    const back = phys.raycast(
+      { x: hxW, y: hyW, z: 0 },
+      { x: sxW, y: syW, z: 0 },
+      { mask: WORLD_MASK },
+    );
+    if (back && back.hitPointWorld) {
+      const hx = back.hitPointWorld.x, hy = back.hitPointWorld.y;
+      // The back-ray hit point is the entry surface on the shoulder side
+      // of the wall. Pull TOWARD shoulder by LIMB_PAD (along back-ray dir,
+      // which is hand→shoulder).
+      const inv = 1 / segLen;
+      const ux = -dxW * inv, uy = -dyW * inv;
+      out.x = (hx + ux * LIMB_PAD) - ox;
+      out.y = (hy + uy * LIMB_PAD) - oy;
+    }
+    // Both rays missed → no penetration → leave (out.x, out.y) at the
+    // requested hand position. Already initialized at function entry.
   }
 
   _drawArm(sx, sy, hx, hy, z, upper, lower, handMesh, shoulderJoint, elbowJoint, isRight, stretched, bendOverride) {
