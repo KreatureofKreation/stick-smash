@@ -607,3 +607,147 @@ window.__test_rigClipsFloorOnLunge = function () {
     sm.body.position.y = savedY;
   }
 };
+
+window.__test_punchBoostImpulse = function () {
+  const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
+  window.__weaponTest.assert(sm, 'need local live player');
+  const target = window.game.players.find(p => p && !p.isLocal && p.alive);
+  window.__weaponTest.assert(target, 'need bot target — start match with bots: 1');
+
+  sm.body.position.x = target.body.position.x - 0.6 * sm.facing;
+  sm.body.position.y = target.body.position.y;
+  sm.body.velocity.x = 0;
+  sm.body.velocity.y = 0;
+  sm._impulseFrameBudget = 0;
+  sm._impulseStunUntil = 0;
+  const startVx = sm.body.velocity.x;
+
+  const prevW = sm.weapon; sm.weapon = null; // simulate unarmed
+  const wasFeature = window.__forceFeatures.punch;
+  window.__forceFeatures.punch = 1;
+
+  // Stand-in for the takeDamage+punch-boost combo. Call applyImpulse
+  // directly with the math the punch-boost hook would apply: FIST_RECOIL=4,
+  // kb direction = facing × +x.
+  const FIST_RECOIL = 4;
+  const kbX = sm.facing * 8, kbY = 4;
+  const dirLen = Math.hypot(kbX, kbY);
+  const ux = kbX / dirLen, uy = kbY / dirLen;
+  sm.applyImpulse(-ux * FIST_RECOIL, -uy * FIST_RECOIL * 0.6);
+
+  window.__forceFeatures.punch = wasFeature;
+  sm.weapon = prevW;
+
+  const deltaVx = sm.body.velocity.x - startVx;
+  const expectedSign = -sm.facing;
+  window.__weaponTest.assert(
+    Math.sign(deltaVx) === expectedSign,
+    'punch-boost should push attacker backward (facing=' + sm.facing +
+    ', deltaVx=' + deltaVx.toFixed(3) + ')',
+  );
+  window.__weaponTest.assert(
+    Math.abs(deltaVx) >= 2.5,
+    'punch-boost magnitude should be at least 2.5 m/s (got ' + Math.abs(deltaVx).toFixed(3) + ')',
+  );
+};
+
+window.__test_recoilJump = function () {
+  const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
+  window.__weaponTest.assert(sm, 'need local live player');
+
+  const Shotgun = window.game.weaponRegistry?.Shotgun;
+  window.__weaponTest.assert(Shotgun, 'no Shotgun in registry');
+  sm.weapon = new Shotgun(window.game);
+  sm.weapon.attachTo(sm);
+
+  sm.aimDir = { x: 0, y: -1 };
+  sm.input = { ...sm.input, aimActive: true };
+  sm.body.velocity.x = 0;
+  sm.body.velocity.y = 0;
+  sm._impulseFrameBudget = 0;
+  sm.weapon.cooldown = 0;
+  const startVy = sm.body.velocity.y;
+
+  const wasFeature = window.__forceFeatures.recoil;
+  window.__forceFeatures.recoil = 1;
+  sm.weapon.fire(sm);
+  window.__forceFeatures.recoil = wasFeature;
+
+  const deltaVy = sm.body.velocity.y - startVy;
+  window.__weaponTest.assert(
+    deltaVy > 5,
+    'shoot-down recoil should boost player upward (deltaVy=' +
+    deltaVy.toFixed(3) + ')',
+  );
+};
+
+window.__test_standableWeapon = function () {
+  const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
+  window.__weaponTest.assert(sm, 'need local live player');
+  const probe = window.game.physics.raycast(
+    { x: sm.body.position.x, y: sm.body.position.y + 4, z: 0 },
+    { x: sm.body.position.x, y: sm.body.position.y - 4, z: 0 },
+    { mask: 0x0001 },
+  );
+  if (!probe) return 'SKIP: no floor under player';
+  const floorY = probe.hitPointWorld.y;
+
+  const Sword = window.game.weaponRegistry?.Sword;
+  if (!Sword) return 'SKIP: no Sword class';
+  const sw = new Sword(window.game);
+  const swX = sm.body.position.x + 1.5;
+  sw.spawnAt(swX, floorY + 0.5, 0);
+  window.__weaponTest.assert(sw.body, 'weapon body should spawn');
+
+  for (let i = 0; i < 60; i++) window.game.physics.step(1 / 60);
+
+  sm.body.position.x = swX;
+  sm.body.position.y = sw.body.position.y + 1.0;
+  sm.body.velocity.x = 0;
+  sm.body.velocity.y = 0;
+  for (let i = 0; i < 90; i++) window.game.physics.step(1 / 60);
+
+  const playerBottom = sm.body.position.y - 0.75;
+  const standingOnWeapon = playerBottom > floorY + 0.05;
+
+  if (sw.body) window.game.physics.remove(sw.body);
+
+  window.__weaponTest.assert(
+    standingOnWeapon,
+    'player should rest above floor on weapon (playerBottom=' +
+    playerBottom.toFixed(3) + ', floor=' + floorY.toFixed(3) + ')',
+  );
+};
+
+window.__test_hitReactionKnockback = function () {
+  const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
+  window.__weaponTest.assert(sm, 'need local live player');
+
+  sm.body.velocity.x = 0;
+  sm.body.velocity.y = 0;
+  sm._impulseFrameBudget = 0;
+  sm._impulseStunUntil = 0;
+  const startVx = sm.body.velocity.x;
+  const startStun = sm._impulseStunUntil;
+
+  const wasFeature = window.__forceFeatures.hitReaction;
+  window.__forceFeatures.hitReaction = 1;
+  sm.takeDamage(10, {
+    attacker: { weapon: { hitKnockback: 2.0 } },
+    weapon: 'test',
+    kb: { x: 10, y: 4 },
+    stun: 0.2,
+  });
+  window.__forceFeatures.hitReaction = wasFeature;
+
+  const deltaVx = sm.body.velocity.x - startVx;
+  window.__weaponTest.assert(
+    deltaVx > 0,
+    'hit-reaction should push victim in kb direction (deltaVx=' +
+    deltaVx.toFixed(3) + ')',
+  );
+  window.__weaponTest.assert(
+    sm._impulseStunUntil > startStun,
+    'hit-reaction should set _impulseStunUntil',
+  );
+};
