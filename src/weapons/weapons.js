@@ -1426,18 +1426,18 @@ export class Shurikens extends Weapon {
     // Shape (12 vertices: alternating outer-tip + inner-cleft) extruded
     // thin, with a center hole punched through.
     const grp = new THREE.Group();
-    grp.add(_buildShurikenMesh(0.14, 0.04, 0.025));
+    grp.add(_buildShurikenMesh(0.18, 0.05, 0.025));
     this.mesh = grp;
     // Anchor offset so it visually centers in hand.
     grp.position.x = 0.14;
   }
   fire(player) {
     const ax = player.aimDir.x, ay = player.aimDir.y;
-    const mesh = _buildShurikenMesh(0.16, 0.045, 0.03);
+    const mesh = _buildShurikenMesh(0.20, 0.058, 0.03);
     const proj = new Projectile(this.game, {
       x: player.position.x + ax * 0.7, y: player.position.y + 0.7 + ay * 0.3,
-      vx: ax * 26, vy: ay * 26, damage: 22, owner: player,
-      gravity: true, gravityScale: 0.2, life: 2.2, radius: 0.10,
+      vx: ax * 22, vy: ay * 22, damage: 22, owner: player,
+      gravity: true, gravityScale: 0.2, life: 2.5, radius: 0.13,
       sticky: true, stickLife: 5, mesh, color: 0x888899,
     });
     // Spin freely as it flies — do NOT orient to velocity.
