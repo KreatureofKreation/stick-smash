@@ -1424,24 +1424,24 @@ export class Shurikens extends Weapon {
   _buildMesh() {
     const grp = new THREE.Group();
     const mat = new THREE.MeshLambertMaterial({ color: 0x888899, emissive: 0x222233 });
-    const armA = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.025, 0.025), mat);
-    const armB = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.18, 0.025), mat);
-    armA.position.x = 0.1; armB.position.x = 0.1;
+    const armA = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.06, 0.06), mat);
+    const armB = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.45, 0.06), mat);
+    armA.position.x = 0.25; armB.position.x = 0.25;
     grp.add(armA, armB);
     this.mesh = grp;
   }
   fire(player) {
     const ax = player.aimDir.x, ay = player.aimDir.y;
-    // 4-pointed throwing star: two crossed thin boxes
+    // 4-pointed throwing star: two crossed thin boxes (2.5x size, slower).
     const mat = new THREE.MeshLambertMaterial({ color: 0x888899, emissive: 0x222233 });
-    const armA = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.03, 0.03), mat);
-    const armB = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.22, 0.03), mat);
+    const armA = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.075, 0.075), mat);
+    const armB = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.55, 0.075), mat);
     const grp = new THREE.Group();
     grp.add(armA, armB);
     const proj = new Projectile(this.game, {
       x: player.position.x + ax * 0.7, y: player.position.y + 0.7 + ay * 0.3,
-      vx: ax * 38, vy: ay * 38, damage: 22, owner: player,
-      gravity: true, gravityScale: 0.2, life: 1.6, radius: 0.05,
+      vx: ax * 30, vy: ay * 30, damage: 22, owner: player,
+      gravity: true, gravityScale: 0.2, life: 2.0, radius: 0.12,
       sticky: true, stickLife: 5, mesh: grp, color: 0x888899,
     });
     // Spin freely as it flies — do NOT orient to velocity.
