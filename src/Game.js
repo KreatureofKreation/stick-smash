@@ -9,6 +9,7 @@ import { Bot } from './ai/Bot.js';
 import { Level } from './levels/Level.js';
 import { getLevel, LEVELS } from './levels/definitions.js';
 import { pickRandomSpawn, PICKUP_CLASSES, setDisabledWeapons, WEAPON_CLASSES } from './weapons/weapons.js';
+import { tickAllFirePatches } from './weapons/fx/FirePatch.js';
 import { audio } from './audio/Audio.js';
 import { HUD } from './ui/HUD.js';
 import { Menu } from './ui/Menu.js';
@@ -793,6 +794,7 @@ export class Game {
         pr.update(dt);
         if (pr.dead) this.projectiles.splice(i, 1);
       }
+      tickAllFirePatches(dt);
 
       // Respawn dead players
       for (const p of this.players) {

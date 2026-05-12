@@ -14,11 +14,11 @@ function assertNear(actual, expected, eps, msg) {
 
 window.__weaponTest = { assert, assertNear, results: [] };
 
-window.__weaponTest.run = function (name) {
+window.__weaponTest.run = async function (name) {
   const fn = window['__test_' + name];
   if (typeof fn !== 'function') throw new Error('No test named __test_' + name);
   try {
-    fn();
+    await fn();
     window.__weaponTest.results.push({ name, ok: true });
     return 'PASS: ' + name;
   } catch (e) {
@@ -423,4 +423,15 @@ window.__test_ar_three_burst = function () {
   window.__weaponTest.assert(second - sustained === 3, 'AR second tap after cooldown should fire 3 (got ' + (second - sustained) + ')');
   while (window.game.projectiles.length) window.game.projectiles.pop().destroy?.();
   if (sm.weapon === w) { w.destroy(); sm.weapon = null; }
+};
+
+window.__test_fire_patch_cap = async function () {
+  const mod = await import('../weapons/fx/FirePatch.js');
+  const { spawnFirePatch, getActivePatches, clearAllPatches } = mod;
+  clearAllPatches();
+  for (let i = 0; i < 25; i++) spawnFirePatch(window.game, { x: i * 0.5, y: 0, owner: null });
+  const active = getActivePatches();
+  window.__weaponTest.assert(active.length === 16, 'fire patches should cap at 16 (got ' + active.length + ')');
+  window.__weaponTest.assert(active[0].x >= 4.5, 'oldest patches should be evicted (got x=' + active[0].x + ')');
+  clearAllPatches();
 };
