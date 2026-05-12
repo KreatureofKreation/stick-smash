@@ -189,3 +189,28 @@ window.__test_weapon_pose_flags = function () {
     inst.destroy?.();
   }
 };
+
+window.__test_pistol_uses_effective_aim = function () {
+  const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
+  window.__weaponTest.assert(sm, 'need local live player');
+  const reg = window.game.weaponRegistry || {};
+  const Pistol = reg.Pistol;
+  window.__weaponTest.assert(Pistol, 'Pistol class missing');
+  const w = new Pistol(window.game);
+  w.attachTo(sm);
+  sm.weapon = w;
+  // Force a known effectiveAimDir different from player.aimDir so the test
+  // proves fire() reads effectiveAimDir, not aimDir.
+  sm.aimDir = { x: 1, y: 0 };
+  w.effectiveAimDir = { x: 0, y: 1 }; // straight up
+  const before = window.game.projectiles.length;
+  w.fire(sm);
+  window.__weaponTest.assert(window.game.projectiles.length === before + 1, 'pistol fire should spawn a projectile');
+  const proj = window.game.projectiles[window.game.projectiles.length - 1];
+  const vx = proj.body.velocity.x, vy = proj.body.velocity.y;
+  window.__weaponTest.assert(Math.abs(vx) < 1, 'pistol projectile vx should be near 0 (got ' + vx + ')');
+  window.__weaponTest.assert(vy > 10, 'pistol projectile vy should be positive and large (got ' + vy + ')');
+  proj.destroy();
+  w.destroy();
+  sm.weapon = null;
+};
