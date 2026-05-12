@@ -1396,8 +1396,8 @@ export class StickmanRig {
     const aimBendL = (params.armPoseL === 'aim') ? aimBend : undefined;
     this._drawArm(sLX, sLY, this._handLPos.x, this._handLPos.y, zL, this.upperArmL, this.lowerArmL, this.handL, this.shoulderL, this.elbowL, false, false, aimBendL, params);
     this._drawArm(sRX, sRY, this._handRPos.x, this._handRPos.y, zR, this.upperArmR, this.lowerArmR, this.handR, this.shoulderR, this.elbowR, true, !!params.gumGumPunch, aimBendR, params);
-    this._drawLeg(hipLX, hipLY, this._footLPos.x, this._footLPos.y, zL, this.upperLegL, this.lowerLegL, this.footL, this.hipL, this.kneeL, false);
-    this._drawLeg(hipRX, hipRY, this._footRPos.x, this._footRPos.y, zR, this.upperLegR, this.lowerLegR, this.footR, this.hipR, this.kneeR, true);
+    this._drawLeg(hipLX, hipLY, this._footLPos.x, this._footLPos.y, zL, this.upperLegL, this.lowerLegL, this.footL, this.hipL, this.kneeL, false, params);
+    this._drawLeg(hipRX, hipRY, this._footRPos.x, this._footRPos.y, zR, this.upperLegR, this.lowerLegR, this.footR, this.hipR, this.kneeR, true, params);
 
     // Hand orientation for aim
     if (params.armPoseR === 'aim' || params.armPoseR === 'attack' || params.armPoseR === 'strikePosed') {
@@ -1504,7 +1504,7 @@ export class StickmanRig {
     handMesh.position.set(chx, chy, z);
   }
 
-  _drawLeg(hx, hy, fx, fy, z, upper, lower, footMesh, hipJoint, kneeJoint, isRight) {
+  _drawLeg(hx, hy, fx, fy, z, upper, lower, footMesh, hipJoint, kneeJoint, isRight, params) {
     hipJoint.position.set(hx, hy, z);
     const upperLen = 0.50, lowerLen = 0.50;
     const maxReach = (upperLen + lowerLen) * 0.99;
@@ -1514,6 +1514,11 @@ export class StickmanRig {
     if (d > maxReach) {
       const f = maxReach / d;
       cfx = hx + dx * f; cfy = hy + dy * f;
+    }
+    if (params) {
+      this._sweepClamp(hx, hy, cfx, cfy, params, this._sweepOut);
+      cfx = this._sweepOut.x;
+      cfy = this._sweepOut.y;
     }
     solveIK(this._tmpKnee, hx, hy, cfx, cfy, upperLen, lowerLen, this.facing >= 0 ? 1 : -1);
     const kx = this._tmpKnee.x, ky = this._tmpKnee.y;
