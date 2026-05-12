@@ -939,6 +939,13 @@ export class Stickman {
       w.body.angularVelocity.set(0, 0, this.facing * 18);
       w.dropCooldown = 0.5;     // can't pick back up immediately
       w._thrownBy = this;
+      // Sub-B throw-boost — player gets counter-impulse opposite throw dir.
+      if (window.__forceFeatures?.throw !== 0) {
+        const mag = w.throwImpulse ?? 0;
+        if (mag > 0) {
+          this.applyImpulse(-dx * mag, -(dy * mag));
+        }
+      }
       // Damage on impact via collide handler.
       const onHit = (e) => {
         const other = e.body;
@@ -1286,6 +1293,19 @@ export class Stickman {
         stun,
         launch: launch || superPunch,
       });
+      // Sub-B punch-boost — attacker gets opposite impulse on melee connect.
+      // Magnitude from weapon.meleeRecoilImpulse (or FIST_RECOIL for unarmed).
+      // Direction is opposite the strike (kb points TOWARD victim).
+      if (window.__forceFeatures?.punch !== 0) {
+        const FIST_RECOIL = 4;
+        const mag = this.weapon?.meleeRecoilImpulse ?? FIST_RECOIL;
+        if (mag > 0) {
+          const dirLen = Math.hypot(kbX, kbY) || 1;
+          const ux = kbX / dirLen, uy = kbY / dirLen;
+          // Y component scaled 0.6 so punch-down doesn't catapult straight up.
+          this.applyImpulse(-ux * mag, -uy * mag * 0.6);
+        }
+      }
       this.attackHits.add(p.id);
 
       // Upward-launcher → start juggle on victim.
