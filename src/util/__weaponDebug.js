@@ -380,19 +380,23 @@ window.__test_ar_three_burst = function () {
   const w = new AR(window.game);
   w.attachTo(sm); sm.weapon = w;
   sm.aimDir = { x: 1, y: 0 };
+  // Drive both heldTick (per-tick state machine) AND worldTick (cooldown
+  // decrement). In real gameplay the game loop calls both each frame; in
+  // test isolation we have to do it manually.
+  const tick = (n) => { for (let i = 0; i < n; i++) { w.heldTick(1 / 60, sm); w.worldTick(1 / 60); } };
   const before = window.game.projectiles.length;
   w.tryFire(sm);
-  for (let i = 0; i < 12; i++) w.heldTick(1 / 60, sm); // 0.2s — covers 3 burst shots @ 0.05s
+  tick(12); // 0.2s — covers 3 burst shots @ 0.05s
   const after = window.game.projectiles.length;
   window.__weaponTest.assert(after - before === 3, 'AR single tap should fire exactly 3 shots (got ' + (after - before) + ')');
   // Holding (without re-tapping tryFire) should NOT auto-burst more.
-  for (let i = 0; i < 12; i++) w.heldTick(1 / 60, sm);
+  tick(12);
   const sustained = window.game.projectiles.length;
   window.__weaponTest.assert(sustained - after === 0, 'AR should not auto-burst on held attack (got ' + (sustained - after) + ' extra)');
   // After 0.4s cooldown, another tap fires another 3.
-  for (let i = 0; i < 25; i++) w.heldTick(1 / 60, sm);
+  tick(25);
   w.tryFire(sm);
-  for (let i = 0; i < 12; i++) w.heldTick(1 / 60, sm);
+  tick(12);
   const second = window.game.projectiles.length;
   window.__weaponTest.assert(second - sustained === 3, 'AR second tap after cooldown should fire 3 (got ' + (second - sustained) + ')');
   while (window.game.projectiles.length) window.game.projectiles.pop().destroy?.();
