@@ -1002,6 +1002,30 @@ export class DualPistols extends Weapon {
     grp.add(this._meshL);
     this.mesh = grp;
   }
+  // Compact children back into local-space positions around the parent
+  // origin. Held updateMesh sets each child to a WORLD position (handR /
+  // handL); without recentering, throwing the weapon would make both
+  // pistols orbit the parent in a huge circle as the body spins.
+  _packForWorld() {
+    if (this._meshR) {
+      this._meshR.position.set(0.0, 0.08, 0);
+      this._meshR.rotation.set(0, 0, 0);
+      this._meshR.scale.set(1, 1, 1);
+    }
+    if (this._meshL) {
+      this._meshL.position.set(0.0, -0.08, 0);
+      this._meshL.rotation.set(0, 0, 0);
+      this._meshL.scale.set(1, 1, 1);
+    }
+  }
+  spawnAt(x, y, z = 0) {
+    this._packForWorld();
+    return super.spawnAt(x, y, z);
+  }
+  dropAt(pos, vel) {
+    this._packForWorld();
+    return super.dropAt(pos, vel);
+  }
   updateMesh(player) {
     // Override: don't run base wall-reorient (would conflict with two
     // independent muzzle anchors). Position each pistol at its respective
