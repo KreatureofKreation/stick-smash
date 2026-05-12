@@ -420,6 +420,20 @@ export class Stickman {
     if (opts.kb) {
       this.applyKnockback(opts.kb.x, opts.kb.y, opts.stun ?? 0.25);
       this.rig.flinch?.(opts.kb.x, clamp(amount / 25, 0.4, 1.5));
+      // Sub-B hit-reaction — additive impulse on top of applyKnockback.
+      // Magnitude scales with damage × attacker weapon's hitKnockback. Y
+      // dampened + small +2 uppercut for Stick-Fight signature read.
+      // 120ms input damping via _impulseStunUntil (handled in update).
+      if (window.__forceFeatures?.hitReaction !== 0) {
+        const hk = opts.attacker?.weapon?.hitKnockback ?? 1.0;
+        const KNOCKBACK_SCALE = 0.6;
+        const mag = amount * hk * KNOCKBACK_SCALE;
+        if (mag > 0) {
+          const dirLen = Math.hypot(opts.kb.x, opts.kb.y) || 1;
+          const ux = opts.kb.x / dirLen, uy = opts.kb.y / dirLen;
+          this.applyImpulse(ux * mag, uy * mag * 0.4 + 2, { stunMs: 120 });
+        }
+      }
     }
     // Launch flag from combat MOVE_TABLE — heavy/launcher hits ragdoll the
     // victim regardless of remaining HP. Pure stagger lights leave the
@@ -1441,7 +1455,9 @@ export class Stickman {
   _move(dt) {
     const now = performance.now();
     const frozen = now < this._frozenUntil;
-    const moveX = frozen ? 0 : this.input.moveX;
+    // Sub-B hit-reaction: input damped (not removed) while _impulseStunUntil active.
+    const inputAuthority = (now < this._impulseStunUntil) ? 0.3 : 1.0;
+    const moveX = frozen ? 0 : this.input.moveX * inputAuthority;
     const boosted = now < this.speedBoostUntil;
     const flying = now < this.flightUntil;
     const crouchInput = !flying && this.grounded && this.input.moveY < -0.4;
