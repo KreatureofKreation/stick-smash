@@ -820,23 +820,23 @@ export class Crossbow extends Weapon {
     this.poseRight = 'aim';
     this.poseLeft = null;        // 1H outstretched
     this.ammo = 8;
-    this.length = 1.2;
-    this.barrelOffset = 0.85;
+    this.length = 1.6;
+    this.barrelOffset = 1.1;
     this._postFireTimer = 0;
   }
   _buildMesh() {
     const grp = new THREE.Group();
-    const stock = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.11, 0.10), new THREE.MeshLambertMaterial({ color: 0x3a2410 }));
-    stock.position.x = 0.18;
+    const stock = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.14, 0.13), new THREE.MeshLambertMaterial({ color: 0x3a2410 }));
+    stock.position.x = 0.25;
     // Horizontal limbs (NOT a vertical bow arc) — long & wide
-    const limbU = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.5, 0.06), new THREE.MeshLambertMaterial({ color: 0x4a2a14 }));
-    limbU.position.set(0.32, 0.07, 0); limbU.rotation.z = 0.5;
-    const limbD = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.5, 0.06), new THREE.MeshLambertMaterial({ color: 0x4a2a14 }));
-    limbD.position.set(0.32, -0.07, 0); limbD.rotation.z = -0.5;
-    const string = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.012, 0.012), new THREE.MeshLambertMaterial({ color: 0xddd8c8 }));
+    const limbU = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.65, 0.06), new THREE.MeshLambertMaterial({ color: 0x4a2a14 }));
+    limbU.position.set(0.45, 0.09, 0); limbU.rotation.z = 0.5;
+    const limbD = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.65, 0.06), new THREE.MeshLambertMaterial({ color: 0x4a2a14 }));
+    limbD.position.set(0.45, -0.09, 0); limbD.rotation.z = -0.5;
+    const string = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.012, 0.012), new THREE.MeshLambertMaterial({ color: 0xddd8c8 }));
     string.position.set(0.05, 0, 0);
-    const bolt = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.028, 0.028), new THREE.MeshLambertMaterial({ color: 0x202024 }));
-    bolt.position.set(0.32, 0.06, 0);
+    const bolt = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.035, 0.035), new THREE.MeshLambertMaterial({ color: 0x202024 }));
+    bolt.position.set(0.45, 0.06, 0);
     grp.add(stock, limbU, limbD, string, bolt);
     this.mesh = grp;
     this._stringMesh = string;
@@ -847,11 +847,11 @@ export class Crossbow extends Weapon {
     const sp = 48;  // 1.6× the old bow's 30
     const boltMesh = (() => {
       const g = new THREE.Group();
-      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.42, 6), new THREE.MeshLambertMaterial({ color: 0x202024 }));
-      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.08, 6), new THREE.MeshLambertMaterial({ color: 0x666674 }));
-      tip.position.y = 0.25;
-      const fletch = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.005), new THREE.MeshLambertMaterial({ color: 0xddccaa }));
-      fletch.position.y = -0.18;
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.6, 6), new THREE.MeshLambertMaterial({ color: 0x202024 }));
+      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.12, 6), new THREE.MeshLambertMaterial({ color: 0x666674 }));
+      tip.position.y = 0.36;
+      const fletch = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.005), new THREE.MeshLambertMaterial({ color: 0xddccaa }));
+      fletch.position.y = -0.26;
       g.add(shaft, tip, fletch);
       return g;
     })();
