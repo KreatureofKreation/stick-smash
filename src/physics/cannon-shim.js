@@ -413,8 +413,11 @@ export class World {
     // ignores masks and ground-checks hit other players, causing false grounded.
     const mask = (opts && (opts.collisionFilterMask ?? opts.mask)) ?? 0xFFFF;
     const filterGroups = (((0xFFFF) << 16) | (mask & 0xFFFF)) >>> 0;
-    // castRay(ray, maxToi, solid, filterFlags?, filterGroups?, ...).
-    const hit = this._rapier.castRay(this._ray, len, true, undefined, filterGroups);
+    // castRayAndGetNormal returns the actual hit normal (cannon-es contract).
+    // castRay alone gives only the distance, which forced a (0,1,0) placeholder
+    // — that broke any consumer that needs the wall normal (Weapon.updateMesh
+    // wall reorient, etc.).
+    const hit = this._rapier.castRayAndGetNormal(this._ray, len, true, undefined, filterGroups);
     if (hit) {
       // Rapier 0.14 renamed `toi` → `timeOfImpact`. Read both for safety.
       const toi = hit.timeOfImpact ?? hit.toi;
@@ -422,7 +425,9 @@ export class World {
         result.hasHit = true;
         result.distance = toi;
         result.hitPointWorld.set(from.x + dirX * toi, from.y + dirY * toi, from.z + dirZ * toi);
-        result.hitNormalWorld.set(0, 1, 0);
+        const n = hit.normal;
+        if (n) result.hitNormalWorld.set(n.x, n.y, n.z);
+        else result.hitNormalWorld.set(0, 1, 0);
         result.body = null;
       }
     }

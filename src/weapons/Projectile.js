@@ -96,12 +96,30 @@ export class Projectile {
       // double-apply on a fast projectile that both swept-hit and contact-hit.
       if (this._hitPlayers?.has(sm)) return;
       if (sm && sm !== this.owner && sm.alive && sm.invuln <= 0) {
-        sm.takeDamage(this.damage, {
+        // Head detection from projectile-vs-player body positions. The
+        // cannon-shim doesn't supply a usable contact-point delta, so we
+        // approximate: if the projectile's body Y is above the player's
+        // body center by ~0.4, the contact landed on the upper sphere
+        // (head/shoulder) rather than the torso/lower sphere. This catches
+        // the common case where the projectile body sphere overlaps the
+        // player capsule before the per-tick swept raycast can run (cannon
+        // collide fires inside physics.step, before Projectile.update).
+        const projY = this.body?.position?.y ?? 0;
+        const isHead = projY > sm.body.position.y + 0.4;
+        const dmg = this.damage * (isHead ? 2 : 1);
+        sm.takeDamage(dmg, {
           attacker: this.owner,
           weapon: 'projectile',
           kb: { x: this.body.velocity.x * 0.15, y: 5 + Math.abs(this.body.velocity.y) * 0.1 },
-          stun: 0.25,
+          stun: isHead ? 0.5 : 0.25,
+          isHead,
         });
+        if (isHead) {
+          const vx = this.body.velocity.x, vy = this.body.velocity.y;
+          const sp = Math.hypot(vx, vy) || 1;
+          sm.headSnap?.((vx / sp) * 0.18, (vy / sp) * 0.10 + 0.06);
+        }
+        this._hitPlayers.add(sm);
         hitPlayer = sm;
       }
     } else if (other.userData?.kind === 'tile') {

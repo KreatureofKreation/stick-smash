@@ -47,8 +47,13 @@ window.__test_headshot_registers = function () {
     damage: 10, owner: null,
   });
   window.__weaponTest.assert(proj, 'game.spawnTestProjectile not available');
-  // Step physics a few frames to let the sweep run.
-  for (let i = 0; i < 10; i++) window.game.physics.step(1 / 60);
+  // Step physics + per-tick projectile updates so both the cannon-es contact
+  // path and the swept-capsule path get a chance to fire. The game's main
+  // loop drives both each frame; in test isolation we have to do it manually.
+  for (let i = 0; i < 10; i++) {
+    window.game.physics.step(1 / 60);
+    for (const pr of window.game.projectiles) pr.update(1 / 60);
+  }
   // Damage applied (with head 2× → 20)
   window.__weaponTest.assertNear(startHp - sm.health, 20, 0.5, 'headshot damage should be 2x base');
   // Head snap impulse fired (lag offset moved)
@@ -64,7 +69,10 @@ window.__test_bodyshot_no_double = function () {
     x: sm.body.position.x - 2, y: bodyY,
     vx: 60, vy: 0, damage: 10, owner: null,
   });
-  for (let i = 0; i < 10; i++) window.game.physics.step(1 / 60);
+  for (let i = 0; i < 10; i++) {
+    window.game.physics.step(1 / 60);
+    for (const pr of window.game.projectiles) pr.update(1 / 60);
+  }
   // Damage exactly 10 (not 20 from a double-apply, not 0 from no-hit).
   window.__weaponTest.assertNear(startHp - sm.health, 10, 0.5, 'body shot should apply base damage exactly once');
 };
@@ -83,12 +91,47 @@ window.__test_weapon_wall_reorient = function () {
   sm.weapon.aimAdjusted = false;
   sm.weapon.effectiveAimDir = null;
 
-  const wallY = sm.position.y + 0.55;
-  const beforeHit = window.game.physics.raycast(
-    { x: sm.position.x, y: wallY, z: 0 },
-    { x: sm.position.x + sm.facing * 1.5, y: wallY, z: 0 },
+  // Probe outward in BOTH facing directions to find a wall within the
+  // weapon's short raycast range. The test scene's player spawn is not
+  // guaranteed to be near a wall, so we hunt for one and teleport the
+  // player + flip facing as needed.
+  const weaponLen = sm.weapon.length ?? 0.6;
+  const probeY = sm.body.position.y + 0.55;
+  // Long probe in current facing first.
+  const probeFacing = (dir) => window.game.physics.raycast(
+    { x: sm.body.position.x, y: probeY, z: 0 },
+    { x: sm.body.position.x + dir * 30, y: probeY, z: 0 },
+    { mask: 0x0001 /* WORLD */ },
   );
-  if (!beforeHit) return 'SKIP: no near wall in test scene';
+  let probe = probeFacing(sm.facing);
+  let dir = sm.facing;
+  if (!probe) {
+    probe = probeFacing(-sm.facing);
+    dir = -sm.facing;
+  }
+  if (!probe) return 'SKIP: no wall in 30m of player in test scene';
+  // Teleport: handR sits at body.x + facing*0.4 (rig offset). Place body so
+  // handR is 0.3m short of the wall — well within weapon length 0.6.
+  const wallX = probe.hitPointWorld.x;
+  sm.facing = dir;
+  sm.body.position.x = wallX - dir * 0.7;
+  sm.body.position.y = Math.max(probe.hitPointWorld.y - 0.55, 1.0);
+  // Step physics + sync rig so handR follows the teleported body. Without
+  // this the rig (and thus updateMesh's raycast origin) keeps the pre-
+  // teleport hand position.
+  sm.aimDir = { x: dir, y: 0 };
+  sm.input = { ...sm.input, aimActive: true };
+  window.game.physics.step(1 / 60);
+  sm._syncRig(1 / 60, false);
+  const handR = sm.rig?.handR?.position;
+  const handX = handR?.x ?? (sm.body.position.x + dir * 0.4);
+  const handY = handR?.y ?? (sm.body.position.y + 0.55);
+  let beforeHit = window.game.physics.raycast(
+    { x: handX, y: handY, z: 0 },
+    { x: handX + dir * weaponLen, y: handY, z: 0 },
+    { mask: 0x0001 },
+  );
+  if (!beforeHit) return 'SKIP: could not reposition near wall in test scene (hand at ' + handX.toFixed(2) + ',' + handY.toFixed(2) + ')';
 
   const wallNormal = beforeHit.hitNormalWorld;
   const nx = wallNormal.x, ny = wallNormal.y;
@@ -128,6 +171,15 @@ window.__test_weapon_wall_reorient = function () {
 window.__test_weapon_no_wall_no_adjust = function () {
   const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
   window.__weaponTest.assert(sm && sm.weapon, 'need armed local player');
+  // Teleport to open space (well above any tile + high enough that a short
+  // upward ray can't hit anything). Test scene tops out around y=6, so y=20
+  // is safely clear. Important: raycast from inside player's own collider
+  // returns dist=0 even with a WORLD-only mask in this shim, so we also
+  // step physics + sync rig to settle the hand position before testing.
+  sm.body.position.x = 0;
+  sm.body.position.y = 20;
+  window.game.physics.step(1 / 60);
+  sm._syncRig(1 / 60, false);
   // Poison both fields with sentinel values to detect a no-op or stale path.
   sm.weapon.aimAdjusted = true;
   sm.weapon.effectiveAimDir = { x: 999, y: 999 };
