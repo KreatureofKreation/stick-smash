@@ -2836,6 +2836,12 @@ export const SPAWN_TABLE = [
   { cls: SniperRifle,   w: 4,   id: 'sniper',       label: 'Sniper Rifle',  cat: 'ranged' },
   { cls: ThrowingKnives,w: 6,   id: 'knives',       label: 'Throwing Knives', cat: 'ranged' },
   { cls: StickyBomb,    w: 4,   id: 'sticky',       label: 'Sticky Bomb',   cat: 'ranged' },
+  { cls: SMG,           w: 10,  id: 'smg',          label: 'SMG',           cat: 'ranged' },
+  { cls: AssaultRifle,  w: 9,   id: 'assaultrifle', label: 'Assault Rifle', cat: 'ranged' },
+  { cls: Revolver,      w: 7,   id: 'revolver',     label: 'Revolver',      cat: 'ranged' },
+  { cls: Crossbow,      w: 6,   id: 'crossbow',     label: 'Crossbow',      cat: 'ranged' },
+  { cls: Flamethrower,  w: 5,   id: 'flamethrower', label: 'Flamethrower',  cat: 'ranged' },
+  { cls: DualPistols,   w: 8,   id: 'dualpistols',  label: 'Dual Pistols',  cat: 'ranged' },
   // joke
   { cls: RubberChicken, w: 2,   id: 'chicken',      label: 'Rubber Chicken',cat: 'joke' },
   { cls: Boomerang,     w: 5,   id: 'boomerang',    label: 'Boomerang',     cat: 'joke' },
