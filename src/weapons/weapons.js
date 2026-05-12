@@ -843,28 +843,22 @@ export class Flamethrower extends Weapon {
     super(game);
     this.name = 'Flamethrower';
     this.icon = '🔥';
-    this.fireDelay = 0;
+    this.fireDelay = 0.04;       // 25Hz fire rate while held
     this.aimWeapon = true;
     this.poseRight = 'aim';
     this.poseLeft = 'support';
-    this.ammo = 100;
-    this.length = 0.75;
+    this.ammo = 80;              // ~3.2s sustained
+    this.length = 0.65;
     this.barrelOffset = 0.55;
     this._held = false;
-    this._tickAccum = 0;
-    this._tickDur = 1 / 30;
-    this._range = 5;
-    this._coneRad = 25 * Math.PI / 180;  // half-angle
-    this._burnDur = 3;
-    this._burnDmgPerSec = 3;
-    this._coneVisual = null;
+    this._fireAccum = 0;
   }
   _buildMesh() {
     const grp = new THREE.Group();
     const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.32, 8), new THREE.MeshLambertMaterial({ color: 0x553311 }));
     tank.rotation.z = Math.PI / 2; tank.position.set(0.0, -0.05, 0);
     const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.4, 8), new THREE.MeshLambertMaterial({ color: 0x222226 }));
-    nozzle.rotation.z = Math.PI / 2; nozzle.position.set(0.5, 0.05, 0);
+    nozzle.rotation.z = Math.PI / 2; nozzle.position.set(0.4, 0.05, 0);
     const grip = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.18, 0.08), new THREE.MeshLambertMaterial({ color: 0x222222 }));
     grip.position.set(0.18, -0.18, 0); grip.rotation.z = -0.15;
     grp.add(tank, nozzle, grip);
@@ -872,83 +866,64 @@ export class Flamethrower extends Weapon {
   }
   tryFire(player) {
     this._held = true;
-    if (!this._coneVisual) this._buildConeVisual();
-    if (this._coneVisual) this._coneVisual.visible = true;
+    if (this.cooldown > 0) return;
+    this._fireAccum = this.fireDelay;
   }
   releaseFire(player) {
     this._held = false;
-    if (this._coneVisual) this._coneVisual.visible = false;
-  }
-  _buildConeVisual() {
-    const geo = new THREE.ConeGeometry(this._range * Math.tan(this._coneRad), this._range, 8, 1, true);
-    const mat = new THREE.MeshBasicMaterial({ color: 0xff7733, transparent: true, opacity: 0.6, side: THREE.DoubleSide });
-    const cone = new THREE.Mesh(geo, mat);
-    cone.visible = false;
-    this.game.scene.add(cone);
-    this._coneVisual = cone;
+    this._fireAccum = 0;
   }
   heldTick(dt, player) {
     if (!this._held) return;
-    this._tickAccum += dt;
-    while (this._tickAccum >= this._tickDur && this.ammo > 0) {
-      this._tickAccum -= this._tickDur;
-      this._fireOneCone(player);
+    this._fireAccum += dt;
+    while (this._fireAccum >= this.fireDelay && this.ammo > 0) {
+      this._fireAccum -= this.fireDelay;
+      this._fireOneFlame(player);
       this.ammo--;
       if (this.ammo <= 0) {
         this._held = false;
-        if (this._coneVisual) this._coneVisual.visible = false;
         player.weapon = null;
         this.destroy();
         return;
       }
     }
-    if (this._coneVisual && this._held) {
-      const aim = this.effectiveAimDir ?? player.aimDir;
-      const ang = Math.atan2(aim.y, aim.x);
-      const cx = player.position.x + aim.x * (this._range / 2);
-      const cy = player.position.y + 0.6 + aim.y * (this._range / 2);
-      this._coneVisual.position.set(cx, cy, 0);
-      this._coneVisual.rotation.set(0, 0, ang - Math.PI / 2);
-    }
+    // Continuous low cam shake while firing.
     if (this._held) this.game.fx.camera.punch(0.005);
   }
-  _fireOneCone(player) {
+  _fireOneFlame(player) {
     const aim = this.effectiveAimDir ?? player.aimDir;
-    const aimAng = Math.atan2(aim.y, aim.x);
-    const halfArc = this._coneRad;
-    const r2 = this._range * this._range;
-    const ox = player.position.x, oy = player.position.y + 0.6;
-    for (const p of this.game.players) {
-      if (!p || !p.alive || p === player || p.invuln > 0) continue;
-      const dx = p.position.x - ox, dy = p.position.y - oy;
-      if (dx * dx + dy * dy > r2) continue;
-      const ang = Math.atan2(dy, dx);
-      let delta = ang - aimAng;
-      while (delta > Math.PI) delta -= Math.PI * 2;
-      while (delta < -Math.PI) delta += Math.PI * 2;
-      if (Math.abs(delta) > halfArc) continue;
-      p.applyBurn?.(this._burnDur, this._burnDmgPerSec, player);
-    }
-    // World fire patches on cone end-arc — sample 3 points.
-    for (let i = 0; i < 3; i++) {
-      const sampleAng = aimAng + (i - 1) * (halfArc * 0.6);
-      const sx = ox + Math.cos(sampleAng) * this._range * 0.95;
-      const sy = oy + Math.sin(sampleAng) * this._range * 0.95;
-      const hit = this.game.physics.raycast(
-        { x: sx, y: sy + 0.3, z: 0 },
-        { x: sx, y: sy - 0.6, z: 0 },
-        { mask: COL_GROUPS.WORLD },
-      );
-      if (hit) {
-        const hx = hit.hitPointWorld.x;
-        const hy = hit.hitPointWorld.y + 0.02;
-        spawnFirePatch(this.game, { x: hx, y: hy, owner: player });
+    // 15° cone spread per shot — fans out naturally.
+    const a = Math.atan2(aim.y, aim.x) + rand(-0.13, 0.13);
+    const sp = 22 + rand(-2, 2);
+    const mz = this._muzzlePos(player);
+    // Small orange-red glowing sphere.
+    const flameMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.09, 6, 5),
+      new THREE.MeshLambertMaterial({ color: 0xff5511, emissive: 0xff8833, emissiveIntensity: 1.2 }),
+    );
+    const proj = new Projectile(this.game, {
+      x: mz.x, y: mz.y,
+      vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+      damage: 0,                  // damage is the ignite, not the impact
+      owner: player,
+      mesh: flameMesh,
+      gravity: true, gravityScale: 0.25,
+      life: 0.6, radius: 0.08,
+      sticky: true, stickLife: 1.5,
+      tracerColor: 0xff8833,
+    });
+    // On impact: ignite players hit, drop a fire patch on world hits.
+    proj.onHit = (pr, other) => {
+      if (other.userData?.kind === 'player') {
+        const sm = other.userData.stickman;
+        sm?.applyBurn?.(2.5, 4, player);
+      } else if (other.userData?.kind === 'tile') {
+        spawnFirePatch(this.game, {
+          x: pr.body.position.x, y: pr.body.position.y, owner: player,
+        });
       }
-    }
-  }
-  destroy() {
-    if (this._coneVisual?.parent) this._coneVisual.parent.remove(this._coneVisual);
-    super.destroy?.();
+    };
+    audio.shoot();
   }
 }
 

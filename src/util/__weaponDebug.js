@@ -476,14 +476,23 @@ window.__test_flamethrower_cone_ignites = async function () {
   window.__weaponTest.assert(FT, 'Flamethrower class missing');
   const w = new FT(window.game);
   w.attachTo(sm); sm.weapon = w;
-  // Place target 3m forward
-  target.body.position.x = sm.body.position.x + sm.facing * 3;
+  // Place target ~2m forward, same height.
+  target.body.position.x = sm.body.position.x + sm.facing * 2;
   target.body.position.y = sm.body.position.y;
   sm.aimDir = { x: sm.facing, y: 0 };
+  // Sync rig so handR is in aim pose.
+  for (let i = 0; i < 30; i++) { window.game.physics.step(1 / 60); sm._syncRig(1 / 60, false); }
   w.tryFire(sm);
-  for (let i = 0; i < 10; i++) w.heldTick(1 / 60, sm);
+  // Pump several flame projectiles + step physics + projectile updates so
+  // they travel to the target and ignite on contact.
+  for (let i = 0; i < 30; i++) {
+    w.heldTick(1 / 60, sm);
+    window.game.physics.step(1 / 60);
+    for (const pr of window.game.projectiles) pr.update(1 / 60);
+  }
   window.__weaponTest.assert(target._burnDoT, 'target should be ignited (got _burnDoT=' + target._burnDoT + ')');
   w.releaseFire(sm);
+  while (window.game.projectiles.length) window.game.projectiles.pop().destroy?.();
   if (sm.weapon === w) { w.destroy(); sm.weapon = null; }
 };
 
