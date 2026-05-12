@@ -141,3 +141,29 @@ window.__test_weapon_no_wall_no_adjust = function () {
   window.__weaponTest.assertNear(ea.x, 0, 0.001, 'no-wall: ea.x should equal aimDir.x (0)');
   window.__weaponTest.assertNear(ea.y, 1, 0.001, 'no-wall: ea.y should equal aimDir.y (1)');
 };
+
+window.__test_pose_left_respects_flag = function () {
+  const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
+  window.__weaponTest.assert(sm, 'need local live player');
+  // Equip a weapon with poseLeft = null (1H) and verify left arm is NOT 'aim'.
+  const fake1H = { poseRight: 'aim', poseLeft: null, aimWeapon: true,
+    updateMesh: () => {}, attachTo: () => {}, detach: () => {}, mesh: { visible: false } };
+  sm.weapon = fake1H;
+  sm.input = { ...sm.input, aimActive: true };
+  sm.aimDir = { x: sm.facing, y: 0 };
+  sm._syncRig(1 / 60, false);
+  const armPoseL = sm._lastArmPoseL;
+  window.__weaponTest.assert(armPoseL !== 'aim', '1H weapon should NOT drive left arm to aim (got ' + armPoseL + ')');
+
+  fake1H.poseLeft = 'support';
+  sm._syncRig(1 / 60, false);
+  const armPoseL2 = sm._lastArmPoseL;
+  window.__weaponTest.assert(armPoseL2 === 'aim', '2H weapon (poseLeft=support) should drive left arm to aim (got ' + armPoseL2 + ')');
+
+  // Also confirm poseLeft='aim' (future dual-pistol case) drives left arm to aim.
+  fake1H.poseLeft = 'aim';
+  sm._syncRig(1 / 60, false);
+  window.__weaponTest.assert(sm._lastArmPoseL === 'aim', 'dual (poseLeft=aim) should also drive left arm to aim (got ' + sm._lastArmPoseL + ')');
+
+  sm.weapon = null;
+};

@@ -1801,12 +1801,18 @@ export class Stickman {
       aimPose ? 'aim' :
       this.grabbing ? 'hold' :
       this.input.grab ? 'grab' : 'walk';
-    // Two-hand grip — left arm also aims while ranged weapon is held.
+    // Left arm follows poseLeft flag explicitly. 1H weapons (Pistol etc.)
+    // leave left arm in its idle/walk pose; 2H weapons (Shotgun, Sniper,
+    // Minigun, RPG, etc.) set poseLeft='support' to drive it to 'aim' so
+    // both hands grip the gun. The future dual-pistol case sets poseLeft='aim'
+    // so the left arm mirrors the right independently.
+    const supports2H = this.weapon?.poseLeft === 'support' || this.weapon?.poseLeft === 'aim';
     const armPoseL =
-      aimPose ? 'aim' :
-      this.weapon?.poseLeft === 'support' ? 'aim' :
+      (aimPose && supports2H) ? 'aim' :
       this.grabbing ? 'hold' :
       this.input.grab ? 'grab' : 'walk';
+    this._lastArmPoseR = armPoseR;
+    this._lastArmPoseL = armPoseL;
 
     let holdPos = null;
     if (this.grabbing) {
