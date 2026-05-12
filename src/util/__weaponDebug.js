@@ -660,7 +660,9 @@ window.__test_recoilJump = function () {
   sm.weapon = new Shotgun(window.game);
   sm.weapon.attachTo(sm);
 
-  sm.aimDir = { x: 0, y: -1 };
+  // aimDir is a THREE.Vector3 in production — mutate via .set, don't
+  // replace the object (game tick would crash on aimDir.set call later).
+  sm.aimDir.set(0, -1, 0);
   sm.input = { ...sm.input, aimActive: true };
   sm.body.velocity.x = 0;
   sm.body.velocity.y = 0;
