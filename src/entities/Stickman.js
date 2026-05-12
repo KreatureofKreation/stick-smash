@@ -1907,8 +1907,8 @@ export class Stickman {
     params.spinning = somersaulting;
     params.dt = dt;
     params.physics = this.world;
-    params.worldOriginX = this.body.position.x;
-    params.worldOriginY = this.body.position.y;
+    params.worldOriginX = rigInLocal ? this.body.position.x : 0;
+    params.worldOriginY = rigInLocal ? this.body.position.y : 0;
     this.rig.update(rigPos, params);
 
     if (rigInLocal) {

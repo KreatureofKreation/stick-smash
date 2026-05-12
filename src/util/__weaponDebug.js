@@ -542,10 +542,10 @@ window.__test_rigClipsWallStanding = function () {
     sm._syncRig(1 / 60, false);
   }
 
-  // Hand position is local to rig.group (which is at body.position).
-  // World hand X = body.x + rig.handR.position.x.
-  const handLocalX = sm.rig.handR.position.x;
-  const handWorldX = sm.body.position.x + handLocalX;
+  // sm._syncRig(_, false) uses rigInLocal=false → group at (0,0) and
+  // rig.handR.position is already in WORLD coords (mesh positions are
+  // computed off rigPos which equals body.position in that mode).
+  const handWorldX = sm.rig.handR.position.x;
 
   // Wall surface is at wallX. Sweep should hold hand on the body side
   // of the wall: |handWorldX - wallX| should keep handWorldX on body side.
@@ -582,8 +582,8 @@ window.__test_rigClipsFloorOnLunge = function () {
   sm.body.position.y = floorY - 1.0;
   try {
     sm._syncRig(1 / 60, false);
-    const headLocalY = sm.rig.head.position.y;
-    const headWorldY = sm.body.position.y + headLocalY;
+    // rigInLocal=false → group at (0,0), head.position is already world.
+    const headWorldY = sm.rig.head.position.y;
     const HEAD_RADIUS = 0.34;
     const LIMB_PAD = 0.06;
     // After clamp: head bottom = floor + LIMB_PAD (within numeric eps).
@@ -592,7 +592,7 @@ window.__test_rigClipsFloorOnLunge = function () {
       headBottom >= floorY - 0.005,
       'head bottom must stay above floor (headBottom=' + headBottom.toFixed(3) +
       ', floorY=' + floorY.toFixed(3) + ', bodyY=' + sm.body.position.y.toFixed(3) +
-      ', headLocalY=' + headLocalY.toFixed(3) + ')',
+      ', headWorldY=' + headWorldY.toFixed(3) + ')',
     );
     // Also assert the clamp actually fired — head world Y should be
     // very close to floor + HEAD_RADIUS + LIMB_PAD, not floating high.
