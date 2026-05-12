@@ -860,6 +860,29 @@ export class StickmanRig {
     this._headLagX = damp(this._headLagX, targetLagX, 0.0008, dt);
     this._headLagY = damp(this._headLagY, targetLagY, 0.0008, dt);
     this.head.position.set(headX + this._headLagX, headY + this._headLagY, hipZ);
+    // Floor clamp — prevent head sphere from dipping below ground on
+    // big lunges, somersaults, or post-knockdown sprawl. Vertical
+    // down-ray only; horizontal walls are already handled by body
+    // capsule + arm/leg sweeps (head shoulder is rigidly attached
+    // ~0.95m above torso, can't reach a wall the body hasn't).
+    if (params.physics && params.physics.raycast) {
+      const HEAD_RADIUS = 0.34;
+      const ox = params.worldOriginX ?? 0;
+      const oy = params.worldOriginY ?? 0;
+      const headWorldX = ox + this.head.position.x;
+      const headWorldY = oy + this.head.position.y;
+      const floor = params.physics.raycast(
+        { x: headWorldX, y: headWorldY, z: 0 },
+        { x: headWorldX, y: headWorldY - (HEAD_RADIUS + 0.20), z: 0 },
+        { mask: WORLD_MASK },
+      );
+      if (floor && floor.hitPointWorld) {
+        const minLocalY = (floor.hitPointWorld.y + HEAD_RADIUS + LIMB_PAD) - oy;
+        if (this.head.position.y < minLocalY) {
+          this.head.position.y = minLocalY;
+        }
+      }
+    }
     this.headPitch = damp(this.headPitch, this.headPitchTarget, 0.0008, dt);
     this.headPitchTarget = 0; // reset each frame — callers set it before the head render
     this.head.rotation.set((params.aim?.y ?? 0) * 0.4 + this.headPitch, this.facing < 0 ? Math.PI : 0, this.bodyTilt * 0.5);
