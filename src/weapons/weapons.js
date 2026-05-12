@@ -693,22 +693,48 @@ export class Revolver extends Weapon {
     this.poseLeft = null;          // 1H
     this.ammo = 6;
     this.length = 0.55;
-    this.barrelOffset = 0.50;
+    this.barrelOffset = 0.65;
     this._hammerCock = 0;
   }
   _buildMesh() {
     const grp = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.13, 0.09), new THREE.MeshLambertMaterial({ color: 0x4a3018 }));
-    body.position.x = 0.2;
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.32, 10), new THREE.MeshLambertMaterial({ color: 0x222226 }));
-    barrel.rotation.z = Math.PI / 2; barrel.position.x = 0.5;
-    const cylinder = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.1, 6), new THREE.MeshLambertMaterial({ color: 0x33332e }));
-    cylinder.rotation.z = Math.PI / 2; cylinder.position.set(0.18, 0, 0);
-    const hammer = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.06, 0.05), new THREE.MeshLambertMaterial({ color: 0x111114 }));
-    hammer.position.set(0.05, 0.1, 0);
-    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.22, 0.08), new THREE.MeshLambertMaterial({ color: 0x222222 }));
-    grip.position.set(0.02, -0.18, 0); grip.rotation.z = -0.25;
-    grp.add(body, barrel, cylinder, hammer, grip);
+    // Frame — slim, longer than a pistol body
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.11, 0.08), new THREE.MeshLambertMaterial({ color: 0x2a2226 }));
+    frame.position.x = 0.16;
+    // Long barrel — distinguishes from pistol
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.42, 12), new THREE.MeshLambertMaterial({ color: 0x14141a }));
+    barrel.rotation.z = Math.PI / 2; barrel.position.set(0.42, 0.015, 0);
+    // Top strap (continues over barrel)
+    const top = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.03, 0.06), new THREE.MeshLambertMaterial({ color: 0x14141a }));
+    top.position.set(0.42, 0.07, 0);
+    // Exposed cylinder — fat, visible, between frame and grip
+    const cylinder = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.12, 8), new THREE.MeshLambertMaterial({ color: 0x33333a }));
+    cylinder.rotation.z = Math.PI / 2; cylinder.position.set(0.18, -0.02, 0);
+    // Cylinder front face flute (cosmetic — visible chamber holes)
+    const fluteMat = new THREE.MeshLambertMaterial({ color: 0x111114 });
+    for (let i = 0; i < 6; i++) {
+      const ang = (i / 6) * Math.PI * 2;
+      const fx = 0.18 + Math.cos(ang) * 0.045 * 0; // x is the rotation axis — depth doesn't change
+      const fy = -0.02 + Math.sin(ang) * 0.045;
+      const fz = Math.cos(ang) * 0.045;
+      const flute = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.13, 4), fluteMat);
+      flute.rotation.z = Math.PI / 2;
+      flute.position.set(0.18, fy, fz);
+      grp.add(flute);
+    }
+    // Front sight blade
+    const sight = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.04, 0.015), new THREE.MeshLambertMaterial({ color: 0x080808 }));
+    sight.position.set(0.6, 0.07, 0);
+    // Hammer — exposed
+    const hammer = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.07, 0.05), new THREE.MeshLambertMaterial({ color: 0x111114 }));
+    hammer.position.set(0.05, 0.11, 0);
+    // Grip — sharp back-lean angle, wood color
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.26, 0.08), new THREE.MeshLambertMaterial({ color: 0x4a2818 }));
+    grip.position.set(-0.02, -0.18, 0); grip.rotation.z = -0.32;
+    // Trigger guard — small arc
+    const guard = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.012, 6, 12, Math.PI), new THREE.MeshLambertMaterial({ color: 0x2a2226 }));
+    guard.rotation.z = -Math.PI / 2; guard.position.set(0.12, -0.07, 0);
+    grp.add(frame, barrel, top, cylinder, sight, hammer, grip, guard);
     this.mesh = grp;
     this._hammerMesh = hammer;
   }
