@@ -866,7 +866,7 @@ export class StickmanRig {
     // capsule + arm/leg sweeps (head shoulder is rigidly attached
     // ~0.95m above torso, can't reach a wall the body hasn't).
     if (params.physics && params.physics.raycast) {
-      const HEAD_RADIUS = 0.34;
+      const HEAD_RADIUS = 0.34; // matches SphereGeometry(0.34) in constructor
       const ox = params.worldOriginX ?? 0;
       const oy = params.worldOriginY ?? 0;
       const headWorldX = ox + this.head.position.x;
