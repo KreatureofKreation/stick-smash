@@ -68,3 +68,46 @@ window.__test_bodyshot_no_double = function () {
   // Damage exactly 10 (not 20 from a double-apply, not 0 from no-hit).
   window.__weaponTest.assertNear(startHp - sm.health, 10, 0.5, 'body shot should apply base damage exactly once');
 };
+
+window.__test_weapon_wall_reorient = function () {
+  const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
+  window.__weaponTest.assert(sm, 'need local live player');
+  // Force-equip a stub aiming weapon if not already armed.
+  if (!sm.weapon) {
+    const reg = window.game.weaponRegistry || {};
+    const W = reg.Pistol || Object.values(reg)[0];
+    window.__weaponTest.assert(W, 'no weapon class to equip');
+    sm.weapon = new W(window.game);
+    sm.weapon.attachTo(sm);
+  }
+  const wallY = sm.position.y + 0.55;
+  const beforeHit = window.game.physics.raycast(
+    { x: sm.position.x, y: wallY, z: 0 },
+    { x: sm.position.x + sm.facing * 1.5, y: wallY, z: 0 },
+  );
+  if (!beforeHit) {
+    // Test environment lacks a near wall — skip silently with a clear marker.
+    return 'SKIP: no near wall in test scene';
+  }
+  // Aim straight forward into the wall.
+  sm.aimDir = { x: sm.facing, y: 0 };
+  sm.input = { ...sm.input, aimActive: true };
+  sm.weapon.updateMesh(sm);
+  window.__weaponTest.assert(sm.weapon.aimAdjusted === true, 'aimAdjusted flag should be set when hitting wall');
+  const ea = sm.weapon.effectiveAimDir;
+  window.__weaponTest.assert(ea, 'effectiveAimDir should be set');
+  const dotIntoWall = ea.x * sm.facing + ea.y * 0;
+  window.__weaponTest.assert(dotIntoWall < 0.95, 'effective aim should rotate off the wall normal');
+};
+
+window.__test_weapon_no_wall_no_adjust = function () {
+  const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
+  window.__weaponTest.assert(sm && sm.weapon, 'need armed local player');
+  // Aim straight up — should not hit a ceiling in normal test scene.
+  sm.aimDir = { x: 0, y: 1 };
+  sm.input = { ...sm.input, aimActive: true };
+  sm.weapon.updateMesh(sm);
+  window.__weaponTest.assert(sm.weapon.aimAdjusted === false, 'no wall = no adjust');
+  // effectiveAimDir should be set to the unadjusted aim
+  window.__weaponTest.assert(sm.weapon.effectiveAimDir, 'effectiveAimDir should still be set when no adjust');
+};

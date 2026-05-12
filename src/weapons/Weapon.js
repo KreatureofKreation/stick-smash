@@ -92,7 +92,39 @@ export class Weapon {
 
     if (this.aimWeapon) {
       const aim = player.aimDir;
-      const aimAng = Math.atan2(aim.y, aim.x);
+      let aimX = aim.x, aimY = aim.y;
+      // Wall reorient: cast forward along the player's aim from handR. If we'd
+      // poke through a wall, rotate aim to the wall tangent biased toward the
+      // input aim's vertical sign so the gun pivots in the direction the user
+      // is leaning the cursor (slightly up = points up along the wall, etc.).
+      const weaponLength = this.length ?? 0.6;
+      const from = { x: handX, y: handY, z: 0 };
+      const to = { x: handX + aimX * weaponLength, y: handY + aimY * weaponLength, z: 0 };
+      const hit = this.game.physics.raycast(from, to, { mask: COL_GROUPS.WORLD });
+      if (hit) {
+        const n = hit.hitNormalWorld;
+        let nx = n.x, ny = n.y;
+        const nlen = Math.hypot(nx, ny) || 1;
+        nx /= nlen; ny /= nlen;
+        // Tangent perpendicular to the normal (2D).
+        let tx = -ny, ty = nx;
+        // Bias tangent direction by input aim's vertical sign. If aimY is near
+        // zero, fall back to whichever tangent has the same horizontal sign as
+        // the player's facing (so a flat shot along a vertical wall points
+        // along the player's facing rather than back toward them).
+        const wantUp = aimY > 0.05 ? 1 : (aimY < -0.05 ? -1 : 0);
+        if (wantUp !== 0) {
+          if (Math.sign(ty) !== wantUp) { tx = -tx; ty = -ty; }
+        } else {
+          if (Math.sign(tx) !== Math.sign(facing) && Math.sign(tx) !== 0) { tx = -tx; ty = -ty; }
+        }
+        aimX = tx; aimY = ty;
+        this.aimAdjusted = true;
+      } else {
+        this.aimAdjusted = false;
+      }
+      this.effectiveAimDir = { x: aimX, y: aimY };
+      const aimAng = Math.atan2(aimY, aimX);
       this.mesh.position.set(handX, handY, 0);
       this.mesh.rotation.set(0, 0, aimAng);
       this.mesh.scale.set(1, facing >= 0 ? 1 : -1, 1);
