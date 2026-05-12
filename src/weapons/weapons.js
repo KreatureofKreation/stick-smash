@@ -471,12 +471,39 @@ export class Minigun extends Weapon {
   }
   _buildMesh() {
     const grp = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.22, 0.18), new THREE.MeshLambertMaterial({ color: 0x444455 }));
-    body.position.x = 0.35;
-    const barrels = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.5, 8), new THREE.MeshLambertMaterial({ color: 0x222233 }));
-    barrels.rotation.z = Math.PI / 2; barrels.position.x = 0.7;
-    grp.add(body, barrels);
+    // Receiver — chunky main body
+    const recv = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.28, 0.22), new THREE.MeshLambertMaterial({ color: 0x33333a }));
+    recv.position.x = 0.28;
+    // Six rotating barrels arranged in a hex pattern
+    const barrelMat = new THREE.MeshLambertMaterial({ color: 0x141418 });
+    const barrels = new THREE.Group();
+    for (let i = 0; i < 6; i++) {
+      const ang = (i / 6) * Math.PI * 2;
+      const by = Math.sin(ang) * 0.08;
+      const bz = Math.cos(ang) * 0.08;
+      const b = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.6, 6), barrelMat);
+      b.rotation.z = Math.PI / 2;
+      b.position.set(0.7, by, bz);
+      barrels.add(b);
+    }
+    // Hub at front holding the barrels together
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.06, 8), new THREE.MeshLambertMaterial({ color: 0x222229 }));
+    hub.rotation.z = Math.PI / 2; hub.position.set(0.99, 0, 0);
+    // Ammo drum (right side)
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.16, 12), new THREE.MeshLambertMaterial({ color: 0x44443c }));
+    drum.rotation.z = Math.PI / 2; drum.position.set(0.18, -0.08, -0.16);
+    // Belt feed link from drum to receiver
+    const feed = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.06, 0.08), new THREE.MeshLambertMaterial({ color: 0x2a2a30 }));
+    feed.position.set(0.16, -0.05, -0.07);
+    // Pistol grip (rear)
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.22, 0.09), new THREE.MeshLambertMaterial({ color: 0x222222 }));
+    grip.position.set(0.05, -0.2, 0); grip.rotation.z = -0.18;
+    // Front handle (forward grip)
+    const fgrip = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.18, 0.08), new THREE.MeshLambertMaterial({ color: 0x222222 }));
+    fgrip.position.set(0.5, -0.22, 0);
+    grp.add(recv, barrels, hub, drum, feed, grip, fgrip);
     this.mesh = grp;
+    this._barrelGroup = barrels;
   }
   tryFire(player) {
     // Press handler — kick into spin-up if currently idle/spin-down.
@@ -526,9 +553,8 @@ export class Minigun extends Weapon {
       else if (this._state === 'firing') rate = 30;
       else if (this._state === 'spinningDown') rate = 30 * (1 - this._stateTimer / this._spinDownDur);
       this._barrelAngle += rate * dt;
-      // Find the barrel mesh in the group — _buildMesh adds [body, barrels],
-      // so children[1] is the barrel cylinder.
-      const barrel = this.mesh?.children?.[1];
+      // Barrel group rotates around its own axis (set by _buildMesh).
+      const barrel = this._barrelGroup;
       if (barrel) barrel.rotation.x = this._barrelAngle;
     }
   }
