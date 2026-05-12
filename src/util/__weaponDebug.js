@@ -251,3 +251,18 @@ window.__test_minigun_spin_up_then_fire = function () {
   m.destroy();
   sm.weapon = null;
 };
+
+window.__test_sniper_muzzle_under_barrel = function () {
+  const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
+  window.__weaponTest.assert(sm, 'need local live player');
+  const reg = window.game.weaponRegistry || {};
+  const SR = reg.SniperRifle;
+  window.__weaponTest.assert(SR, 'SniperRifle class missing');
+  const w = new SR(window.game);
+  const mz = w._muzzleWorld(sm);
+  const expectedX = sm.position.x + sm.facing * 0.55;
+  const expectedY = sm.position.y + 0.45;
+  window.__weaponTest.assertNear(mz.x, expectedX, 0.001, 'sniper muzzle x should be at barrel tip (' + expectedX + ', got ' + mz.x + ')');
+  window.__weaponTest.assertNear(mz.y, expectedY, 0.001, 'sniper muzzle y should be just under barrel (' + expectedY + ', got ' + mz.y + ')');
+  w.destroy();
+};

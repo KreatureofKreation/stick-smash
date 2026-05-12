@@ -742,14 +742,13 @@ export class SniperRifle extends Weapon {
     this.mesh = grp;
   }
   _muzzleWorld(player) {
-    // Muzzle position in WORLD coords. Anchored to the player's shoulder
-    // with a small forward-of-facing offset; the laser then fans out along
-    // aimDir from there. Decoupling the muzzle origin from the vertical
-    // aim component keeps it from sinking below the player's feet (and
-    // into the floor) when aiming straight down.
+    // Anchor the laser/raycast origin under the barrel tip so the red dot
+    // visibly emits from the gun rather than the shooter's shoulder.
+    // Decoupled from aimDir.y so straight-down aim doesn't sink the origin
+    // into the floor.
     const facing = player.facing || 1;
-    const baseX = player.position.x + facing * 0.4;
-    const baseY = player.position.y + 0.55;
+    const baseX = player.position.x + facing * 0.55;
+    const baseY = player.position.y + 0.45;
     return { x: baseX, y: baseY };
   }
   _castShot(player, maxRange = 60) {
