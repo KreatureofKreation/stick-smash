@@ -214,3 +214,40 @@ window.__test_pistol_uses_effective_aim = function () {
   w.destroy();
   sm.weapon = null;
 };
+
+window.__test_minigun_spin_up_then_fire = function () {
+  const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
+  window.__weaponTest.assert(sm, 'need local live player');
+  const reg = window.game.weaponRegistry || {};
+  const Minigun = reg.Minigun;
+  window.__weaponTest.assert(Minigun, 'Minigun class missing');
+  const m = new Minigun(window.game);
+  m.attachTo(sm); sm.weapon = m;
+  sm.aimDir = { x: 1, y: 0 };
+  // Press attack — minigun enters spinningUp.
+  m.tryFire(sm);
+  window.__weaponTest.assert(m._state === 'spinningUp', 'should enter spinningUp on press (got ' + m._state + ')');
+  // Tick for ~0.166s (10 frames @ 60fps) — still spinning up, no shots yet.
+  for (let i = 0; i < 10; i++) m.heldTick(1 / 60, sm);
+  const beforeProj = window.game.projectiles.length;
+  window.__weaponTest.assert(m._state === 'spinningUp', 'should still be spinningUp at ~0.166s (got ' + m._state + ')');
+  // Tick past 0.3s — should transition to firing and start spawning projectiles.
+  for (let i = 0; i < 12; i++) m.heldTick(1 / 60, sm);
+  window.__weaponTest.assert(m._state === 'firing', 'should be firing after spin-up (got ' + m._state + ')');
+  const afterSpinUp = window.game.projectiles.length;
+  window.__weaponTest.assert(afterSpinUp > beforeProj, 'should fire projectiles after spin-up (got ' + (afterSpinUp - beforeProj) + ' new)');
+  // Continue holding for 0.5s — sustained fire.
+  for (let i = 0; i < 30; i++) m.heldTick(1 / 60, sm);
+  const sustained = window.game.projectiles.length;
+  window.__weaponTest.assert(sustained - afterSpinUp >= 6, 'should sustain auto-fire (expected >=6 more, got ' + (sustained - afterSpinUp) + ')');
+  // Release attack — should enter spinningDown.
+  m.releaseFire(sm);
+  window.__weaponTest.assert(m._state === 'spinningDown', 'should enter spinningDown on release (got ' + m._state + ')');
+  // Tick past 0.5s — should return to idle.
+  for (let i = 0; i < 35; i++) m.heldTick(1 / 60, sm);
+  window.__weaponTest.assert(m._state === 'idle', 'should return to idle after spin-down (got ' + m._state + ')');
+  // Cleanup
+  while (window.game.projectiles.length) window.game.projectiles.pop().destroy?.();
+  m.destroy();
+  sm.weapon = null;
+};

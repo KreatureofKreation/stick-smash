@@ -191,6 +191,17 @@ export class Weapon {
     if (this.dropCooldown > 0) this.dropCooldown -= dt;
   }
 
+  // Per-tick update for held weapons. Base is a no-op; subclasses (Minigun,
+  // Flamethrower, SMG, AR, Crossbow, DualPistols) override to drive their
+  // own state. Called from Stickman.update each tick when the player is
+  // armed.
+  heldTick(dt, player) { /* override */ }
+
+  // Optional release-edge hook — Stickman calls this when input.attack
+  // transitions from true → false. Used by auto-fire weapons that need to
+  // know when the trigger was let go.
+  releaseFire(player) { /* override */ }
+
   tryFire(player) {
     if (this.cooldown > 0) return;
     this.cooldown = this.fireDelay;

@@ -457,6 +457,13 @@ export class Minigun extends Weapon {
     this.poseRight = 'aim';
     this.poseLeft = 'support';
     this.ammo = 60;
+    this.length = 0.85;
+    this._state = 'idle';      // 'idle' | 'spinningUp' | 'firing' | 'spinningDown'
+    this._stateTimer = 0;
+    this._fireAccum = 0;
+    this._barrelAngle = 0;
+    this._spinUpDur = 0.3;
+    this._spinDownDur = 0.5;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -466,6 +473,60 @@ export class Minigun extends Weapon {
     barrels.rotation.z = Math.PI / 2; barrels.position.x = 0.7;
     grp.add(body, barrels);
     this.mesh = grp;
+  }
+  tryFire(player) {
+    // Press handler — kick into spin-up if currently idle/spin-down.
+    if (this._state === 'idle' || this._state === 'spinningDown') {
+      this._state = 'spinningUp';
+      this._stateTimer = 0;
+    }
+    // No immediate fire — heldTick handles it after spin-up completes.
+  }
+  releaseFire(player) {
+    if (this._state === 'firing' || this._state === 'spinningUp') {
+      this._state = 'spinningDown';
+      this._stateTimer = 0;
+    }
+  }
+  heldTick(dt, player) {
+    this._stateTimer += dt;
+    if (this._state === 'spinningUp') {
+      if (this._stateTimer >= this._spinUpDur) {
+        this._state = 'firing';
+        this._stateTimer = 0;
+        this._fireAccum = 0;
+      }
+    } else if (this._state === 'firing') {
+      this._fireAccum += dt;
+      while (this._fireAccum >= this.fireDelay && this.ammo > 0) {
+        this._fireAccum -= this.fireDelay;
+        this.fire(player);
+        this.ammo--;
+        if (this.ammo <= 0) {
+          this._state = 'idle';
+          player.weapon = null;
+          this.destroy();
+          return;
+        }
+      }
+    } else if (this._state === 'spinningDown') {
+      if (this._stateTimer >= this._spinDownDur) {
+        this._state = 'idle';
+        this._stateTimer = 0;
+      }
+    }
+    // Visual barrel rotation. Skip on lowQ per project perf-tier rule.
+    if (!window.__lowQ) {
+      let rate = 0;
+      if (this._state === 'spinningUp') rate = (this._stateTimer / this._spinUpDur) * 30;
+      else if (this._state === 'firing') rate = 30;
+      else if (this._state === 'spinningDown') rate = 30 * (1 - this._stateTimer / this._spinDownDur);
+      this._barrelAngle += rate * dt;
+      // Find the barrel mesh in the group — _buildMesh adds [body, barrels],
+      // so children[1] is the barrel cylinder.
+      const barrel = this.mesh?.children?.[1];
+      if (barrel) barrel.rotation.x = this._barrelAngle;
+    }
   }
   fire(player) {
     const aim = this.effectiveAimDir ?? player.aimDir;

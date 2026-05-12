@@ -1686,6 +1686,9 @@ export class Stickman {
       // Attack
       if (now.attackPressed) this._doAttack();
       this._chargeTick(dt);
+      // Per-tick held-weapon hook (e.g., Minigun spin-up + auto-fire while attack held).
+      if (this.weapon?.heldTick) this.weapon.heldTick(dt, this);
+      if (now.attackReleased && this.weapon?.releaseFire) this.weapon.releaseFire(this);
 
       // Special / weapon alt fire / force powers.
       if (now.specialPressed) {
