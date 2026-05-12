@@ -776,23 +776,23 @@ export class Crossbow extends Weapon {
     this.poseRight = 'aim';
     this.poseLeft = 'support';   // 2H
     this.ammo = 8;
-    this.length = 0.65;
-    this.barrelOffset = 0.45;
+    this.length = 1.2;
+    this.barrelOffset = 0.85;
     this._postFireTimer = 0;
   }
   _buildMesh() {
     const grp = new THREE.Group();
-    const stock = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.07, 0.06), new THREE.MeshLambertMaterial({ color: 0x3a2410 }));
-    stock.position.x = 0.05;
-    // Horizontal limbs (NOT a vertical bow arc)
-    const limbU = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.28, 0.04), new THREE.MeshLambertMaterial({ color: 0x4a2a14 }));
-    limbU.position.set(0.13, 0.04, 0); limbU.rotation.z = 0.5;
-    const limbD = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.28, 0.04), new THREE.MeshLambertMaterial({ color: 0x4a2a14 }));
-    limbD.position.set(0.13, -0.04, 0); limbD.rotation.z = -0.5;
-    const string = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.006, 0.006), new THREE.MeshLambertMaterial({ color: 0xddd8c8 }));
-    string.position.set(0.0, 0, 0);
-    const bolt = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.018, 0.018), new THREE.MeshLambertMaterial({ color: 0x202024 }));
-    bolt.position.set(0.13, 0.03, 0);
+    const stock = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.11, 0.10), new THREE.MeshLambertMaterial({ color: 0x3a2410 }));
+    stock.position.x = 0.18;
+    // Horizontal limbs (NOT a vertical bow arc) — long & wide
+    const limbU = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.5, 0.06), new THREE.MeshLambertMaterial({ color: 0x4a2a14 }));
+    limbU.position.set(0.32, 0.07, 0); limbU.rotation.z = 0.5;
+    const limbD = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.5, 0.06), new THREE.MeshLambertMaterial({ color: 0x4a2a14 }));
+    limbD.position.set(0.32, -0.07, 0); limbD.rotation.z = -0.5;
+    const string = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.012, 0.012), new THREE.MeshLambertMaterial({ color: 0xddd8c8 }));
+    string.position.set(0.05, 0, 0);
+    const bolt = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.028, 0.028), new THREE.MeshLambertMaterial({ color: 0x202024 }));
+    bolt.position.set(0.32, 0.06, 0);
     grp.add(stock, limbU, limbD, string, bolt);
     this.mesh = grp;
     this._stringMesh = string;
