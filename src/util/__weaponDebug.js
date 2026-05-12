@@ -323,3 +323,24 @@ window.__test_bow_removed = function () {
   const reg = window.game?.weaponRegistry || {};
   window.__weaponTest.assert(!reg.Bow, 'Bow should be removed from weapon registry (got ' + reg.Bow + ')');
 };
+
+window.__test_smg_full_auto = function () {
+  const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
+  window.__weaponTest.assert(sm, 'need local live player');
+  const reg = window.game.weaponRegistry || {};
+  const SMG = reg.SMG;
+  window.__weaponTest.assert(SMG, 'SMG class missing');
+  const w = new SMG(window.game);
+  w.attachTo(sm); sm.weapon = w;
+  sm.aimDir = { x: 1, y: 0 };
+  // Press attack — should start auto-firing immediately (no spin-up).
+  w.tryFire(sm);
+  const before = window.game.projectiles.length;
+  // 0.5s of held attack at fireDelay 0.06s = ~8 shots.
+  for (let i = 0; i < 30; i++) w.heldTick(1 / 60, sm);
+  const after = window.game.projectiles.length;
+  window.__weaponTest.assert(after - before >= 6, 'SMG should auto-fire 6+ shots in 0.5s held (got ' + (after - before) + ')');
+  // Cleanup
+  while (window.game.projectiles.length) window.game.projectiles.pop().destroy?.();
+  if (sm.weapon === w) { w.destroy(); sm.weapon = null; }
+};
