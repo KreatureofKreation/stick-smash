@@ -345,6 +345,32 @@ window.__test_smg_full_auto = function () {
   if (sm.weapon === w) { w.destroy(); sm.weapon = null; }
 };
 
+window.__test_revolver_heavy_single_shot = function () {
+  const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
+  window.__weaponTest.assert(sm, 'need local live player');
+  const reg = window.game.weaponRegistry || {};
+  const Rev = reg.Revolver;
+  window.__weaponTest.assert(Rev, 'Revolver class missing');
+  const w = new Rev(window.game);
+  w.attachTo(sm); sm.weapon = w;
+  sm.aimDir = { x: 1, y: 0 };
+  window.__weaponTest.assert(w.poseLeft === null, 'Revolver should be 1H (poseLeft=null)');
+  window.__weaponTest.assert(w.ammo === 6, 'Revolver should start with 6 ammo');
+  const before = window.game.projectiles.length;
+  // Use the standard tryFire so cooldown logic kicks in (Revolver doesn't override).
+  w.tryFire(sm);
+  const after = window.game.projectiles.length;
+  window.__weaponTest.assert(after - before === 1, 'Revolver should fire exactly 1 projectile per click (got ' + (after - before) + ')');
+  const proj = window.game.projectiles[after - 1];
+  window.__weaponTest.assert(proj.damage === 35, 'Revolver projectile damage should be 35 (got ' + proj.damage + ')');
+  // Click again immediately — cooldown blocks.
+  const beforeCool = window.game.projectiles.length;
+  w.tryFire(sm);
+  window.__weaponTest.assert(window.game.projectiles.length === beforeCool, 'Revolver should be on cooldown after firing');
+  while (window.game.projectiles.length) window.game.projectiles.pop().destroy?.();
+  if (sm.weapon === w) { w.destroy(); sm.weapon = null; }
+};
+
 window.__test_ar_three_burst = function () {
   const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
   window.__weaponTest.assert(sm, 'need local live player');
