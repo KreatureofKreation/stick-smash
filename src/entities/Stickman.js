@@ -189,6 +189,9 @@ export class Stickman {
     this.attackCooldown = 0;
     this.attackHits = new Set();  // bodies hit this swing
     this.hitstun = 0;
+    // Sub-B force features
+    this._impulseFrameBudget = 0;      // resets to 0 at start of each update()
+    this._impulseStunUntil = 0;        // performance.now() timestamp; input damped while < now
     // Combat — combo state
     this.moveId = null;          // 'jab'|'cross'|'hook'|'knee'|'spinBack'
                                   // |'heavyNeutral'|'heavyUp'|'heavyDown'|'heavyForward'|'heavyBack'
@@ -336,6 +339,39 @@ export class Stickman {
     this.body.velocity.x = vx;
     this.body.velocity.y = vy;
     this.hitstun = Math.max(this.hitstun, stun);
+  }
+
+  // Additive velocity impulse with per-call and per-frame caps. Used by Sub-B
+  // force features (punch-boost, throw-boost, recoil-jump, hit-reaction).
+  // Per-call cap stops a single huge impulse from teleporting the body.
+  // Per-frame budget stops multi-hit chains (minigun pellets, dual pistols)
+  // from accumulating to launch velocity.
+  applyImpulse(vx, vy, opts = {}) {
+    if (this.state === STATE.DEAD) return;
+    const cap = opts.cap ?? 18;
+    const mag = Math.hypot(vx, vy);
+    let sx = vx, sy = vy;
+    if (mag > cap) {
+      const f = cap / mag;
+      sx *= f; sy *= f;
+    }
+    const budgetMax = 26;
+    const used = this._impulseFrameBudget;
+    if (used >= budgetMax) return;
+    const remaining = budgetMax - used;
+    const newMag = Math.hypot(sx, sy);
+    if (newMag > remaining) {
+      const f = remaining / newMag;
+      sx *= f; sy *= f;
+    }
+    this._impulseFrameBudget += Math.hypot(sx, sy);
+    this.body.wakeUp();
+    this.body.velocity.x += sx;
+    this.body.velocity.y += sy;
+    if (opts.stunMs) {
+      const until = performance.now() + opts.stunMs;
+      if (until > this._impulseStunUntil) this._impulseStunUntil = until;
+    }
   }
 
   takeDamage(amount, opts = {}) {
@@ -1589,6 +1625,7 @@ export class Stickman {
   }
 
   update(dt, ctx) {
+    this._impulseFrameBudget = 0;
     this._dt = dt;
     const { players, level } = ctx;
 

@@ -126,6 +126,17 @@ export class Game {
     // Reused vectors for mouse aim — avoid per-frame Vector3 allocation.
     this._aimNDC = new THREE.Vector3();
     this._aimDir = new THREE.Vector3();
+
+    // Sub-B feature toggles — per-feature on/off for A/B tuning during dev.
+    if (typeof window !== 'undefined' && !window.__forceFeatures) {
+      window.__forceFeatures = {
+        punch: 1,
+        throw: 1,
+        recoil: 1,
+        standable: 1,
+        hitReaction: 1,
+      };
+    }
   }
   hitStop(amount = 0.06) { this.hitStopTimer = Math.max(this.hitStopTimer, amount); }
 
