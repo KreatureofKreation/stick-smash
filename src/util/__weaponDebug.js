@@ -571,21 +571,38 @@ window.__test_rigClipsFloorOnLunge = function () {
   if (!probe) return 'SKIP: no floor under player';
   const floorY = probe.hitPointWorld.y;
 
-  // Force-push head below floor by manually setting its local position,
-  // then run _syncRig once and verify the clamp lifted it back.
-  sm.body.position.y = floorY + 1.0; // body just above floor
-  // Run one sync so head position is set by rig.
-  sm._syncRig(1 / 60, false);
-  // Save the post-sync head Y for comparison.
-  const headLocalY = sm.rig.head.position.y;
-  const headWorldY = sm.body.position.y + headLocalY;
-
-  // Head sphere bottom should never dip below floor + LIMB_PAD.
-  const HEAD_RADIUS = 0.34;
-  const headBottom = headWorldY - HEAD_RADIUS;
-  window.__weaponTest.assert(
-    headBottom >= floorY - 0.005,
-    'head bottom must stay above floor (headBottom=' + headBottom.toFixed(3) +
-    ', floorY=' + floorY.toFixed(3) + ')',
-  );
+  // Drive the body sub-floor so the rig's natural head position
+  // (~0.95m above body) lands within the clamp's 0.54m down-ray range.
+  // We never call physics.step in this test, so the artificially-low
+  // body position holds for the single _syncRig call.
+  // Body at floorY - 0.5 → head world ~ floorY + 0.45, ray reaches
+  // floorY - 0.09 (well past the floor surface). Clamp must fire.
+  const savedY = sm.body.position.y;
+  sm.body.position.y = floorY - 0.5;
+  try {
+    sm._syncRig(1 / 60, false);
+    const headLocalY = sm.rig.head.position.y;
+    const headWorldY = sm.body.position.y + headLocalY;
+    const HEAD_RADIUS = 0.34;
+    const LIMB_PAD = 0.06;
+    // After clamp: head bottom = floor + LIMB_PAD (within numeric eps).
+    const headBottom = headWorldY - HEAD_RADIUS;
+    window.__weaponTest.assert(
+      headBottom >= floorY - 0.005,
+      'head bottom must stay above floor (headBottom=' + headBottom.toFixed(3) +
+      ', floorY=' + floorY.toFixed(3) + ', bodyY=' + sm.body.position.y.toFixed(3) +
+      ', headLocalY=' + headLocalY.toFixed(3) + ')',
+    );
+    // Also assert the clamp actually fired — head world Y should be
+    // very close to floor + HEAD_RADIUS + LIMB_PAD, not floating high.
+    const expectedHeadWorldY = floorY + HEAD_RADIUS + LIMB_PAD;
+    window.__weaponTest.assert(
+      Math.abs(headWorldY - expectedHeadWorldY) < 0.05,
+      'clamp should drive head to floor + radius + pad (expected ' +
+      expectedHeadWorldY.toFixed(3) + ', got ' + headWorldY.toFixed(3) + ')',
+    );
+  } finally {
+    // Restore body position so subsequent tests/playtest aren't broken.
+    sm.body.position.y = savedY;
+  }
 };
