@@ -1063,6 +1063,13 @@ export class StickmanRig {
     if (params.armPoseR === 'aim') {
       handRX = sRX + Math.cos(aimAng) * aimDist;
       handRY = sRY + Math.sin(aimAng) * aimDist;
+      // Breathing sway: small low-frequency oscillation perpendicular to aim
+      // direction so the gun hand has visible weight, not stuck-on-rails.
+      // Spring stiffness reduction below lets motion + recoil also push
+      // the hand around naturally.
+      const breath = Math.sin(this.t * 1.6) * 0.015;
+      handRX += -Math.sin(aimAng) * breath;
+      handRY += Math.cos(aimAng) * breath;
     } else if (params.armPoseR === 'strikePosed') {
       // Pose offsets are absolute relative to shoulder. Lean is applied earlier
       // (snapped onto bodyTilt) so we don't repeat it here.
@@ -1298,8 +1305,13 @@ export class StickmanRig {
     // Ragdoll softens spring stiffness so limbs flop instead of snapping back.
     // Fully ragdoll (1.0) = very soft; idle ragdoll (0.10) barely affects feel.
     const ragSoft = clamp(this.ragdollAmount, 0, 1);
-    let handK = lerp(stiff ? 380 : 130, 28, ragSoft);
-    let handD = lerp(stiff ? 22 : 9, 2.8, ragSoft);
+    // Aim hold uses softer spring than melee strike-pose so the gun has
+    // visible weight (sways with motion + breath) instead of feeling
+    // welded to the hand. Strike/hold poses keep the original stiffness
+    // — those need to land on a precise pose at a precise moment.
+    const aimHold = (params.armPoseR === 'aim');
+    let handK = lerp(stiff ? (aimHold ? 200 : 380) : 130, 28, ragSoft);
+    let handD = lerp(stiff ? (aimHold ? 14 : 22) : 9, 2.8, ragSoft);
     // Mid-spin (somersault) — drop spring stiffness so hands trail behind
     // the body rotation instead of snapping to the pose. Reads as floppy
     // ragdoll arms whirling around the spin axis.
@@ -1360,8 +1372,13 @@ export class StickmanRig {
     // Render limbs via IK using the spring-chased extremity positions.
     const zL = hipZ - Z_STAGGER;
     const zR = hipZ + Z_STAGGER;
-    this._drawArm(sLX, sLY, this._handLPos.x, this._handLPos.y, zL, this.upperArmL, this.lowerArmL, this.handL, this.shoulderL, this.elbowL, false, false);
-    this._drawArm(sRX, sRY, this._handRPos.x, this._handRPos.y, zR, this.upperArmR, this.lowerArmR, this.handR, this.shoulderR, this.elbowR, true, !!params.gumGumPunch);
+    // During aim pose: elbow tucks down (bend = -1) for both arms — natural
+    // gun-shoulder posture. Default melee bend (facing sign) is wrong here
+    // because the IK's "default" places elbow up for windup arcs.
+    const aimBendR = (params.armPoseR === 'aim') ? -1 : undefined;
+    const aimBendL = (params.armPoseL === 'aim') ? -1 : undefined;
+    this._drawArm(sLX, sLY, this._handLPos.x, this._handLPos.y, zL, this.upperArmL, this.lowerArmL, this.handL, this.shoulderL, this.elbowL, false, false, aimBendL);
+    this._drawArm(sRX, sRY, this._handRPos.x, this._handRPos.y, zR, this.upperArmR, this.lowerArmR, this.handR, this.shoulderR, this.elbowR, true, !!params.gumGumPunch, aimBendR);
     this._drawLeg(hipLX, hipLY, this._footLPos.x, this._footLPos.y, zL, this.upperLegL, this.lowerLegL, this.footL, this.hipL, this.kneeL, false);
     this._drawLeg(hipRX, hipRY, this._footRPos.x, this._footRPos.y, zR, this.upperLegR, this.lowerLegR, this.footR, this.hipR, this.kneeR, true);
 
@@ -1373,7 +1390,7 @@ export class StickmanRig {
     }
   }
 
-  _drawArm(sx, sy, hx, hy, z, upper, lower, handMesh, shoulderJoint, elbowJoint, isRight, stretched) {
+  _drawArm(sx, sy, hx, hy, z, upper, lower, handMesh, shoulderJoint, elbowJoint, isRight, stretched, bendOverride) {
     shoulderJoint.position.set(sx, sy, z);
     if (stretched) {
       orientLimb(upper, sx, sy, z, hx, hy, z);
@@ -1394,7 +1411,11 @@ export class StickmanRig {
       const f = maxReach / d;
       chx = sx + dx * f; chy = sy + dy * f;
     }
-    solveIK(this._tmpKnee, sx, sy, chx, chy, upperLen, lowerLen, this.facing >= 0 ? 1 : -1);
+    // bendOverride: explicit -1 forces elbow below the shoulder→hand line
+    // (natural for aiming a gun — the elbow tucks down). Default uses
+    // facing sign which puts elbow up for melee windup arcs.
+    const bend = bendOverride !== undefined ? bendOverride : (this.facing >= 0 ? 1 : -1);
+    solveIK(this._tmpKnee, sx, sy, chx, chy, upperLen, lowerLen, bend);
     const ex = this._tmpKnee.x, ey = this._tmpKnee.y;
     elbowJoint.position.set(ex, ey, z);
     orientLimb(upper, sx, sy, z, ex, ey, z);
