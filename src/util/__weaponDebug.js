@@ -506,3 +506,104 @@ window.__test_fire_patch_cap = async function () {
   window.__weaponTest.assert(active[0].x >= 4.5, 'oldest patches should be evicted (got x=' + active[0].x + ')');
   clearAllPatches();
 };
+
+window.__test_rigClipsWallStanding = function () {
+  const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
+  window.__weaponTest.assert(sm, 'need local live player');
+
+  // Hunt for a wall in either facing direction within 30m of the player.
+  const probeY = sm.body.position.y + 0.55;
+  const probeFacing = (dir) => window.game.physics.raycast(
+    { x: sm.body.position.x, y: probeY, z: 0 },
+    { x: sm.body.position.x + dir * 30, y: probeY, z: 0 },
+    { mask: 0x0001 },
+  );
+  let probe = probeFacing(sm.facing);
+  let dir = sm.facing;
+  if (!probe) {
+    probe = probeFacing(-sm.facing);
+    dir = -sm.facing;
+  }
+  if (!probe) return 'SKIP: no wall in 30m of player';
+
+  const wallX = probe.hitPointWorld.x;
+  sm.facing = dir;
+  // Position body so shoulder + maxReach reaches PAST the wall.
+  // body→shoulder offset ~0.18 horizontal, arm reach 0.88 max.
+  // Place body 0.7m short of wall — hand wants to be ~0.36m past wall.
+  sm.body.position.x = wallX - dir * 0.7;
+  sm.body.position.y = Math.max(probe.hitPointWorld.y - 0.55, 1.0);
+  sm.aimDir = { x: dir, y: 0 };
+  sm.input = { ...sm.input, aimActive: true };
+
+  // Settle pose spring and rig.
+  for (let i = 0; i < 30; i++) {
+    window.game.physics.step(1 / 60);
+    sm._syncRig(1 / 60, false);
+  }
+
+  // sm._syncRig(_, false) uses rigInLocal=false → group at (0,0) and
+  // rig.handR.position is already in WORLD coords (mesh positions are
+  // computed off rigPos which equals body.position in that mode).
+  const handWorldX = sm.rig.handR.position.x;
+
+  // Wall surface is at wallX. Sweep should hold hand on the body side
+  // of the wall: |handWorldX - wallX| should keep handWorldX on body side.
+  // body side = wallX - dir * (positive value) i.e. dir*(wallX - handWorldX) > 0.
+  const intoWallSign = dir * (handWorldX - wallX);
+  window.__weaponTest.assert(
+    intoWallSign < 0.02,
+    'hand should NOT cross wall surface (handX=' + handWorldX.toFixed(3) +
+    ', wallX=' + wallX.toFixed(3) + ', dir=' + dir + ', signed-penetration=' + intoWallSign.toFixed(3) + ')',
+  );
+};
+
+window.__test_rigClipsFloorOnLunge = function () {
+  const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
+  window.__weaponTest.assert(sm, 'need local live player');
+
+  // Find a floor tile under the player.
+  const probe = window.game.physics.raycast(
+    { x: sm.body.position.x, y: sm.body.position.y + 4, z: 0 },
+    { x: sm.body.position.x, y: sm.body.position.y - 4, z: 0 },
+    { mask: 0x0001 },
+  );
+  if (!probe) return 'SKIP: no floor under player';
+  const floorY = probe.hitPointWorld.y;
+
+  // Drive the body deep sub-floor so the rig's natural head position
+  // (hip + ~0.95m) lands BELOW the clamp's lift threshold of
+  // floor + HEAD_RADIUS + LIMB_PAD = floor + 0.40m. We never call
+  // physics.step in this test, so the artificially-low body position
+  // holds for the single _syncRig call.
+  // Body at floorY - 1.0 → head natural world ~ floorY - 0.05 (below
+  // floor). Clamp must lift it to floor + 0.40m.
+  const savedY = sm.body.position.y;
+  sm.body.position.y = floorY - 1.0;
+  try {
+    sm._syncRig(1 / 60, false);
+    // rigInLocal=false → group at (0,0), head.position is already world.
+    const headWorldY = sm.rig.head.position.y;
+    const HEAD_RADIUS = 0.34;
+    const LIMB_PAD = 0.06;
+    // After clamp: head bottom = floor + LIMB_PAD (within numeric eps).
+    const headBottom = headWorldY - HEAD_RADIUS;
+    window.__weaponTest.assert(
+      headBottom >= floorY - 0.005,
+      'head bottom must stay above floor (headBottom=' + headBottom.toFixed(3) +
+      ', floorY=' + floorY.toFixed(3) + ', bodyY=' + sm.body.position.y.toFixed(3) +
+      ', headWorldY=' + headWorldY.toFixed(3) + ')',
+    );
+    // Also assert the clamp actually fired — head world Y should be
+    // very close to floor + HEAD_RADIUS + LIMB_PAD, not floating high.
+    const expectedHeadWorldY = floorY + HEAD_RADIUS + LIMB_PAD;
+    window.__weaponTest.assert(
+      Math.abs(headWorldY - expectedHeadWorldY) < 0.05,
+      'clamp should drive head to floor + radius + pad (expected ' +
+      expectedHeadWorldY.toFixed(3) + ', got ' + headWorldY.toFixed(3) + ')',
+    );
+  } finally {
+    // Restore body position so subsequent tests/playtest aren't broken.
+    sm.body.position.y = savedY;
+  }
+};

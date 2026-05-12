@@ -7,6 +7,14 @@ import { lerp, damp, clamp } from '../util/math.js';
 const _v = new THREE.Vector3();
 const _yAxis = new THREE.Vector3(0, 1, 0);
 const Z_STAGGER = 0.08;
+// Minimum distance from limb endpoint to wall surface after clamp.
+// 0.06m clears cylinder radius (~0.04) plus a small visual margin so
+// the mesh doesn't poke into the tile at glancing angles.
+const LIMB_PAD = 0.06;
+// Mask for world geometry only. Equals COL_GROUPS.WORLD = 0x0001 (see
+// src/physics/PhysicsWorld.js). Hardcoded here to avoid importing the
+// physics module into the rig — rig stays display-only.
+const WORLD_MASK = 0x0001;
 
 function makeLimb(radius, length, mat) {
   const g = new THREE.CylinderGeometry(radius, radius, length, 8, 1, false);
@@ -622,6 +630,7 @@ export class StickmanRig {
 
     // Scratch
     this._tmpKnee = { x: 0, y: 0 };
+    this._sweepOut = { x: 0, y: 0 };
   }
 
   resetSprings() {
@@ -851,6 +860,29 @@ export class StickmanRig {
     this._headLagX = damp(this._headLagX, targetLagX, 0.0008, dt);
     this._headLagY = damp(this._headLagY, targetLagY, 0.0008, dt);
     this.head.position.set(headX + this._headLagX, headY + this._headLagY, hipZ);
+    // Floor clamp — prevent head sphere from dipping below ground on
+    // big lunges, somersaults, or post-knockdown sprawl. Vertical
+    // down-ray only; horizontal walls are already handled by body
+    // capsule + arm/leg sweeps (head shoulder is rigidly attached
+    // ~0.95m above torso, can't reach a wall the body hasn't).
+    if (params.physics && params.physics.raycast) {
+      const HEAD_RADIUS = 0.34; // matches SphereGeometry(0.34) in constructor
+      const ox = params.worldOriginX ?? 0;
+      const oy = params.worldOriginY ?? 0;
+      const headWorldX = ox + this.head.position.x;
+      const headWorldY = oy + this.head.position.y;
+      const floor = params.physics.raycast(
+        { x: headWorldX, y: headWorldY, z: 0 },
+        { x: headWorldX, y: headWorldY - (HEAD_RADIUS + 0.20), z: 0 },
+        { mask: WORLD_MASK },
+      );
+      if (floor && floor.hitPointWorld) {
+        const minLocalY = (floor.hitPointWorld.y + HEAD_RADIUS + LIMB_PAD) - oy;
+        if (this.head.position.y < minLocalY) {
+          this.head.position.y = minLocalY;
+        }
+      }
+    }
     this.headPitch = damp(this.headPitch, this.headPitchTarget, 0.0008, dt);
     this.headPitchTarget = 0; // reset each frame — callers set it before the head render
     this.head.rotation.set((params.aim?.y ?? 0) * 0.4 + this.headPitch, this.facing < 0 ? Math.PI : 0, this.bodyTilt * 0.5);
@@ -1385,10 +1417,10 @@ export class StickmanRig {
     const aimBend = -(this.facing >= 0 ? 1 : -1);
     const aimBendR = (params.armPoseR === 'aim') ? aimBend : undefined;
     const aimBendL = (params.armPoseL === 'aim') ? aimBend : undefined;
-    this._drawArm(sLX, sLY, this._handLPos.x, this._handLPos.y, zL, this.upperArmL, this.lowerArmL, this.handL, this.shoulderL, this.elbowL, false, false, aimBendL);
-    this._drawArm(sRX, sRY, this._handRPos.x, this._handRPos.y, zR, this.upperArmR, this.lowerArmR, this.handR, this.shoulderR, this.elbowR, true, !!params.gumGumPunch, aimBendR);
-    this._drawLeg(hipLX, hipLY, this._footLPos.x, this._footLPos.y, zL, this.upperLegL, this.lowerLegL, this.footL, this.hipL, this.kneeL, false);
-    this._drawLeg(hipRX, hipRY, this._footRPos.x, this._footRPos.y, zR, this.upperLegR, this.lowerLegR, this.footR, this.hipR, this.kneeR, true);
+    this._drawArm(sLX, sLY, this._handLPos.x, this._handLPos.y, zL, this.upperArmL, this.lowerArmL, this.handL, this.shoulderL, this.elbowL, false, false, aimBendL, params);
+    this._drawArm(sRX, sRY, this._handRPos.x, this._handRPos.y, zR, this.upperArmR, this.lowerArmR, this.handR, this.shoulderR, this.elbowR, true, !!params.gumGumPunch, aimBendR, params);
+    this._drawLeg(hipLX, hipLY, this._footLPos.x, this._footLPos.y, zL, this.upperLegL, this.lowerLegL, this.footL, this.hipL, this.kneeL, false, params);
+    this._drawLeg(hipRX, hipRY, this._footRPos.x, this._footRPos.y, zR, this.upperLegR, this.lowerLegR, this.footR, this.hipR, this.kneeR, true, params);
 
     // Hand orientation for aim
     if (params.armPoseR === 'aim' || params.armPoseR === 'attack' || params.armPoseR === 'strikePosed') {
@@ -1398,13 +1430,69 @@ export class StickmanRig {
     }
   }
 
-  _drawArm(sx, sy, hx, hy, z, upper, lower, handMesh, shoulderJoint, elbowJoint, isRight, stretched, bendOverride) {
+  _sweepClamp(sxLocal, syLocal, hxLocal, hyLocal, params, out) {
+    out.x = hxLocal;
+    out.y = hyLocal;
+    const phys = params.physics;
+    if (!phys || !phys.raycast) return;
+    const ox = params.worldOriginX ?? 0;
+    const oy = params.worldOriginY ?? 0;
+    const sxW = ox + sxLocal, syW = oy + syLocal;
+    const hxW = ox + hxLocal, hyW = oy + hyLocal;
+    const dxW = hxW - sxW, dyW = hyW - syW;
+    const segLen = Math.hypot(dxW, dyW);
+    if (segLen < 0.02) return;
+    // Forward ray: shoulder → hand. Project z to 0 (rig lives near z=0,
+    // colliders are at z=0).
+    const fwd = phys.raycast(
+      { x: sxW, y: syW, z: 0 },
+      { x: hxW, y: hyW, z: 0 },
+      { mask: WORLD_MASK },
+    );
+    if (fwd && fwd.hitPointWorld) {
+      const hitXW = fwd.hitPointWorld.x, hitYW = fwd.hitPointWorld.y;
+      // Pull back along ray by LIMB_PAD.
+      const inv = 1 / segLen;
+      const ux = dxW * inv, uy = dyW * inv;
+      out.x = (hitXW - ux * LIMB_PAD) - ox;
+      out.y = (hitYW - uy * LIMB_PAD) - oy;
+      return;
+    }
+    // Back-ray fallback — hand may already be inside a wall (prior frame
+    // penetration). Cast hand → shoulder; a hit means hand is on the
+    // wrong side of geometry.
+    const back = phys.raycast(
+      { x: hxW, y: hyW, z: 0 },
+      { x: sxW, y: syW, z: 0 },
+      { mask: WORLD_MASK },
+    );
+    if (back && back.hitPointWorld) {
+      const hitXW = back.hitPointWorld.x, hitYW = back.hitPointWorld.y;
+      // The back-ray hit point is the entry surface on the shoulder side
+      // of the wall. Pull TOWARD shoulder by LIMB_PAD (along back-ray dir,
+      // which is hand→shoulder).
+      const inv = 1 / segLen;
+      const ux = -dxW * inv, uy = -dyW * inv;
+      out.x = (hitXW + ux * LIMB_PAD) - ox;
+      out.y = (hitYW + uy * LIMB_PAD) - oy;
+    }
+    // Both rays missed → no penetration → leave (out.x, out.y) at the
+    // requested hand position. Already initialized at function entry.
+  }
+
+  _drawArm(sx, sy, hx, hy, z, upper, lower, handMesh, shoulderJoint, elbowJoint, isRight, stretched, bendOverride, params) {
     shoulderJoint.position.set(sx, sy, z);
     if (stretched) {
-      orientLimb(upper, sx, sy, z, hx, hy, z);
+      let sxh = hx, syh = hy;
+      if (params) {
+        this._sweepClamp(sx, sy, hx, hy, params, this._sweepOut);
+        sxh = this._sweepOut.x;
+        syh = this._sweepOut.y;
+      }
+      orientLimb(upper, sx, sy, z, sxh, syh, z);
       lower.visible = false;
       elbowJoint.visible = false;
-      handMesh.position.set(hx, hy, z);
+      handMesh.position.set(sxh, syh, z);
       return;
     }
     if (!lower.visible) lower.visible = true;
@@ -1419,6 +1507,14 @@ export class StickmanRig {
       const f = maxReach / d;
       chx = sx + dx * f; chy = sy + dy * f;
     }
+    // World-collision clamp — if shoulder→hand crosses a wall, pull the
+    // hand back to LIMB_PAD short of the surface. IK below auto-folds the
+    // arm with the shortened reach (cartoon squish).
+    if (params) {
+      this._sweepClamp(sx, sy, chx, chy, params, this._sweepOut);
+      chx = this._sweepOut.x;
+      chy = this._sweepOut.y;
+    }
     // bendOverride: explicit -1 forces elbow below the shoulder→hand line
     // (natural for aiming a gun — the elbow tucks down). Default uses
     // facing sign which puts elbow up for melee windup arcs.
@@ -1431,7 +1527,7 @@ export class StickmanRig {
     handMesh.position.set(chx, chy, z);
   }
 
-  _drawLeg(hx, hy, fx, fy, z, upper, lower, footMesh, hipJoint, kneeJoint, isRight) {
+  _drawLeg(hx, hy, fx, fy, z, upper, lower, footMesh, hipJoint, kneeJoint, isRight, params) {
     hipJoint.position.set(hx, hy, z);
     const upperLen = 0.50, lowerLen = 0.50;
     const maxReach = (upperLen + lowerLen) * 0.99;
@@ -1441,6 +1537,11 @@ export class StickmanRig {
     if (d > maxReach) {
       const f = maxReach / d;
       cfx = hx + dx * f; cfy = hy + dy * f;
+    }
+    if (params) {
+      this._sweepClamp(hx, hy, cfx, cfy, params, this._sweepOut);
+      cfx = this._sweepOut.x;
+      cfy = this._sweepOut.y;
     }
     solveIK(this._tmpKnee, hx, hy, cfx, cfy, upperLen, lowerLen, this.facing >= 0 ? 1 : -1);
     const kx = this._tmpKnee.x, ky = this._tmpKnee.y;
