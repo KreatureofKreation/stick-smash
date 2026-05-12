@@ -17,6 +17,7 @@ export class Weapon {
     this.holdOffset = new THREE.Vector3(0.4, 0.1, 0); // local to player
     this.aimWeapon = false; // if true, mesh rotates with aim direction
     this.length = 0.6;        // mesh length along the barrel axis; subclasses with longer barrels override
+    this.barrelOffset = 0.55; // distance from handR along aim axis to the barrel tip; ranged subclasses override
     this.poseRight = false; // 'aim' | false — set true on ranged in subclass
     this.poseLeft = null;
     this.holder = null;
@@ -189,6 +190,22 @@ export class Weapon {
     }
     if (this.cooldown > 0) this.cooldown -= dt;
     if (this.dropCooldown > 0) this.dropCooldown -= dt;
+  }
+
+  // Muzzle world position — the actual rendered barrel-tip in world space.
+  // Anchors to the player's right hand and projects forward by barrelOffset
+  // along the wall-reorient-aware aim direction. Subclasses with non-
+  // standard mesh layouts (Sniper) override _muzzleWorld; everything else
+  // uses this default.
+  _muzzlePos(player) {
+    const aim = this.effectiveAimDir ?? player.aimDir;
+    const handR = player.rig?.handR?.position;
+    if (handR) {
+      return { x: handR.x + aim.x * this.barrelOffset, y: handR.y + aim.y * this.barrelOffset };
+    }
+    // Fallback before rig is built.
+    const facing = player.facing || 1;
+    return { x: player.position.x + facing * 0.7, y: player.position.y + 0.7 };
   }
 
   // Per-tick update for held weapons. Base is a no-op; subclasses (Minigun,

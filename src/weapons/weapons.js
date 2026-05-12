@@ -377,6 +377,7 @@ export class Pistol extends Weapon {
     this.aimWeapon = true;
     this.poseRight = 'aim';
     this.ammo = 12;
+    this.barrelOffset = 0.55;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -389,18 +390,17 @@ export class Pistol extends Weapon {
   }
   fire(player) {
     const aim = this.effectiveAimDir ?? player.aimDir;
-    const muzzleX = player.position.x + aim.x * 0.9;
-    const muzzleY = player.position.y + 0.7 + aim.y * 0.4;
+    const mz = this._muzzlePos(player);
     const speed = 38;
     new Projectile(this.game, {
-      x: muzzleX, y: muzzleY, vx: aim.x * speed, vy: aim.y * speed,
+      x: mz.x, y: mz.y, vx: aim.x * speed, vy: aim.y * speed,
       damage: 20, owner: player, gravity: false, life: 1.6, radius: 0.08,
       color: 0xffcc33, emissive: 0xffaa00, tracer: true,
     });
     audio.shoot();
     const rec = player.grounded ? 0.5 : 1.4;
     player.body.velocity.x -= aim.x * rec;
-    this.game.fx.particles.burst(muzzleX, muzzleY, 0, { count: 5, speed: 4, color: 0xffaa33 });
+    this.game.fx.particles.burst(mz.x, mz.y, 0, { count: 5, speed: 4, color: 0xffaa33 });
     this.game.fx.camera.punch(0.08);
   }
 }
@@ -415,6 +415,7 @@ export class Shotgun extends Weapon {
     this.poseRight = 'aim';
     this.poseLeft = 'support';
     this.ammo = 4;
+    this.barrelOffset = 0.85;
   }
   _buildMesh() {
     const g = new THREE.BoxGeometry(0.85, 0.16, 0.12);
@@ -428,11 +429,12 @@ export class Shotgun extends Weapon {
   fire(player) {
     const aim = this.effectiveAimDir ?? player.aimDir;
     const ax = aim.x, ay = aim.y;
+    const mz = this._muzzlePos(player);
     for (let i = 0; i < 7; i++) {
       const a = Math.atan2(ay, ax) + rand(-0.2, 0.2);
       const sp = rand(28, 36);
       new Projectile(this.game, {
-        x: player.position.x + ax * 0.9, y: player.position.y + 0.7 + ay * 0.3,
+        x: mz.x, y: mz.y,
         vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
         damage: 14, owner: player, gravity: false, life: 0.6, radius: 0.07,
         color: 0xffaa33, tracer: true,
@@ -443,7 +445,7 @@ export class Shotgun extends Weapon {
     player.body.velocity.x -= ax * rec;
     if (!player.grounded) player.body.velocity.y -= ay * 4;
     audio.shoot(); audio.shoot();
-    this.game.fx.particles.burst(player.position.x + ax, player.position.y + 0.7, 0, { count: 12, speed: 6, color: 0xff8833 });
+    this.game.fx.particles.burst(mz.x, mz.y, 0, { count: 12, speed: 6, color: 0xff8833 });
     this.game.fx.camera.punch(0.3);
   }
 }
@@ -459,6 +461,7 @@ export class Minigun extends Weapon {
     this.poseLeft = 'support';
     this.ammo = 60;
     this.length = 0.85;
+    this.barrelOffset = 0.90;
     this._state = 'idle';      // 'idle' | 'spinningUp' | 'firing' | 'spinningDown'
     this._stateTimer = 0;
     this._fireAccum = 0;
@@ -532,8 +535,9 @@ export class Minigun extends Weapon {
   fire(player) {
     const aim = this.effectiveAimDir ?? player.aimDir;
     const a = Math.atan2(aim.y, aim.x) + rand(-0.06, 0.06);
+    const mz = this._muzzlePos(player);
     new Projectile(this.game, {
-      x: player.position.x + aim.x * 1, y: player.position.y + 0.7 + aim.y * 0.3,
+      x: mz.x, y: mz.y,
       vx: Math.cos(a) * 42, vy: Math.sin(a) * 42, damage: 9, owner: player,
       gravity: false, life: 1.2, radius: 0.06, color: 0xffcc33, tracer: true,
     });
@@ -555,6 +559,7 @@ export class SMG extends Weapon {
     this.poseLeft = 'support';
     this.ammo = 60;
     this.length = 0.55;
+    this.barrelOffset = 0.55;
     this._held = false;
     this._fireAccum = 0;
   }
@@ -595,8 +600,9 @@ export class SMG extends Weapon {
     const aim = this.effectiveAimDir ?? player.aimDir;
     const a = Math.atan2(aim.y, aim.x) + rand(-0.07, 0.07);
     const sp = 40;
+    const mz = this._muzzlePos(player);
     new Projectile(this.game, {
-      x: player.position.x + aim.x * 0.7, y: player.position.y + 0.7 + aim.y * 0.3,
+      x: mz.x, y: mz.y,
       vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
       damage: 6, owner: player, gravity: false, life: 1.2, radius: 0.05,
       color: 0xffcc66, tracer: true,
@@ -618,6 +624,7 @@ export class AssaultRifle extends Weapon {
     this.poseLeft = 'support';
     this.ammo = 30;
     this.length = 0.95;
+    this.barrelOffset = 1.00;
     this._burstRemaining = 0;
     this._burstAccum = 0;
     this._burstShotIndex = 0;
@@ -662,8 +669,9 @@ export class AssaultRifle extends Weapon {
     const spread = [0.035, 0.025, 0.015][shotIndex] ?? 0.02;
     const a = Math.atan2(aim.y, aim.x) + rand(-spread, spread);
     const sp = 50;
+    const mz = this._muzzlePos(player);
     new Projectile(this.game, {
-      x: player.position.x + aim.x * 0.95, y: player.position.y + 0.7 + aim.y * 0.3,
+      x: mz.x, y: mz.y,
       vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
       damage: 12, owner: player, gravity: false, life: 1.4, radius: 0.06,
       color: 0xffeecc, tracer: true,
@@ -685,6 +693,7 @@ export class Revolver extends Weapon {
     this.poseLeft = null;          // 1H
     this.ammo = 6;
     this.length = 0.55;
+    this.barrelOffset = 0.50;
     this._hammerCock = 0;
   }
   _buildMesh() {
@@ -706,8 +715,9 @@ export class Revolver extends Weapon {
   fire(player) {
     const aim = this.effectiveAimDir ?? player.aimDir;
     const sp = 60;
+    const mz = this._muzzlePos(player);
     new Projectile(this.game, {
-      x: player.position.x + aim.x * 0.7, y: player.position.y + 0.7 + aim.y * 0.3,
+      x: mz.x, y: mz.y,
       vx: aim.x * sp, vy: aim.y * sp,
       damage: 35, owner: player, gravity: false, life: 1.5, radius: 0.09,
       color: 0xffaa55, emissive: 0xff7733, tracer: true,
@@ -717,7 +727,7 @@ export class Revolver extends Weapon {
     player.body.velocity.x -= aim.x * rec;
     if (!player.grounded) player.body.velocity.y -= aim.y * 0.4;
     this.game.fx.camera.punch(0.18);
-    this.game.fx.particles.burst(player.position.x + aim.x, player.position.y + 0.7, 0,
+    this.game.fx.particles.burst(mz.x, mz.y, 0,
       { count: 7, speed: 5, color: 0xffaa55 });
     this._hammerCock = 1;
   }
@@ -741,6 +751,7 @@ export class Crossbow extends Weapon {
     this.poseLeft = 'support';   // 2H
     this.ammo = 8;
     this.length = 0.85;
+    this.barrelOffset = 0.55;
     this._postFireTimer = 0;
   }
   _buildMesh() {
@@ -774,8 +785,9 @@ export class Crossbow extends Weapon {
       g.add(shaft, tip, fletch);
       return g;
     })();
+    const mz = this._muzzlePos(player);
     const proj = new Projectile(this.game, {
-      x: player.position.x + aim.x * 0.95, y: player.position.y + 0.7 + aim.y * 0.3,
+      x: mz.x, y: mz.y,
       vx: aim.x * sp, vy: aim.y * sp,
       damage: 28, owner: player, mesh: boltMesh,
       gravity: true, gravityScale: 0.5,
@@ -811,6 +823,7 @@ export class Flamethrower extends Weapon {
     this.poseLeft = 'support';
     this.ammo = 100;
     this.length = 0.75;
+    this.barrelOffset = 0.55;
     this._held = false;
     this._tickAccum = 0;
     this._tickDur = 1 / 30;
@@ -924,6 +937,7 @@ export class DualPistols extends Weapon {
     this.poseLeft = 'aim';        // dual — both arms aim independently
     this.ammo = 24;
     this.length = 0.55;
+    this.barrelOffset = 0.55;
     this._nextHand = 'R';
   }
   _buildMesh() {
@@ -1073,6 +1087,7 @@ export class RPG extends Weapon {
     this.poseRight = 'aim';
     this.poseLeft = 'support';
     this.ammo = 1;
+    this.barrelOffset = 0.85;
   }
   _buildMesh() {
     const grp = new THREE.Group();
@@ -1085,8 +1100,9 @@ export class RPG extends Weapon {
   }
   fire(player) {
     const aim = this.effectiveAimDir ?? player.aimDir;
+    const mz = this._muzzlePos(player);
     new Projectile(this.game, {
-      x: player.position.x + aim.x * 0.9, y: player.position.y + 0.7 + aim.y * 0.3,
+      x: mz.x, y: mz.y,
       vx: aim.x * 28, vy: aim.y * 28, damage: 0, owner: player,
       gravity: false, life: 2.2, radius: 0.15,
       explosive: true, explodeOnContact: true, color: 0xff4d6d, emissive: 0xaa0030,
@@ -1115,6 +1131,7 @@ export class SniperRifle extends Weapon {
     this.poseRight = 'aim';
     this.poseLeft = 'support';
     this.ammo = 3;
+    this.barrelOffset = 1.27;
     this._laser = null;
     this._laserDot = null;
     this._tracerTime = 0;
