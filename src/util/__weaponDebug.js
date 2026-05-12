@@ -425,6 +425,26 @@ window.__test_ar_three_burst = function () {
   if (sm.weapon === w) { w.destroy(); sm.weapon = null; }
 };
 
+window.__test_flamethrower_cone_ignites = async function () {
+  const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
+  const target = window.game?.players?.find(p => p && p.alive && !p.isLocal);
+  window.__weaponTest.assert(sm && target, 'need local + non-local players');
+  const reg = window.game.weaponRegistry || {};
+  const FT = reg.Flamethrower;
+  window.__weaponTest.assert(FT, 'Flamethrower class missing');
+  const w = new FT(window.game);
+  w.attachTo(sm); sm.weapon = w;
+  // Place target 3m forward
+  target.body.position.x = sm.body.position.x + sm.facing * 3;
+  target.body.position.y = sm.body.position.y;
+  sm.aimDir = { x: sm.facing, y: 0 };
+  w.tryFire(sm);
+  for (let i = 0; i < 10; i++) w.heldTick(1 / 60, sm);
+  window.__weaponTest.assert(target._burnDoT, 'target should be ignited (got _burnDoT=' + target._burnDoT + ')');
+  w.releaseFire(sm);
+  if (sm.weapon === w) { w.destroy(); sm.weapon = null; }
+};
+
 window.__test_fire_patch_cap = async function () {
   const mod = await import('../weapons/fx/FirePatch.js');
   const { spawnFirePatch, getActivePatches, clearAllPatches } = mod;
