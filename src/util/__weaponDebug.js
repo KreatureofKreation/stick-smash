@@ -226,10 +226,10 @@ window.__test_weapon_pose_flags = function () {
   window.__weaponTest.assert(Object.keys(reg).length > 0, 'weaponRegistry should be populated');
   const expected = [
     ['Pistol',      'aim', null],
-    ['Shotgun',     'aim', 'support'],
-    ['SniperRifle', 'aim', 'support'],
-    ['Minigun',     'aim', 'support'],
-    ['RPG',         'aim', 'support'],
+    ['Shotgun',     'aim', null],   // was 'support'
+    ['SniperRifle', 'aim', null],   // was 'support'
+    ['Minigun',     'aim', null],   // was 'support'
+    ['RPG',         'aim', null],   // was 'support'
   ];
   for (const [name, right, left] of expected) {
     const W = reg[name];

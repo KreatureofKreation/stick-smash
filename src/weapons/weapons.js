@@ -413,7 +413,7 @@ export class Shotgun extends Weapon {
     this.fireDelay = 0.6;
     this.aimWeapon = true;
     this.poseRight = 'aim';
-    this.poseLeft = 'support';
+    this.poseLeft = null;
     this.ammo = 4;
     this.barrelOffset = 0.90;
   }
@@ -475,7 +475,7 @@ export class Minigun extends Weapon {
     this.fireDelay = 0.05;
     this.aimWeapon = true;
     this.poseRight = 'aim';
-    this.poseLeft = 'support';
+    this.poseLeft = null;
     this.ammo = 60;
     this.length = 0.85;
     this.barrelOffset = 0.90;
@@ -600,7 +600,7 @@ export class SMG extends Weapon {
     this.fireDelay = 0.06;
     this.aimWeapon = true;
     this.poseRight = 'aim';
-    this.poseLeft = 'support';
+    this.poseLeft = null;
     this.ammo = 60;
     this.length = 0.55;
     this.barrelOffset = 0.55;
@@ -665,7 +665,7 @@ export class AssaultRifle extends Weapon {
     this._burstInterval = 0.05;
     this.aimWeapon = true;
     this.poseRight = 'aim';
-    this.poseLeft = 'support';
+    this.poseLeft = null;
     this.ammo = 30;
     this.length = 0.95;
     this.barrelOffset = 1.00;
@@ -818,7 +818,7 @@ export class Crossbow extends Weapon {
     this.fireDelay = 0.9;
     this.aimWeapon = true;
     this.poseRight = 'aim';
-    this.poseLeft = 'support';   // 2H
+    this.poseLeft = null;        // 1H outstretched
     this.ammo = 8;
     this.length = 1.2;
     this.barrelOffset = 0.85;
@@ -890,7 +890,7 @@ export class Flamethrower extends Weapon {
     this.fireDelay = 0.04;       // 25Hz fire rate while held
     this.aimWeapon = true;
     this.poseRight = 'aim';
-    this.poseLeft = 'support';
+    this.poseLeft = null;
     this.ammo = 80;              // ~3.2s sustained
     this.length = 0.65;
     this.barrelOffset = 0.55;
@@ -1137,7 +1137,7 @@ export class RPG extends Weapon {
     this.fireDelay = 1.2;
     this.aimWeapon = true;
     this.poseRight = 'aim';
-    this.poseLeft = 'support';
+    this.poseLeft = null;
     this.ammo = 1;
     this.barrelOffset = 0.85;
   }
@@ -1181,7 +1181,7 @@ export class SniperRifle extends Weapon {
     this.fireDelay = 1.0;
     this.aimWeapon = true;
     this.poseRight = 'aim';
-    this.poseLeft = 'support';
+    this.poseLeft = null;
     this.ammo = 3;
     this.barrelOffset = 1.27;
     this._laser = null;
