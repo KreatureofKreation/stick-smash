@@ -541,10 +541,11 @@ export class Minigun extends Weapon {
       vx: Math.cos(a) * 42, vy: Math.sin(a) * 42, damage: 9, owner: player,
       gravity: false, life: 1.2, radius: 0.06, color: 0xffcc33, tracer: true,
     });
-    const rec = player.grounded ? 0.15 : 0.45;
+    const rec = player.grounded ? 1.2 : 3.5;       // hard to control, like a real minigun
     player.body.velocity.x -= aim.x * rec;
+    if (!player.grounded) player.body.velocity.y -= aim.y * 1.5;  // air = even pushier
     audio.shoot();
-    this.game.fx.camera.punch(0.04);
+    this.game.fx.camera.punch(0.12);                // ~3× cam shake
   }
 }
 
