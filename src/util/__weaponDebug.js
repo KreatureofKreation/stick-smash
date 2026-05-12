@@ -344,3 +344,31 @@ window.__test_smg_full_auto = function () {
   while (window.game.projectiles.length) window.game.projectiles.pop().destroy?.();
   if (sm.weapon === w) { w.destroy(); sm.weapon = null; }
 };
+
+window.__test_ar_three_burst = function () {
+  const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
+  window.__weaponTest.assert(sm, 'need local live player');
+  const reg = window.game.weaponRegistry || {};
+  const AR = reg.AssaultRifle;
+  window.__weaponTest.assert(AR, 'AssaultRifle class missing');
+  const w = new AR(window.game);
+  w.attachTo(sm); sm.weapon = w;
+  sm.aimDir = { x: 1, y: 0 };
+  const before = window.game.projectiles.length;
+  w.tryFire(sm);
+  for (let i = 0; i < 12; i++) w.heldTick(1 / 60, sm); // 0.2s — covers 3 burst shots @ 0.05s
+  const after = window.game.projectiles.length;
+  window.__weaponTest.assert(after - before === 3, 'AR single tap should fire exactly 3 shots (got ' + (after - before) + ')');
+  // Holding (without re-tapping tryFire) should NOT auto-burst more.
+  for (let i = 0; i < 12; i++) w.heldTick(1 / 60, sm);
+  const sustained = window.game.projectiles.length;
+  window.__weaponTest.assert(sustained - after === 0, 'AR should not auto-burst on held attack (got ' + (sustained - after) + ' extra)');
+  // After 0.4s cooldown, another tap fires another 3.
+  for (let i = 0; i < 25; i++) w.heldTick(1 / 60, sm);
+  w.tryFire(sm);
+  for (let i = 0; i < 12; i++) w.heldTick(1 / 60, sm);
+  const second = window.game.projectiles.length;
+  window.__weaponTest.assert(second - sustained === 3, 'AR second tap after cooldown should fire 3 (got ' + (second - sustained) + ')');
+  while (window.game.projectiles.length) window.game.projectiles.pop().destroy?.();
+  if (sm.weapon === w) { w.destroy(); sm.weapon = null; }
+};
