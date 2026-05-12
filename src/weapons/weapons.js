@@ -1697,6 +1697,32 @@ export class HulkHands extends Weapon {
     super.destroy();
   }
 
+  // Compact the two fist children into local-space positions around the
+  // parent origin before the weapon goes back into the world. Held-mode
+  // updateMesh sets each fist to a WORLD position via getWorldPosition;
+  // without recentering, throwing the weapon would make both fists orbit
+  // the parent in a huge arc as the body spins. (Same fix as DualPistols.)
+  _packForWorld() {
+    if (this._fistR) {
+      this._fistR.position.set(0.0, 0.10, 0);
+      this._fistR.rotation.set(0, 0, 0);
+      this._fistR.scale.set(HULK_FIST_SCALE, HULK_FIST_SCALE, HULK_FIST_SCALE);
+    }
+    if (this._fistL) {
+      this._fistL.position.set(0.0, -0.10, 0);
+      this._fistL.rotation.set(0, 0, 0);
+      this._fistL.scale.set(-HULK_FIST_SCALE, HULK_FIST_SCALE, HULK_FIST_SCALE);
+    }
+  }
+  spawnAt(x, y, z = 0) {
+    this._packForWorld();
+    return super.spawnAt(x, y, z);
+  }
+  dropAt(pos, vel) {
+    this._packForWorld();
+    return super.dropAt(pos, vel);
+  }
+
   updateMesh(player) {
     if (!player) return;
     const rig = player.rig;
