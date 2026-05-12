@@ -416,8 +416,15 @@ export class Pistol extends Weapon {
       color: 0xffcc33, emissive: 0xffaa00, tracer: true,
     });
     audio.shoot();
-    const rec = player.grounded ? 0.5 : 1.4;
-    player.body.velocity.x -= aim.x * rec;
+    // Sub-B recoil-jump — opposite aim direction. Y kept full (no damping)
+    // so shooting straight down recoil-jumps straight up — the whole
+    // point of the mechanic.
+    if (window.__forceFeatures?.recoil !== 0) {
+      const recoilMag = this.recoilImpulse;
+      if (recoilMag > 0) {
+        player.applyImpulse(-aim.x * recoilMag, -aim.y * recoilMag);
+      }
+    }
     this.game.fx.particles.burst(mz.x, mz.y, 0, { count: 5, speed: 4, color: 0xffaa33 });
     this.game.fx.camera.punch(0.08);
   }
@@ -478,10 +485,15 @@ export class Shotgun extends Weapon {
         color: 0xffaa33, tracer: true,
       });
     }
-    // Strong recoil — shotgun blast. Tame on ground, big in air.
-    const rec = player.grounded ? 3 : 8;
-    player.body.velocity.x -= ax * rec;
-    if (!player.grounded) player.body.velocity.y -= ay * 4;
+    // Sub-B recoil-jump — opposite aim direction. Y kept full (no damping)
+    // so shooting straight down recoil-jumps straight up — the whole
+    // point of the mechanic.
+    if (window.__forceFeatures?.recoil !== 0) {
+      const recoilMag = this.recoilImpulse;
+      if (recoilMag > 0) {
+        player.applyImpulse(-aim.x * recoilMag, -aim.y * recoilMag);
+      }
+    }
     audio.shoot(); audio.shoot();
     this.game.fx.particles.burst(mz.x, mz.y, 0, { count: 12, speed: 6, color: 0xff8833 });
     this.game.fx.camera.punch(0.3);
@@ -608,9 +620,15 @@ export class Minigun extends Weapon {
       vx: Math.cos(a) * 42, vy: Math.sin(a) * 42, damage: 9, owner: player,
       gravity: false, life: 1.2, radius: 0.06, color: 0xffcc33, tracer: true,
     });
-    const rec = player.grounded ? 1.2 : 3.5;       // hard to control, like a real minigun
-    player.body.velocity.x -= aim.x * rec;
-    if (!player.grounded) player.body.velocity.y -= aim.y * 1.5;  // air = even pushier
+    // Sub-B recoil-jump — opposite aim direction. Y kept full (no damping)
+    // so shooting straight down recoil-jumps straight up — the whole
+    // point of the mechanic.
+    if (window.__forceFeatures?.recoil !== 0) {
+      const recoilMag = this.recoilImpulse;
+      if (recoilMag > 0) {
+        player.applyImpulse(-aim.x * recoilMag, -aim.y * recoilMag);
+      }
+    }
     audio.shoot();
     this.game.fx.camera.punch(0.12);                // ~3× cam shake
   }
@@ -679,6 +697,15 @@ export class SMG extends Weapon {
       color: 0xffcc66, tracer: true,
     });
     audio.shoot();
+    // Sub-B recoil-jump — opposite aim direction. Y kept full (no damping)
+    // so shooting straight down recoil-jumps straight up — the whole
+    // point of the mechanic.
+    if (window.__forceFeatures?.recoil !== 0) {
+      const recoilMag = this.recoilImpulse;
+      if (recoilMag > 0) {
+        player.applyImpulse(-aim.x * recoilMag, -aim.y * recoilMag);
+      }
+    }
     this.game.fx.camera.punch(0.025);
   }
 }
@@ -751,6 +778,15 @@ export class AssaultRifle extends Weapon {
       color: 0xffeecc, tracer: true,
     });
     audio.shoot();
+    // Sub-B recoil-jump — opposite aim direction. Y kept full (no damping)
+    // so shooting straight down recoil-jumps straight up — the whole
+    // point of the mechanic.
+    if (window.__forceFeatures?.recoil !== 0) {
+      const recoilMag = this.recoilImpulse;
+      if (recoilMag > 0) {
+        player.applyImpulse(-aim.x * recoilMag, -aim.y * recoilMag);
+      }
+    }
     const punch = shotIndex === 0 ? 0.06 : 0.04;
     this.game.fx.camera.punch(punch);
   }
@@ -826,9 +862,15 @@ export class Revolver extends Weapon {
       color: 0xffaa55, emissive: 0xff7733, tracer: true,
     });
     audio.shoot();
-    const rec = player.grounded ? 0.25 : 0.5;
-    player.body.velocity.x -= aim.x * rec;
-    if (!player.grounded) player.body.velocity.y -= aim.y * 0.4;
+    // Sub-B recoil-jump — opposite aim direction. Y kept full (no damping)
+    // so shooting straight down recoil-jumps straight up — the whole
+    // point of the mechanic.
+    if (window.__forceFeatures?.recoil !== 0) {
+      const recoilMag = this.recoilImpulse;
+      if (recoilMag > 0) {
+        player.applyImpulse(-aim.x * recoilMag, -aim.y * recoilMag);
+      }
+    }
     this.game.fx.camera.punch(0.18);
     this.game.fx.particles.burst(mz.x, mz.y, 0,
       { count: 7, speed: 5, color: 0xffaa55 });
@@ -902,6 +944,15 @@ export class Crossbow extends Weapon {
     });
     proj._orientToVel = true;
     audio.shoot();
+    // Sub-B recoil-jump — opposite aim direction. Y kept full (no damping)
+    // so shooting straight down recoil-jumps straight up — the whole
+    // point of the mechanic.
+    if (window.__forceFeatures?.recoil !== 0) {
+      const recoilMag = this.recoilImpulse;
+      if (recoilMag > 0) {
+        player.applyImpulse(-aim.x * recoilMag, -aim.y * recoilMag);
+      }
+    }
     this.game.fx.camera.punch(0.12);
     if (this._stringMesh) this._stringMesh.scale.x = 0.85;
     if (this._boltMesh) this._boltMesh.visible = false;
@@ -1007,6 +1058,15 @@ export class Flamethrower extends Weapon {
       }
     };
     audio.shoot();
+    // Sub-B recoil-jump — opposite aim direction. Y kept full (no damping)
+    // so shooting straight down recoil-jumps straight up — the whole
+    // point of the mechanic.
+    if (window.__forceFeatures?.recoil !== 0) {
+      const recoilMag = this.recoilImpulse;
+      if (recoilMag > 0) {
+        player.applyImpulse(-aim.x * recoilMag, -aim.y * recoilMag);
+      }
+    }
   }
 }
 
@@ -1111,6 +1171,15 @@ export class DualPistols extends Weapon {
       color: 0xffcc55, emissive: 0xffaa22, tracer: true,
     });
     audio.shoot();
+    // Sub-B recoil-jump — opposite aim direction. Y kept full (no damping)
+    // so shooting straight down recoil-jumps straight up — the whole
+    // point of the mechanic.
+    if (window.__forceFeatures?.recoil !== 0) {
+      const recoilMag = this.recoilImpulse;
+      if (recoilMag > 0) {
+        player.applyImpulse(-aim.x * recoilMag, -aim.y * recoilMag);
+      }
+    }
     this.game.fx.camera.punch(0.07);
     this._nextHand = (this._nextHand === 'R') ? 'L' : 'R';
   }
@@ -1230,10 +1299,15 @@ export class RPG extends Weapon {
       explosive: true, explodeOnContact: true, color: 0xff4d6d, emissive: 0xaa0030,
       mesh: { geometry: new THREE.ConeGeometry(0.13, 0.5, 8).rotateZ(-Math.PI / 2), material: new THREE.MeshLambertMaterial({ color: 0xff4d6d, emissive: 0xff4d6d, emissiveIntensity: 0.5 }) },
     });
-    // RPG recoil — meaningful kick on ground, big in air for rocket-jumps.
-    const rec = player.grounded ? 4 : 8;
-    player.body.velocity.x -= aim.x * rec;
-    if (!player.grounded) player.body.velocity.y -= aim.y * 5;
+    // Sub-B recoil-jump — opposite aim direction. Y kept full (no damping)
+    // so shooting straight down recoil-jumps straight up — the whole
+    // point of the mechanic.
+    if (window.__forceFeatures?.recoil !== 0) {
+      const recoilMag = this.recoilImpulse;
+      if (recoilMag > 0) {
+        player.applyImpulse(-aim.x * recoilMag, -aim.y * recoilMag);
+      }
+    }
     audio.shoot(); audio.explode();
     this.game.fx.camera.punch(0.4);
   }
@@ -1392,10 +1466,15 @@ export class SniperRifle extends Weapon {
     const ax = aim.x, ay = aim.y;
     audio.shoot(); audio.beep(220, 0.18, 'sawtooth', 0.4);
     this._tracerTime = 0.18;
-    // Big recoil — air recoil is huge to enable rocket-jump-style boosts.
-    const rec = player.grounded ? 5 : 12;
-    player.body.velocity.x -= ax * rec;
-    if (!player.grounded) player.body.velocity.y -= ay * 5;
+    // Sub-B recoil-jump — opposite aim direction. Y kept full (no damping)
+    // so shooting straight down recoil-jumps straight up — the whole
+    // point of the mechanic.
+    if (window.__forceFeatures?.recoil !== 0) {
+      const recoilMag = this.recoilImpulse;
+      if (recoilMag > 0) {
+        player.applyImpulse(-aim.x * recoilMag, -aim.y * recoilMag);
+      }
+    }
     this.game.fx.camera.punch(0.55);
     this.game.hitStop?.(0.06);
     this.game.fx.particles.burst(cast.from.x, cast.from.y, 0, { count: 14, speed: 8, color: 0xffd060 });
@@ -2711,8 +2790,13 @@ export class Kamehameha extends Weapon {
         }
       }
       // Continuous recoil — visibly slides the player back during the beam.
-      p.body.velocity.x -= ax * 0.6;
-      if (!p.grounded) p.body.velocity.y -= ay * 0.4;
+      // Sub-B: route through applyImpulse so per-frame cap applies.
+      if (window.__forceFeatures?.recoil !== 0) {
+        const recoilMag = this.recoilImpulse;
+        if (recoilMag > 0) {
+          p.applyImpulse(-ax * recoilMag * 0.2, -ay * recoilMag * 0.13);
+        }
+      }
       // Charge orb fades out as beam fires.
       if (this._chargeMesh) {
         const fade = 1 - t;
@@ -2743,9 +2827,15 @@ export class Kamehameha extends Weapon {
     this.game.fx.camera.punch(1.0);
     this.game.hitStop(0.12);
     const ax = this._lockedAim.x, ay = this._lockedAim.y;
-    // Heavy backward yeet — shooter visibly slammed back at the moment of release.
-    if (player.grounded) player.body.velocity.x -= ax * 8;
-    else { player.body.velocity.x -= ax * 14; player.body.velocity.y -= ay * 8; }
+    // Sub-B recoil-jump — opposite aim direction. Y kept full (no damping)
+    // so shooting straight down recoil-jumps straight up — the whole
+    // point of the mechanic.
+    if (window.__forceFeatures?.recoil !== 0) {
+      const recoilMag = this.recoilImpulse;
+      if (recoilMag > 0) {
+        player.applyImpulse(-ax * recoilMag, -ay * recoilMag);
+      }
+    }
     // Ring of energy bursting outward at the release point.
     const handX = player.position.x + ax * 0.85;
     const handY = player.position.y + 0.55 + ay * 0.4;
@@ -2866,8 +2956,15 @@ export class Nuke extends Weapon {
       this.destroy();
     };
     audio.shoot();
-    if (player.grounded) player.body.velocity.x -= ax * 4;
-    else { player.body.velocity.x -= ax * 8; player.body.velocity.y -= ay * 6; }
+    // Sub-B recoil-jump — opposite aim direction. Y kept full (no damping)
+    // so shooting straight down recoil-jumps straight up — the whole
+    // point of the mechanic.
+    if (window.__forceFeatures?.recoil !== 0) {
+      const recoilMag = this.recoilImpulse;
+      if (recoilMag > 0) {
+        player.applyImpulse(-ax * recoilMag, -ay * recoilMag);
+      }
+    }
   }
 }
 
@@ -2930,6 +3027,15 @@ export class LightningStaff extends Weapon {
       prev = { x: best.position.x, y: best.position.y };
     }
     game.fx.camera.punch(0.2);
+    // Sub-B recoil-jump — opposite aim direction. Y kept full (no damping)
+    // so shooting straight down recoil-jumps straight up — the whole
+    // point of the mechanic.
+    if (window.__forceFeatures?.recoil !== 0) {
+      const recoilMag = this.recoilImpulse;
+      if (recoilMag > 0) {
+        player.applyImpulse(-player.aimDir.x * recoilMag, -player.aimDir.y * recoilMag);
+      }
+    }
   }
 }
 
