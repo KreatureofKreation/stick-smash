@@ -645,6 +645,15 @@ export class StickmanRig {
     this.hitTilt = clamp(-fromDirX * intensity * 0.6, -0.7, 0.7);
   }
 
+  // One-frame positional impulse on the head's lag offsets. Driven by
+  // Stickman.headSnap when a projectile lands a headshot. The next damp()
+  // tick eases _headLagX/Y back toward their target — that smooth settle
+  // reads as a snap-back to the player.
+  kickHead(ix, iy) {
+    this._headLagX += ix;
+    this._headLagY += iy;
+  }
+
   // pos: world-space body center (or {0,0,0} when ragdolled — the group carries the body transform).
   update(pos, params) {
     const dt = params.dt || 0.016;
