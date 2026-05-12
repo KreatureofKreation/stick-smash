@@ -26,3 +26,9 @@ window.__weaponTest.run = function (name) {
     throw e;
   }
 };
+
+window.__test_headSnap_exists = function () {
+  const sm = window.game?.players?.find(p => p && p.alive);
+  window.__weaponTest.assert(sm, 'no live player to test against');
+  window.__weaponTest.assert(typeof sm.headSnap === 'function', 'Stickman.headSnap missing');
+};

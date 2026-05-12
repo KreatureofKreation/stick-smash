@@ -423,6 +423,24 @@ export class Stickman {
     return false;
   }
 
+  // Apply a brief impulse to the visual head so a headshot reads as a
+  // snap-back. Pure visual reaction — damage is applied by the caller.
+  // The rig's head position is computed each frame as (torsoTip + _headLag*),
+  // and _headLagX/_headLagY are damped toward a velocity-driven target every
+  // tick. Pushing the lag offsets directly produces a one-frame positional
+  // kick that the existing damp() call then settles back over a few frames —
+  // the closest analog the rig has to a spring impulse.
+  headSnap(ix, iy) {
+    if (!this.alive) return;
+    const rig = this.rig;
+    if (!rig || !rig.head) return;
+    // Magnitude is tuned so a 2× damage headshot from a pistol-class
+    // projectile reads as a clear flick without yanking the head out of the
+    // damp envelope's clamp range.
+    rig._headLagX = (rig._headLagX || 0) + ix;
+    rig._headLagY = (rig._headLagY || 0) + iy;
+  }
+
   die(reason = 'ko') {
     if (this.state === STATE.DEAD) return;
     this._clearCombatState();
