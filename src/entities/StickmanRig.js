@@ -81,88 +81,79 @@ const LAUN = [0.55, 0.75];
 function poseJab(rig, params) {
   const t = clamp(params.attackProgress ?? 0, 0, 1);
   const ph = phaseSplit(t, ...LITE);
-  let armRX, armRY, leanZ, armLX, armLY, footShift;
+  let armRX, armRY, leanZ, armLX, armLY;
   if (ph.p === 0) {
     armRX = lerp(0.20, -0.40, ph.e);
     armRY = lerp(-0.30, 0.50, ph.e);
     armLX = lerp(-0.20, -0.15, ph.e);   // guard hand to chin
     armLY = lerp(-0.30, 0.30, ph.e);
     leanZ = lerp(0, -0.18, ph.e);
-    footShift = lerp(0, -0.05, ph.e);   // weight back on rear leg
   } else if (ph.p === 1) {
     armRX = lerp(-0.40, 0.85, ph.e);    // whip forward
     armRY = lerp(0.50, -0.10, ph.e);
     armLX = lerp(-0.15, -0.30, ph.e);   // guard pulls in tight
     armLY = lerp(0.30, 0.10, ph.e);
     leanZ = lerp(-0.18, 0.30, ph.e);
-    footShift = lerp(-0.05, 0.12, ph.e);// step into the punch
   } else {
     armRX = lerp(0.85, 0.20, ph.e);
     armRY = lerp(-0.10, -0.30, ph.e);
     armLX = lerp(-0.30, -0.20, ph.e);
     armLY = lerp(0.10, -0.30, ph.e);
     leanZ = lerp(0.30, 0, ph.e);
-    footShift = lerp(0.12, 0, ph.e);
   }
-  return { armRX, armRY, armLX, armLY, leanZ, footShift };
+  return { armRX, armRY, armLX, armLY, leanZ };
 }
 
 function poseCross(rig, params) {
   const t = clamp(params.attackProgress ?? 0, 0, 1);
   const ph = phaseSplit(t, ...LITE);
-  let armRX, armRY, leanZ, armLX, armLY, footShift;
+  let armRX, armRY, leanZ, armLX, armLY;
   if (ph.p === 0) {
     armRX = lerp(0.20, -0.50, ph.e);    // deeper rear-shoulder chamber
     armRY = lerp(-0.30, 0.55, ph.e);
     armLX = lerp(-0.20, 0.20, ph.e);    // lead hand chambers forward (jab-guard)
     armLY = lerp(-0.30, 0.15, ph.e);
     leanZ = lerp(0, -0.28, ph.e);
-    footShift = lerp(0, -0.08, ph.e);
   } else if (ph.p === 1) {
     armRX = lerp(-0.50, 0.88, ph.e);    // long extension from hip-twist
     armRY = lerp(0.55, -0.10, ph.e);
     armLX = lerp(0.20, -0.25, ph.e);    // lead retracts to chin
     armLY = lerp(0.15, 0.30, ph.e);
     leanZ = lerp(-0.28, 0.40, ph.e);    // full hip rotation
-    footShift = lerp(-0.08, 0.18, ph.e);// drive off rear foot
   } else {
     armRX = lerp(0.88, 0.20, ph.e);
     armRY = lerp(-0.10, -0.30, ph.e);
     armLX = lerp(-0.25, -0.20, ph.e);
     armLY = lerp(0.30, -0.30, ph.e);
     leanZ = lerp(0.40, 0, ph.e);
-    footShift = lerp(0.18, 0, ph.e);
   }
-  return { armRX, armRY, armLX, armLY, leanZ, footShift };
+  return { armRX, armRY, armLX, armLY, leanZ };
 }
 
 function poseHook(rig, params) {
   const t = clamp(params.attackProgress ?? 0, 0, 1);
   const ph = phaseSplit(t, ...LITE);
-  let armRX, armRY, leanZ, armLX, armLY, footShift;
+  let armRX, armRY, leanZ, armLX, armLY;
   if (ph.p === 0) {
     armRX = lerp(0.20, 0.55, ph.e);     // arm wide to the side
     armRY = lerp(-0.30, 0.50, ph.e);
     armLX = lerp(-0.20, -0.30, ph.e);   // off-arm sweeps opposite (rotational balance)
     armLY = lerp(-0.30, 0.20, ph.e);
     leanZ = lerp(0, 0.18, ph.e);
-    footShift = lerp(0, 0.06, ph.e);    // pivot toward target
   } else if (ph.p === 1) {
     armRX = lerp(0.55, 0.85, ph.e);     // curves to centerline at chin
     armRY = lerp(0.50, -0.05, ph.e);
     armLX = lerp(-0.30, -0.05, ph.e);   // counter-sweeps back through center
     armLY = lerp(0.20, -0.20, ph.e);
     leanZ = lerp(0.18, 0.50, ph.e);
-    footShift = lerp(0.06, 0.14, ph.e);
   } else {
     armRX = lerp(0.85, 0.20, ph.e);
     armRY = lerp(-0.05, -0.30, ph.e);
     armLX = lerp(-0.05, -0.20, ph.e);
     armLY = lerp(-0.20, -0.30, ph.e);
     leanZ = lerp(0.50, 0, ph.e);
-    footShift = lerp(0.14, 0, ph.e);
   }
-  return { armRX, armRY, armLX, armLY, leanZ, footShift };
+  return { armRX, armRY, armLX, armLY, leanZ };
 }
 
 function poseKnee(rig, params) {
