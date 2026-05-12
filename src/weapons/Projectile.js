@@ -331,30 +331,54 @@ export class Projectile {
   }
 }
 
-// Closest distance between a 2D segment AB and another 2D segment CD (the
-// capsule's spine). Used to test if a swept projectile path passes within
-// `radius` of a player's head/body capsule.
-function segmentVsCapsule(a, b, c, d, radius) {
-  const d2 = segSegDistSq(a.x, a.y, b.x, b.y, c.x, c.y, d.x, d.y);
+// True if a 2D swept segment AB passes within `radius` of a vertical capsule
+// spine at x=cx running between y=cy1 and y=cy2. All call sites in this file
+// use vertical spines (player head/body capsules), so we specialize to that
+// case to sidestep the parallel-segment edge case in a generic seg-vs-seg
+// distance solver.
+function segmentVsCapsule(a, b, spineHead, spineTail, radius) {
+  const cx = spineHead.x;
+  const cy1 = Math.min(spineHead.y, spineTail.y);
+  const cy2 = Math.max(spineHead.y, spineTail.y);
+  const d2 = segToVerticalSegDistSq(a.x, a.y, b.x, b.y, cx, cy1, cy2);
   return d2 <= radius * radius;
 }
 
-function segSegDistSq(ax, ay, bx, by, cx, cy, dx, dy) {
-  const ux = bx - ax, uy = by - ay;
-  const vx = dx - cx, vy = dy - cy;
-  const wx = ax - cx, wy = ay - cy;
-  const a = ux * ux + uy * uy;
-  const b = ux * vx + uy * vy;
-  const c = vx * vx + vy * vy;
-  const d = ux * wx + uy * wy;
-  const e = vx * wx + vy * wy;
-  const D = a * c - b * b;
-  let sc, tc;
-  if (D < 1e-9) { sc = 0; tc = (b > c ? d / b : e / c); }
-  else { sc = (b * e - c * d) / D; tc = (a * e - b * d) / D; }
-  sc = Math.max(0, Math.min(1, sc));
-  tc = Math.max(0, Math.min(1, tc));
-  const px = ax + sc * ux - (cx + tc * vx);
-  const py = ay + sc * uy - (cy + tc * vy);
-  return px * px + py * py;
+// Squared closest-point distance between segment AB and a vertical line
+// segment at x=cx from y=cy1 to y=cy2 (cy1 <= cy2).
+//
+// Approach: take the minimum of four candidate squared distances:
+//   1. AB endpoints projected onto the vertical segment (clamp y to [cy1,cy2]).
+//   2. Vertical-segment endpoints projected onto AB (clamp t to [0,1]).
+// One of the four always achieves the true minimum for any 2D pair of
+// segments where one is axis-aligned. No parallel-case branch needed.
+function segToVerticalSegDistSq(ax, ay, bx, by, cx, cy1, cy2) {
+  const dx = bx - ax, dy = by - ay;
+  const len2 = dx * dx + dy * dy;
+
+  // Helper: squared distance from point (qx, qy) to the vertical segment.
+  const dPointToVert = (qx, qy) => {
+    const cy = Math.max(cy1, Math.min(cy2, qy));
+    const ex = qx - cx, ey = qy - cy;
+    return ex * ex + ey * ey;
+  };
+
+  // Helper: squared distance from point (qx, qy) to AB.
+  const dPointToAB = (qx, qy) => {
+    if (len2 < 1e-12) {
+      const ex = qx - ax, ey = qy - ay;
+      return ex * ex + ey * ey;
+    }
+    let t = ((qx - ax) * dx + (qy - ay) * dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    const px = ax + t * dx, py = ay + t * dy;
+    const ex = qx - px, ey = qy - py;
+    return ex * ex + ey * ey;
+  };
+
+  let best = dPointToVert(ax, ay);
+  let d = dPointToVert(bx, by); if (d < best) best = d;
+  d = dPointToAB(cx, cy1);      if (d < best) best = d;
+  d = dPointToAB(cx, cy2);      if (d < best) best = d;
+  return best;
 }
