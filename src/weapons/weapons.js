@@ -1387,11 +1387,11 @@ export class SniperRifle extends Weapon {
 // Throwing knives — fast, light, sticky. High rate of fire, low per-hit dmg.
 // Niche between bow (slow, heavy) and pistol (fast, no stick) — sticks into
 // terrain and players for 5s, leaving visible record of recent fights.
-export class ThrowingKnives extends Weapon {
+export class Shurikens extends Weapon {
   constructor(game) {
     super(game);
-    this.name = 'Knives';
-    this.icon = '🔪';
+    this.name = 'Shurikens';
+    this.icon = '⭐';
     this.fireDelay = 0.18;
     this.aimWeapon = true;
     this.poseRight = 'aim';
@@ -1399,29 +1399,29 @@ export class ThrowingKnives extends Weapon {
   }
   _buildMesh() {
     const grp = new THREE.Group();
-    const blade = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.32, 4), new THREE.MeshLambertMaterial({ color: 0xddddee }));
-    blade.rotation.z = -Math.PI / 2; blade.position.x = 0.25;
-    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.05, 0.05), new THREE.MeshLambertMaterial({ color: 0x332010 }));
-    grip.position.x = 0.05;
-    grp.add(blade, grip);
+    const mat = new THREE.MeshLambertMaterial({ color: 0x888899, emissive: 0x222233 });
+    const armA = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.025, 0.025), mat);
+    const armB = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.18, 0.025), mat);
+    armA.position.x = 0.1; armB.position.x = 0.1;
+    grp.add(armA, armB);
     this.mesh = grp;
   }
   fire(player) {
     const ax = player.aimDir.x, ay = player.aimDir.y;
-    const knifeMat = new THREE.MeshLambertMaterial({ color: 0xddddee });
-    const blade = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.34, 4), knifeMat);
-    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.04, 0.04), new THREE.MeshLambertMaterial({ color: 0x332010 }));
-    grip.position.y = -0.2;
-    blade.position.y = 0.05;
+    // 4-pointed throwing star: two crossed thin boxes
+    const mat = new THREE.MeshLambertMaterial({ color: 0x888899, emissive: 0x222233 });
+    const armA = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.03, 0.03), mat);
+    const armB = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.22, 0.03), mat);
     const grp = new THREE.Group();
-    grp.add(blade, grip);
+    grp.add(armA, armB);
     const proj = new Projectile(this.game, {
       x: player.position.x + ax * 0.7, y: player.position.y + 0.7 + ay * 0.3,
       vx: ax * 38, vy: ay * 38, damage: 22, owner: player,
       gravity: true, gravityScale: 0.2, life: 1.6, radius: 0.05,
-      sticky: true, stickLife: 5, mesh: grp, color: 0xddddee,
+      sticky: true, stickLife: 5, mesh: grp, color: 0x888899,
     });
-    proj._orientToVel = true;
+    // Spin freely as it flies — do NOT orient to velocity.
+    proj.body.angularVelocity.set(0, 0, 25);
     audio.beep(900, 0.05, 'square', 0.18);
     audio.swing();
   }
@@ -2875,7 +2875,7 @@ export const WEAPON_CLASSES = [
   Sword, Bat, Pistol, Shotgun, Minigun, SMG, AssaultRifle, Revolver, Crossbow, Flamethrower, DualPistols, Grenade, RPG, RubberChicken, Boomerang, FishSlap,
   FlameSword, IceSword, Kamehameha, Nuke, LightningStaff, Lightsaber,
   Longsword, Mace, WarHammer, Halberd,
-  SniperRifle, ThrowingKnives, StickyBomb,
+  SniperRifle, Shurikens, StickyBomb,
   HulkHands,
 ];
 export const PICKUP_CLASSES = [
@@ -2903,7 +2903,7 @@ export const SPAWN_TABLE = [
   { cls: Grenade,       w: 8,   id: 'grenade',      label: 'Grenade',       cat: 'ranged' },
   { cls: RPG,           w: 4,   id: 'rpg',          label: 'RPG',           cat: 'ranged' },
   { cls: SniperRifle,   w: 4,   id: 'sniper',       label: 'Sniper Rifle',  cat: 'ranged' },
-  { cls: ThrowingKnives,w: 6,   id: 'knives',       label: 'Throwing Knives', cat: 'ranged' },
+  { cls: Shurikens,     w: 6,   id: 'shurikens',    label: 'Shurikens',     cat: 'ranged' },
   { cls: StickyBomb,    w: 4,   id: 'sticky',       label: 'Sticky Bomb',   cat: 'ranged' },
   { cls: SMG,           w: 10,  id: 'smg',          label: 'SMG',           cat: 'ranged' },
   { cls: AssaultRifle,  w: 9,   id: 'assaultrifle', label: 'Assault Rifle', cat: 'ranged' },
