@@ -16,6 +16,7 @@ export class Weapon {
     this.mesh = null;       // visual when held / in-world
     this.holdOffset = new THREE.Vector3(0.4, 0.1, 0); // local to player
     this.aimWeapon = false; // if true, mesh rotates with aim direction
+    this.length = 0.6;        // mesh length along the barrel axis; subclasses with longer barrels override
     this.poseRight = false; // 'aim' | false — set true on ranged in subclass
     this.poseLeft = null;
     this.holder = null;
