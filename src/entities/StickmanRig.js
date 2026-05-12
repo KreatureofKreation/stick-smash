@@ -1427,12 +1427,12 @@ export class StickmanRig {
       { mask: WORLD_MASK },
     );
     if (fwd && fwd.hitPointWorld) {
-      const hx = fwd.hitPointWorld.x, hy = fwd.hitPointWorld.y;
+      const hitXW = fwd.hitPointWorld.x, hitYW = fwd.hitPointWorld.y;
       // Pull back along ray by LIMB_PAD.
       const inv = 1 / segLen;
       const ux = dxW * inv, uy = dyW * inv;
-      out.x = (hx - ux * LIMB_PAD) - ox;
-      out.y = (hy - uy * LIMB_PAD) - oy;
+      out.x = (hitXW - ux * LIMB_PAD) - ox;
+      out.y = (hitYW - uy * LIMB_PAD) - oy;
       return;
     }
     // Back-ray fallback — hand may already be inside a wall (prior frame
@@ -1444,14 +1444,14 @@ export class StickmanRig {
       { mask: WORLD_MASK },
     );
     if (back && back.hitPointWorld) {
-      const hx = back.hitPointWorld.x, hy = back.hitPointWorld.y;
+      const hitXW = back.hitPointWorld.x, hitYW = back.hitPointWorld.y;
       // The back-ray hit point is the entry surface on the shoulder side
       // of the wall. Pull TOWARD shoulder by LIMB_PAD (along back-ray dir,
       // which is hand→shoulder).
       const inv = 1 / segLen;
       const ux = -dxW * inv, uy = -dyW * inv;
-      out.x = (hx + ux * LIMB_PAD) - ox;
-      out.y = (hy + uy * LIMB_PAD) - oy;
+      out.x = (hitXW + ux * LIMB_PAD) - ox;
+      out.y = (hitYW + uy * LIMB_PAD) - oy;
     }
     // Both rays missed → no penetration → leave (out.x, out.y) at the
     // requested hand position. Already initialized at function entry.
