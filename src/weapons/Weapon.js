@@ -58,6 +58,9 @@ export class Weapon {
       linearDamping: 0.2,
       angularDamping: 0.4,
     });
+    // Box collider 0.6×0.16×0.16m. Y-extent intentionally low so player
+    // walking INTO the side rolls the capsule over the top (standable
+    // weapons per Sub-B §3.4). Friction comes from physics.materials.prop.
     body.addShape(new CANNON.Box(new CANNON.Vec3(0.3, 0.08, 0.08)));
     body.position.set(x, y, z);
     body.userData = { kind: 'weapon', weapon: this };
