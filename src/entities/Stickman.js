@@ -423,6 +423,14 @@ export class Stickman {
     return false;
   }
 
+  // Apply a brief impulse to the visual head/neck so a headshot reads as a
+  // snap-back. Pure visual reaction — damage is applied by the caller. The
+  // rig's head lag has its own damped settle, so a one-frame kick is enough.
+  headSnap(ix, iy) {
+    if (!this.alive) return;
+    this.rig?.kickHead?.(ix, iy);
+  }
+
   die(reason = 'ko') {
     if (this.state === STATE.DEAD) return;
     this._clearCombatState();

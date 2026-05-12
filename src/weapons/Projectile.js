@@ -79,6 +79,11 @@ export class Projectile {
       game.scene.add(this.tracer);
       this._lastPos = new THREE.Vector3(opts.x, opts.y, 0);
     }
+
+    // Per-tick swept hit check — independent of physics body collision so fast
+    // projectiles can't tunnel through thin colliders like the visual head.
+    this._sweepFrom = { x: opts.x, y: opts.y };
+    this._hitPlayers = new Set();
   }
 
   _impact(other, contact) {
@@ -86,6 +91,10 @@ export class Projectile {
     let hitPlayer = null;
     if (other.userData?.kind === 'player') {
       const sm = other.userData.stickman;
+      // If the swept-capsule path already counted this player this tick,
+      // skip the cannon-es path's damage application — otherwise we'd
+      // double-apply on a fast projectile that both swept-hit and contact-hit.
+      if (this._hitPlayers?.has(sm)) return;
       if (sm && sm !== this.owner && sm.alive && sm.invuln <= 0) {
         sm.takeDamage(this.damage, {
           attacker: this.owner,
@@ -252,6 +261,46 @@ export class Projectile {
       }
     }
     this.mesh.position.set(p.x, p.y, p.z);
+    // Swept capsule check vs every opposing player's head + body capsules.
+    // Head hit = 2x damage + head-snap. Body hit = standard damage. A given
+    // player can only be hit once per projectile lifetime via this path.
+    const sweepTo = { x: p.x, y: p.y };
+    for (const player of this.game.players) {
+      if (!player || !player.alive || player === this.owner) continue;
+      if (player.invuln > 0) continue;
+      if (this._hitPlayers.has(player)) continue;
+      const pbody = player.body;
+      if (!pbody) continue;
+      const px = pbody.position.x;
+      const py = pbody.position.y;
+      // Head capsule: top of player body (y+0.45 to y+0.65), r=0.18.
+      const headHit = segmentVsCapsule(this._sweepFrom, sweepTo,
+        { x: px, y: py + 0.45 }, { x: px, y: py + 0.65 }, 0.18);
+      // Body capsule: torso (y-0.30 to y+0.40), r=0.30. Skipped if head hit.
+      const bodyHit = headHit ? false : segmentVsCapsule(this._sweepFrom, sweepTo,
+        { x: px, y: py - 0.30 }, { x: px, y: py + 0.40 }, 0.30);
+      if (!headHit && !bodyHit) continue;
+      const isHead = !!headHit;
+      const dmg = this.damage * (isHead ? 2 : 1);
+      player.takeDamage(dmg, {
+        attacker: this.owner,
+        weapon: 'projectile',
+        kb: { x: this.body.velocity.x * 0.15, y: 5 + Math.abs(this.body.velocity.y) * 0.1 },
+        stun: isHead ? 0.5 : 0.25,
+        isHead,
+      });
+      if (isHead) {
+        const vx = this.body.velocity.x, vy = this.body.velocity.y;
+        const sp = Math.hypot(vx, vy) || 1;
+        // Positional impulse — _headLagX/Y are world-unit offsets. Keep small.
+        player.headSnap?.((vx / sp) * 0.18, (vy / sp) * 0.10 + 0.06);
+      }
+      this._hitPlayers.add(player);
+      if (this.explodeOnContact || this.explosive) this._pendingExplode = true;
+      else this._pendingDestroy = true;
+      break;
+    }
+    this._sweepFrom = { x: p.x, y: p.y };
     if (this._orientToVel) {
       const v = this.body.velocity;
       const ang = Math.atan2(v.y, v.x);
@@ -280,4 +329,56 @@ export class Projectile {
     if (this.mesh.parent) this.mesh.parent.remove(this.mesh);
     if (this.tracer) this.tracer.parent?.remove(this.tracer);
   }
+}
+
+// True if a 2D swept segment AB passes within `radius` of a vertical capsule
+// spine at x=cx running between y=cy1 and y=cy2. All call sites in this file
+// use vertical spines (player head/body capsules), so we specialize to that
+// case to sidestep the parallel-segment edge case in a generic seg-vs-seg
+// distance solver.
+function segmentVsCapsule(a, b, spineHead, spineTail, radius) {
+  const cx = spineHead.x;
+  const cy1 = Math.min(spineHead.y, spineTail.y);
+  const cy2 = Math.max(spineHead.y, spineTail.y);
+  const d2 = segToVerticalSegDistSq(a.x, a.y, b.x, b.y, cx, cy1, cy2);
+  return d2 <= radius * radius;
+}
+
+// Squared closest-point distance between segment AB and a vertical line
+// segment at x=cx from y=cy1 to y=cy2 (cy1 <= cy2).
+//
+// Approach: take the minimum of four candidate squared distances:
+//   1. AB endpoints projected onto the vertical segment (clamp y to [cy1,cy2]).
+//   2. Vertical-segment endpoints projected onto AB (clamp t to [0,1]).
+// One of the four always achieves the true minimum for any 2D pair of
+// segments where one is axis-aligned. No parallel-case branch needed.
+function segToVerticalSegDistSq(ax, ay, bx, by, cx, cy1, cy2) {
+  const dx = bx - ax, dy = by - ay;
+  const len2 = dx * dx + dy * dy;
+
+  // Helper: squared distance from point (qx, qy) to the vertical segment.
+  const dPointToVert = (qx, qy) => {
+    const cy = Math.max(cy1, Math.min(cy2, qy));
+    const ex = qx - cx, ey = qy - cy;
+    return ex * ex + ey * ey;
+  };
+
+  // Helper: squared distance from point (qx, qy) to AB.
+  const dPointToAB = (qx, qy) => {
+    if (len2 < 1e-12) {
+      const ex = qx - ax, ey = qy - ay;
+      return ex * ex + ey * ey;
+    }
+    let t = ((qx - ax) * dx + (qy - ay) * dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    const px = ax + t * dx, py = ay + t * dy;
+    const ex = qx - px, ey = qy - py;
+    return ex * ex + ey * ey;
+  };
+
+  let best = dPointToVert(ax, ay);
+  let d = dPointToVert(bx, by); if (d < best) best = d;
+  d = dPointToAB(cx, cy1);      if (d < best) best = d;
+  d = dPointToAB(cx, cy2);      if (d < best) best = d;
+  return best;
 }

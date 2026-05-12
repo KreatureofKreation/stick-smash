@@ -1,5 +1,6 @@
 // Boot. Rapier WASM init must happen before Game is constructed.
 import { initRapier } from './physics/cannon-shim.js';
+import './util/__weaponDebug.js';
 
 async function boot() {
   try {
