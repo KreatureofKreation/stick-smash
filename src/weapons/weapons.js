@@ -963,6 +963,13 @@ export class DualPistols extends Weapon {
     // independent muzzle anchors). Position each pistol at its respective
     // hand bone, rotate to aim direction.
     if (!player) return;
+    // Reset parent group to origin — child meshes use world coordinates
+    // for their positions, but they'd be offset by any stale parent
+    // transform left over from world-spawn (pickup) state.
+    this.mesh.position.set(0, 0, 0);
+    this.mesh.rotation.set(0, 0, 0);
+    this.mesh.quaternion.identity();
+    this.mesh.scale.set(1, 1, 1);
     const handR = player.rig?.handR?.position;
     const handL = player.rig?.handL?.position;
     const aim = player.aimDir;
