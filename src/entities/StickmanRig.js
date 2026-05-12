@@ -1049,7 +1049,10 @@ export class StickmanRig {
 
     const aim = params.aim || { x: 0, y: 0 };
     const aimAng = Math.atan2(aim.y, aim.x);
-    const aimDist = Math.min(0.7, Math.hypot(aim.x, aim.y) * 0.7 + 0.55);
+    // Aim arm is fully extended along the aim direction (close to maxReach
+    // 0.88) like a melee strike pose. Reads as "weapon at full reach" — the
+    // player can blind-fire over cover by extending the arm up and over.
+    const aimDist = Math.min(0.85, Math.hypot(aim.x, aim.y) * 0.85 + 0.85);
 
     // STRIKE_POSES dispatcher — strikePose is already resolved above (hoisted
     // to fix TDZ); just apply arm override here if the pose defines one.
