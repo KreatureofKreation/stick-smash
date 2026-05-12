@@ -15,6 +15,7 @@ import { Menu } from './ui/Menu.js';
 import { TutorialOverlay } from './ui/TutorialOverlay.js';
 import { Net } from './network/Net.js';
 import { rand, clamp, lerp } from './util/math.js';
+import { Projectile } from './weapons/Projectile.js';
 
 export class Game {
   constructor() {
@@ -1052,4 +1053,9 @@ export class Game {
 
   // Helper for projectiles to register themselves
   registerProjectile(pr) { this.projectiles.push(pr); }
+
+  // Dev-only: spawn a bare projectile for the __weaponDebug harness.
+  spawnTestProjectile(opts) {
+    return new Projectile(this, { ...opts, gravity: false, life: 1 });
+  }
 }
