@@ -913,6 +913,78 @@ export class Flamethrower extends Weapon {
   }
 }
 
+export class DualPistols extends Weapon {
+  constructor(game) {
+    super(game);
+    this.name = 'DualPistols';
+    this.icon = '🔫🔫';
+    this.fireDelay = 0.18;
+    this.aimWeapon = true;
+    this.poseRight = 'aim';
+    this.poseLeft = 'aim';        // dual — both arms aim independently
+    this.ammo = 24;
+    this.length = 0.55;
+    this._nextHand = 'R';
+  }
+  _buildMesh() {
+    const buildOne = (color = 0x333344) => {
+      const grp = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.13, 0.08), new THREE.MeshLambertMaterial({ color }));
+      body.position.x = 0.2;
+      const grip = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.18, 0.08), new THREE.MeshLambertMaterial({ color: 0x222222 }));
+      grip.position.set(0.04, -0.15, 0); grip.rotation.z = -0.18;
+      grp.add(body, grip);
+      return grp;
+    };
+    this._meshR = buildOne(0x333344);
+    this._meshL = buildOne(0x333344);
+    const grp = new THREE.Group();
+    grp.add(this._meshR);
+    grp.add(this._meshL);
+    this.mesh = grp;
+  }
+  updateMesh(player) {
+    // Override: don't run base wall-reorient (would conflict with two
+    // independent muzzle anchors). Position each pistol at its respective
+    // hand bone, rotate to aim direction.
+    if (!player) return;
+    const handR = player.rig?.handR?.position;
+    const handL = player.rig?.handL?.position;
+    const aim = player.aimDir;
+    const ang = Math.atan2(aim.y, aim.x);
+    const facing = player.facing;
+    if (handR && this._meshR) {
+      this._meshR.position.set(handR.x, handR.y, 0);
+      this._meshR.rotation.set(0, 0, ang);
+      this._meshR.scale.set(1, facing >= 0 ? 1 : -1, 1);
+    }
+    if (handL && this._meshL) {
+      this._meshL.position.set(handL.x, handL.y, 0);
+      this._meshL.rotation.set(0, 0, ang);
+      this._meshL.scale.set(1, facing >= 0 ? 1 : -1, 1);
+    }
+    this.effectiveAimDir = { x: aim.x, y: aim.y };
+    this.aimAdjusted = false;
+  }
+  fire(player) {
+    const aim = this.effectiveAimDir ?? player.aimDir;
+    const a = Math.atan2(aim.y, aim.x) + rand(-0.018, 0.018);
+    const sp = 38;
+    const handBone = (this._nextHand === 'R') ? player.rig?.handR : player.rig?.handL;
+    const mx = handBone?.position?.x ?? (player.position.x + aim.x * 0.7);
+    const my = handBone?.position?.y ?? (player.position.y + 0.7);
+    new Projectile(this.game, {
+      x: mx + aim.x * 0.3, y: my + aim.y * 0.3,
+      vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+      damage: 12, owner: player, gravity: false, life: 1.5, radius: 0.07,
+      color: 0xffcc55, emissive: 0xffaa22, tracer: true,
+    });
+    audio.shoot();
+    this.game.fx.camera.punch(0.07);
+    this._nextHand = (this._nextHand === 'R') ? 'L' : 'R';
+  }
+}
+
 // === EXPLOSIVES ===
 
 export class Grenade extends Weapon {
@@ -2724,7 +2796,7 @@ export class ForceChokePower {
 
 // Catalog of all weapons and weighted pool for spawns.
 export const WEAPON_CLASSES = [
-  Sword, Bat, Pistol, Shotgun, Minigun, SMG, AssaultRifle, Revolver, Crossbow, Flamethrower, Grenade, RPG, RubberChicken, Boomerang, FishSlap,
+  Sword, Bat, Pistol, Shotgun, Minigun, SMG, AssaultRifle, Revolver, Crossbow, Flamethrower, DualPistols, Grenade, RPG, RubberChicken, Boomerang, FishSlap,
   FlameSword, IceSword, Kamehameha, Nuke, LightningStaff, Lightsaber,
   Longsword, Mace, WarHammer, Halberd,
   SniperRifle, ThrowingKnives, StickyBomb,

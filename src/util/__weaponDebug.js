@@ -425,6 +425,36 @@ window.__test_ar_three_burst = function () {
   if (sm.weapon === w) { w.destroy(); sm.weapon = null; }
 };
 
+window.__test_dual_pistols_alt_fire = function () {
+  const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
+  window.__weaponTest.assert(sm, 'need local live player');
+  const reg = window.game.weaponRegistry || {};
+  const DP = reg.DualPistols;
+  window.__weaponTest.assert(DP, 'DualPistols class missing');
+  const w = new DP(window.game);
+  w.attachTo(sm); sm.weapon = w;
+  window.__weaponTest.assert(w.poseRight === 'aim', 'poseRight should be aim');
+  window.__weaponTest.assert(w.poseLeft === 'aim', 'poseLeft should be aim (dual)');
+  sm.input = { ...sm.input, aimActive: true };
+  sm.aimDir = { x: 1, y: 0 };
+  sm._syncRig(1 / 60, false);
+  window.__weaponTest.assert(sm._lastArmPoseR === 'aim', 'right arm should aim (got ' + sm._lastArmPoseR + ')');
+  window.__weaponTest.assert(sm._lastArmPoseL === 'aim', 'left arm should aim (got ' + sm._lastArmPoseL + ')');
+  // Fire 4 shots — should alternate hand.
+  const seen = [];
+  const origFire = w.fire.bind(w);
+  w.fire = function (player) { seen.push(this._nextHand); origFire(player); };
+  w.tryFire(sm); w.cooldown = 0;
+  w.tryFire(sm); w.cooldown = 0;
+  w.tryFire(sm); w.cooldown = 0;
+  w.tryFire(sm);
+  window.__weaponTest.assert(seen.length === 4, 'should record 4 shots (got ' + seen.length + ')');
+  const alt = (seen[0] !== seen[1]) && (seen[1] !== seen[2]) && (seen[2] !== seen[3]);
+  window.__weaponTest.assert(alt, 'fire should alternate hand each click (got ' + seen.join(',') + ')');
+  while (window.game.projectiles.length) window.game.projectiles.pop().destroy?.();
+  if (sm.weapon === w) { w.destroy(); sm.weapon = null; }
+};
+
 window.__test_flamethrower_cone_ignites = async function () {
   const sm = window.game?.players?.find(p => p && p.isLocal && p.alive);
   const target = window.game?.players?.find(p => p && p.alive && !p.isLocal);
