@@ -1599,30 +1599,30 @@ export class Stickman {
       return;
     }
 
-  // --- RETURNING ---
-  if (mode === 'returning') {
-    const RETURN_ACCEL = T.RETURN_ACCEL ?? 40;
-    const RETURN_VEL_CAP = T.RETURN_VEL_CAP ?? 25;
-    const planet = this._nearestPlanet();
-    if (!planet) return;
-    const px = this.body.position.x, py = this.body.position.y;
-    const dx = planet.cx - px, dy = planet.cy - py;
-    const r = Math.hypot(dx, dy) || 1;
-    const ux = dx / r, uy = dy / r;
-    this.body.velocity.x += ux * RETURN_ACCEL * dt;
-    this.body.velocity.y += uy * RETURN_ACCEL * dt;
-    const vMag = Math.hypot(this.body.velocity.x, this.body.velocity.y);
-    if (vMag > RETURN_VEL_CAP) {
-      const f = RETURN_VEL_CAP / vMag;
-      this.body.velocity.x *= f;
-      this.body.velocity.y *= f;
+    // --- RETURNING ---
+    if (mode === 'returning') {
+      const RETURN_ACCEL = T.RETURN_ACCEL ?? 40;
+      const RETURN_VEL_CAP = T.RETURN_VEL_CAP ?? 25;
+      const planet = this._nearestPlanet();
+      if (!planet) return;
+      const px = this.body.position.x, py = this.body.position.y;
+      const dx = planet.cx - px, dy = planet.cy - py;
+      const r = Math.hypot(dx, dy) || 1;
+      const ux = dx / r, uy = dy / r;
+      this.body.velocity.x += ux * RETURN_ACCEL * dt;
+      this.body.velocity.y += uy * RETURN_ACCEL * dt;
+      const vMag = Math.hypot(this.body.velocity.x, this.body.velocity.y);
+      if (vMag > RETURN_VEL_CAP) {
+        const f = RETURN_VEL_CAP / vMag;
+        this.body.velocity.x *= f;
+        this.body.velocity.y *= f;
+      }
+      if (r < planet.haloRadius) {
+        this._planetMode = 'jumping';
+        this._modeStickPlanet = planet;
+      }
+      return;
     }
-    if (r < planet.haloRadius) {
-      this._planetMode = 'jumping';
-      this._modeStickPlanet = planet;
-    }
-    return;
-  }
   }
 
   _move(dt) {
