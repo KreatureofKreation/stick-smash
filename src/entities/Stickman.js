@@ -1480,6 +1480,8 @@ export class Stickman {
   _movePlanetMagnetic(dt, moveX, boosted, flying) {
     const T = window.__planet ?? {};
     const JUMP_DOWN_ACCEL = T.JUMP_DOWN_ACCEL ?? 30;
+    const AIR_ACCEL = T.AIR_ACCEL ?? 18;
+    const CAPSULE_OFFSET = 0.95;  // matches existing _updateGroundCheck capsule offset
     const mode = this._planetMode;
 
     // --- WALKING ---
@@ -1494,7 +1496,7 @@ export class Stickman {
       const tx = -uy, ty = ux;
 
       // Hard radial snap: lock to surface + capsule offset.
-      const surfaceR = planet.radius + 0.95;  // 0.95 matches existing capsule offset
+      const surfaceR = planet.radius + CAPSULE_OFFSET;  // 0.95 matches existing capsule offset
       this.body.position.x = planet.cx + ux * surfaceR;
       this.body.position.y = planet.cy + uy * surfaceR;
 
@@ -1556,14 +1558,14 @@ export class Stickman {
       const speedMaxAir = 4.0;
       const targetT = moveX * speedMaxAir;
       const dvT = targetT - vT;
-      const stepT = clamp(dvT, -18 * dt, 18 * dt);
+      const stepT = clamp(dvT, -AIR_ACCEL * dt, AIR_ACCEL * dt);
       const newVT = vT + stepT;
       const vR = this.body.velocity.x * ux + this.body.velocity.y * uy;
       this.body.velocity.x = newVT * tx + vR * ux;
       this.body.velocity.y = newVT * ty + vR * uy;
 
       // Land check: radial vel ≤ 0 AND inside the surface band.
-      const surfaceR = planet.radius + 0.95;
+      const surfaceR = planet.radius + CAPSULE_OFFSET;
       if (vR <= 0 && r <= surfaceR + 0.2) {
         this._planetMode = 'walking';
         this._modeStickPlanet = null;
