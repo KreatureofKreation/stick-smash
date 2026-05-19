@@ -15,6 +15,7 @@ export class Planet {
     this.mantleRadius = cfg.mantleRadius ?? cfg.radius * 0.65;
     this.coreRadius = cfg.coreRadius ?? cfg.radius * 0.3;
     this.mass = cfg.mass ?? cfg.radius * cfg.radius * cfg.radius * 1.0;
+    this.pullStrength = cfg.pullStrength ?? 15;  // m/s² applied inside halo (constant-pull model)
     this.haloMul = cfg.haloMul ?? 3;
     this.crustWedges = cfg.crustWedges ?? 16;
     this.mantleWedges = cfg.mantleWedges ?? 8;
