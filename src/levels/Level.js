@@ -4,7 +4,7 @@ import { COL_GROUPS } from '../physics/PhysicsWorld.js';
 import { audio } from '../audio/Audio.js';
 import { rand } from '../util/math.js';
 import { Planet } from './space/Planet.js';
-import { makePlanetGravity } from './space/PlanetGravity.js';
+import { makeProjectileGravity } from './space/PlanetGravity.js';
 import { MeteorShower } from './space/MeteorShower.js';
 
 // Level = grid of destructible tiles + static walls + hazards + spawn points + sky.
@@ -628,7 +628,7 @@ export class Level {
       }
       // Custom multi-planet gravity. World gravity is already 0 (set per
       // level def). Pre-step accumulates summed pull onto each dynamic body.
-      this._planetGravityFn = makePlanetGravity(this, this.game);
+      this._planetGravityFn = makeProjectileGravity(this, this.game);
       this.physics.addPreStep(this._planetGravityFn);
     }
 
