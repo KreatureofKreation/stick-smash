@@ -183,6 +183,9 @@ export class Stickman {
     this.crouching = false;
     this.sliding = false;
     this._currentPlanetRef = null;     // populated by _updateGroundCheck on curved-gravity levels
+    this._planetMode = 'walking';        // 'walking' | 'jumping' | 'launched' | 'returning'
+    this._launchTimer = 0;               // seconds remaining in 'launched' mode
+    this._modeStickPlanet = null;        // planet captured at jump start; sticky during jumping
 
     // Combat
     this.attackTimer = 0;        // counts down through swing
@@ -1447,6 +1450,23 @@ export class Stickman {
       const dy = p.cy - this.body.position.y;
       const d2 = dx * dx + dy * dy;
       if (d2 > p.haloRadius * p.haloRadius) continue;
+      if (d2 < bestD2) { bestD2 = d2; best = p; }
+    }
+    return best;
+  }
+
+  // Nearest planet by Euclidean distance. Unlike _currentPlanet (which uses
+  // haloRadius gating), this never returns null when planets exist — used by
+  // 'returning' to pick a target after a knockback. Halo logic is for the
+  // constant-pull projectile gravity, not the magnetic player snap.
+  _nearestPlanet() {
+    const planets = this.game?.level?.planets;
+    if (!planets || !planets.length) return null;
+    const px = this.body.position.x, py = this.body.position.y;
+    let best = null, bestD2 = Infinity;
+    for (const p of planets) {
+      const dx = p.cx - px, dy = p.cy - py;
+      const d2 = dx * dx + dy * dy;
       if (d2 < bestD2) { bestD2 = d2; best = p; }
     }
     return best;
