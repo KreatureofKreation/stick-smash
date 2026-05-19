@@ -1563,8 +1563,23 @@ export class Stickman {
 
     // --- JUMPING ---
     if (mode === 'jumping') {
-      const planet = this._modeStickPlanet ?? this._nearestPlanet();
+      // Planet hand-off: stay stuck to source planet until we've left its halo,
+      // then re-target the nearest planet. Lets jumps cross between bodies
+      // without yanking sideways early in the arc.
+      let planet = this._modeStickPlanet ?? this._nearestPlanet();
       if (!planet) return;
+      if (this._modeStickPlanet) {
+        const sx = this.body.position.x - this._modeStickPlanet.cx;
+        const sy = this.body.position.y - this._modeStickPlanet.cy;
+        const sd = Math.hypot(sx, sy);
+        if (sd > this._modeStickPlanet.haloRadius) {
+          const near = this._nearestPlanet();
+          if (near && near !== this._modeStickPlanet) {
+            planet = near;
+            this._modeStickPlanet = near;
+          }
+        }
+      }
       const px = this.body.position.x, py = this.body.position.y;
       const dx = px - planet.cx, dy = py - planet.cy;
       const r = Math.hypot(dx, dy) || 1;
@@ -1581,7 +1596,22 @@ export class Stickman {
       const dvT = targetT - vT;
       const stepT = clamp(dvT, -AIR_ACCEL * dt, AIR_ACCEL * dt);
       const newVT = vT + stepT;
-      const vR = this.body.velocity.x * ux + this.body.velocity.y * uy;
+      let vR = this.body.velocity.x * ux + this.body.velocity.y * uy;
+
+      // Air jump — radial impulse outward from current planet. Consumes one
+      // airJumpsLeft. Same cooldown as ground jump so a held button on takeoff
+      // doesn't immediately burn an air jump.
+      const wantJump = this.input.jumpPressed && performance.now() >= (this._jumpInputCooldown || 0);
+      if (wantJump && this.airJumpsLeft > 0) {
+        if (this.charging) this._clearCombatState();
+        this.airJumpsLeft--;
+        vR = 8;
+        this._jumpLockUntil = performance.now() + 80;
+        this._jumpInputCooldown = performance.now() + 120;
+        audio.jump?.();
+        if (this === this.game?.localPlayer) vibrate(12);
+      }
+
       this.body.velocity.x = newVT * tx + vR * ux;
       this.body.velocity.y = newVT * ty + vR * uy;
 
