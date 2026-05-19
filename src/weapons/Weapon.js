@@ -28,7 +28,8 @@ export class Weapon {
     this.dropCooldown = 0;
     // Sub-B impulse tuning — defaults 0 = no force. Per-weapon overrides
     // in weapons.js.
-    this.recoilImpulse = 0;       // firearm recoil magnitude
+    this.recoilImpulse = 0;       // firearm recoil magnitude (single-shot)
+    this.continuousRecoilImpulse = 0;  // sustained-beam recoil, impulse/sec (× dt at call site)
     this.throwImpulse = 0;        // self-impulse when thrown
     this.meleeRecoilImpulse = 0;  // self-impulse on melee strike
     this.hitKnockback = 1.0;      // multiplier for victim knockback on damage

@@ -121,7 +121,7 @@ window.__test_weapon_wall_reorient = function () {
   sm.body.position.y = Math.max(probe.hitPointWorld.y - 0.55, 1.0);
   // Step physics + sync rig many times so the (PR-X-softer) aim-pose spring
   // settles to the new body position. One sync isn't enough at K=200/D=14.
-  sm.aimDir = { x: dir, y: 0 };
+  sm.aimDir.set(dir, 0);
   sm.input = { ...sm.input, aimActive: true };
   for (let i = 0; i < 30; i++) { window.game.physics.step(1 / 60); sm._syncRig(1 / 60, false); }
   const handR = sm.rig?.handR?.position;
@@ -140,7 +140,7 @@ window.__test_weapon_wall_reorient = function () {
   const nnx = nx / nlen, nny = ny / nlen;
 
   // Case A: aim straight forward into the wall.
-  sm.aimDir = { x: sm.facing, y: 0 };
+  sm.aimDir.set(sm.facing, 0);
   sm.input = { ...sm.input, aimActive: true };
   sm.weapon.updateMesh(sm);
   window.__weaponTest.assert(sm.weapon.aimAdjusted === true, 'aimAdjusted should be true on wall hit');
@@ -153,7 +153,7 @@ window.__test_weapon_wall_reorient = function () {
   // Case B: aim slightly UP into the wall — effective aim Y should be > 0.
   sm.weapon.aimAdjusted = false;
   sm.weapon.effectiveAimDir = null;
-  sm.aimDir = { x: sm.facing * 0.95, y: 0.31 };
+  sm.aimDir.set(sm.facing * 0.95, 0.31);
   sm.weapon.updateMesh(sm);
   ea = sm.weapon.effectiveAimDir;
   window.__weaponTest.assert(sm.weapon.aimAdjusted === true, 'aimAdjusted true for slight-up case');
@@ -162,7 +162,7 @@ window.__test_weapon_wall_reorient = function () {
   // Case C: aim slightly DOWN into the wall — effective aim Y should be < 0.
   sm.weapon.aimAdjusted = false;
   sm.weapon.effectiveAimDir = null;
-  sm.aimDir = { x: sm.facing * 0.95, y: -0.31 };
+  sm.aimDir.set(sm.facing * 0.95, -0.31);
   sm.weapon.updateMesh(sm);
   ea = sm.weapon.effectiveAimDir;
   window.__weaponTest.assert(sm.weapon.aimAdjusted === true, 'aimAdjusted true for slight-down case');
@@ -184,7 +184,7 @@ window.__test_weapon_no_wall_no_adjust = function () {
   // Poison both fields with sentinel values to detect a no-op or stale path.
   sm.weapon.aimAdjusted = true;
   sm.weapon.effectiveAimDir = { x: 999, y: 999 };
-  sm.aimDir = { x: 0, y: 1 };
+  sm.aimDir.set(0, 1);
   sm.input = { ...sm.input, aimActive: true };
   sm.weapon.updateMesh(sm);
   window.__weaponTest.assert(sm.weapon.aimAdjusted === false, 'no wall = aimAdjusted false');
@@ -203,7 +203,7 @@ window.__test_pose_left_respects_flag = function () {
     updateMesh: () => {}, attachTo: () => {}, detach: () => {}, mesh: { visible: false } };
   sm.weapon = fake1H;
   sm.input = { ...sm.input, aimActive: true };
-  sm.aimDir = { x: sm.facing, y: 0 };
+  sm.aimDir.set(sm.facing, 0);
   sm._syncRig(1 / 60, false);
   const armPoseL = sm._lastArmPoseL;
   window.__weaponTest.assert(armPoseL !== 'aim', '1H weapon should NOT drive left arm to aim (got ' + armPoseL + ')');
@@ -254,7 +254,7 @@ window.__test_pistol_uses_effective_aim = function () {
   sm.weapon = w;
   // Force a known effectiveAimDir different from player.aimDir so the test
   // proves fire() reads effectiveAimDir, not aimDir.
-  sm.aimDir = { x: 1, y: 0 };
+  sm.aimDir.set(1, 0);
   w.effectiveAimDir = { x: 0, y: 1 }; // straight up
   const before = window.game.projectiles.length;
   w.fire(sm);
@@ -276,7 +276,7 @@ window.__test_minigun_spin_up_then_fire = function () {
   window.__weaponTest.assert(Minigun, 'Minigun class missing');
   const m = new Minigun(window.game);
   m.attachTo(sm); sm.weapon = m;
-  sm.aimDir = { x: 1, y: 0 };
+  sm.aimDir.set(1, 0);
   // Press attack — minigun enters spinningUp.
   m.tryFire(sm);
   window.__weaponTest.assert(m._state === 'spinningUp', 'should enter spinningUp on press (got ' + m._state + ')');
@@ -315,7 +315,7 @@ window.__test_sniper_muzzle_under_barrel = function () {
   w.attachTo(sm); sm.weapon = w;
   // Set a known aim and let rig settle to aim pose so handR is at the
   // expected aim-pose anchor, not the prior idle position.
-  sm.aimDir = { x: sm.facing, y: 0 };
+  sm.aimDir.set(sm.facing, 0);
   sm.input = { ...sm.input, aimActive: true };
   for (let i = 0; i < 30; i++) { window.game.physics.step(1 / 60); sm._syncRig(1 / 60, false); }
   // Force the same effectiveAimDir _muzzleWorld will read.
@@ -344,7 +344,7 @@ window.__test_smg_full_auto = function () {
   window.__weaponTest.assert(SMG, 'SMG class missing');
   const w = new SMG(window.game);
   w.attachTo(sm); sm.weapon = w;
-  sm.aimDir = { x: 1, y: 0 };
+  sm.aimDir.set(1, 0);
   // Press attack — should start auto-firing immediately (no spin-up).
   w.tryFire(sm);
   const before = window.game.projectiles.length;
@@ -365,7 +365,7 @@ window.__test_revolver_heavy_single_shot = function () {
   window.__weaponTest.assert(Rev, 'Revolver class missing');
   const w = new Rev(window.game);
   w.attachTo(sm); sm.weapon = w;
-  sm.aimDir = { x: 1, y: 0 };
+  sm.aimDir.set(1, 0);
   window.__weaponTest.assert(w.poseLeft === null, 'Revolver should be 1H (poseLeft=null)');
   window.__weaponTest.assert(w.ammo === 6, 'Revolver should start with 6 ammo');
   const before = window.game.projectiles.length;
@@ -391,7 +391,7 @@ window.__test_crossbow_flat_arc = function () {
   window.__weaponTest.assert(Cb, 'Crossbow class missing');
   const w = new Cb(window.game);
   w.attachTo(sm); sm.weapon = w;
-  sm.aimDir = { x: 1, y: 0 };
+  sm.aimDir.set(1, 0);
   const before = window.game.projectiles.length;
   w.tryFire(sm);
   const after = window.game.projectiles.length;
@@ -413,7 +413,7 @@ window.__test_ar_three_burst = function () {
   window.__weaponTest.assert(AR, 'AssaultRifle class missing');
   const w = new AR(window.game);
   w.attachTo(sm); sm.weapon = w;
-  sm.aimDir = { x: 1, y: 0 };
+  sm.aimDir.set(1, 0);
   // Drive both heldTick (per-tick state machine) AND worldTick (cooldown
   // decrement). In real gameplay the game loop calls both each frame; in
   // test isolation we have to do it manually.
@@ -448,7 +448,7 @@ window.__test_dual_pistols_alt_fire = function () {
   window.__weaponTest.assert(w.poseRight === 'aim', 'poseRight should be aim');
   window.__weaponTest.assert(w.poseLeft === 'aim', 'poseLeft should be aim (dual)');
   sm.input = { ...sm.input, aimActive: true };
-  sm.aimDir = { x: 1, y: 0 };
+  sm.aimDir.set(1, 0);
   sm._syncRig(1 / 60, false);
   window.__weaponTest.assert(sm._lastArmPoseR === 'aim', 'right arm should aim (got ' + sm._lastArmPoseR + ')');
   window.__weaponTest.assert(sm._lastArmPoseL === 'aim', 'left arm should aim (got ' + sm._lastArmPoseL + ')');
@@ -479,7 +479,7 @@ window.__test_flamethrower_cone_ignites = async function () {
   // Place target ~2m forward, same height.
   target.body.position.x = sm.body.position.x + sm.facing * 2;
   target.body.position.y = sm.body.position.y;
-  sm.aimDir = { x: sm.facing, y: 0 };
+  sm.aimDir.set(sm.facing, 0);
   // Sync rig so handR is in aim pose.
   for (let i = 0; i < 30; i++) { window.game.physics.step(1 / 60); sm._syncRig(1 / 60, false); }
   w.tryFire(sm);
@@ -533,7 +533,7 @@ window.__test_rigClipsWallStanding = function () {
   // Place body 0.7m short of wall — hand wants to be ~0.36m past wall.
   sm.body.position.x = wallX - dir * 0.7;
   sm.body.position.y = Math.max(probe.hitPointWorld.y - 0.55, 1.0);
-  sm.aimDir = { x: dir, y: 0 };
+  sm.aimDir.set(dir, 0);
   sm.input = { ...sm.input, aimActive: true };
 
   // Settle pose spring and rig.

@@ -2653,6 +2653,7 @@ export class Kamehameha extends Weapon {
     this._haloMesh = null;
     this.throwImpulse = 4;
     this.recoilImpulse = 3;
+    this.continuousRecoilImpulse = 36;  // sustained beam: ~36 impulse/sec horizontal
     this.hitKnockback = 1.2;
   }
   _buildMesh() {
@@ -2790,12 +2791,12 @@ export class Kamehameha extends Weapon {
         }
       }
       // Continuous recoil — visibly slides the player back during the beam.
-      // Sub-B: route through applyImpulse so per-frame cap applies.
-      if (window.__forceFeatures?.recoil !== 0) {
-        const recoilMag = this.recoilImpulse;
-        if (recoilMag > 0) {
-          p.applyImpulse(-ax * recoilMag * 0.2, -ay * recoilMag * 0.13);
-        }
+      // Frame-rate independent: continuousRecoilImpulse is impulse/sec, × dt.
+      // Y damped to 0.65 so straight-down beam doesn't fling player too high —
+      // _beginRelease provides the main vertical kick via recoilImpulse.
+      if (window.__forceFeatures?.recoil !== 0 && this.continuousRecoilImpulse > 0) {
+        const mag = this.continuousRecoilImpulse;
+        p.applyImpulse(-ax * mag * dt, -ay * mag * dt * 0.65);
       }
       // Charge orb fades out as beam fires.
       if (this._chargeMesh) {
