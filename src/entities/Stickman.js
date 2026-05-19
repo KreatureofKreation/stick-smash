@@ -342,6 +342,19 @@ export class Stickman {
     this.body.velocity.x = vx;
     this.body.velocity.y = vy;
     this.hitstun = Math.max(this.hitstun, stun);
+    // Magnetic-gravity levels: large knockbacks enter 'launched' mode so the
+    // player isn't snapped back to the surface instantly. Threshold and timer
+    // come from the magnetic-gravity spec.
+    if (this.game?.level?.curvedGravity) {
+      const T = window.__planet ?? {};
+      const LAUNCH_MIN_KB = T.LAUNCH_MIN_KB ?? 6;
+      const mag = Math.hypot(vx, vy);
+      if (mag > LAUNCH_MIN_KB) {
+        this._planetMode = 'launched';
+        this._launchTimer = clamp(mag * 0.04, 0.3, 1.2);
+        this._modeStickPlanet = null;
+      }
+    }
   }
 
   // Additive velocity impulse with per-call and per-frame caps. Used by Sub-B
@@ -1574,7 +1587,19 @@ export class Stickman {
       return;
     }
 
-    // launched / returning handled in Tasks 6 + 7.
+    // --- LAUNCHED ---
+    if (mode === 'launched') {
+      const LAUNCH_DRAG = T.LAUNCH_DRAG ?? 0.98;
+      this.body.velocity.x *= Math.pow(LAUNCH_DRAG, dt * 60);
+      this.body.velocity.y *= Math.pow(LAUNCH_DRAG, dt * 60);
+      this._launchTimer -= dt;
+      if (this._launchTimer <= 0) {
+        this._planetMode = 'returning';
+      }
+      return;
+    }
+
+    // returning handled in Task 7.
   }
 
   _move(dt) {
