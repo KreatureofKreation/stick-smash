@@ -1132,8 +1132,8 @@ export const LEVELS = [
   // Once movement + gravity feel right here, scale up to multi-planet.
   // ---------------------------------------------------------------------
   {
-    id: 'planettest',
-    name: 'Planet Test',
+    id: 'planettest_single',
+    name: 'Planet Test (Single)',
     bgColor: 0x000008,
     gravity: 0,
     curvedGravity: true,

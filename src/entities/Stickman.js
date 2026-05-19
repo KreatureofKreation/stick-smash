@@ -2002,7 +2002,7 @@ export class Stickman {
     let delta = targetAngle - cur;
     while (delta > Math.PI) delta -= Math.PI * 2;
     while (delta < -Math.PI) delta += Math.PI * 2;
-    const rate = 8;
+    const rate = window.__planet?.ROT_SLERP_RATE ?? 12;
     const step = clamp(delta, -rate * dt, rate * dt);
     this._visualAngle = cur + step;
   }

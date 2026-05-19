@@ -36,7 +36,7 @@ export function makeProjectileGravity(level, game) {
     const debrisMul = T.DEBRIS_MUL ?? 0.5;
 
     const applyTo = (body, mul) => {
-      if (!body || body.mass === 0 || body.sleepState === CANNON.Body.SLEEPING) return;
+      if (!body || body.mass === 0 || body._rb?.isSleeping?.()) return;
       let fx = 0, fy = 0;
       for (const p of planets) {
         const dx = p.cx - body.position.x;
