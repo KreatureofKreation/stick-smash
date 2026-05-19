@@ -1,60 +1,72 @@
 import * as CANNON from 'cannon-es';
 
-// Outer Wilds-style gravity zones:
-//   - INVERSE-LINEAR pull: a = G * mass / r. Firmer at surface than constant
-//     magnitude, doesn't spike like 1/r², and naturally tapers toward the
-//     halo edge for smooth re-capture of drifting bodies.
-//   - SINGLE dominant planet at a time per body. Picked by closest center
-//     so dense small planets keep their grip in halo overlaps.
-//   - GROUNDED players get a 1.3× stick bonus so micro-bumps from sphere
-//     contact don't accumulate into orbital escape.
-//
-// Tuning per planet via the level config's `mass` field. With G = 1.0,
-// surface gravity = mass / radius. So a r=5 planet needing surface a=12
-// uses mass=60. Small asteroids can run hotter (higher mass relative to
-// radius) without becoming overpowering at distance because the linear
-// falloff bleeds the pull.
+// Tunables exposed on window.__planet for live in-browser tuning.
+const DEFAULTS = {
+  PROJECTILE_PULL_DEFAULT: 15,   // m/s² inside halo, per planet
+  EDGE_TAPER_FRAC: 0.10,         // last 10% of halo radius tapers from full → 0
+  DEBRIS_MUL: 0.5,               // softer pull for crates/ragdoll/debris bodies
+  // Player-side magnetic-gravity tunables (read by Stickman._movePlanetMagnetic).
+  JUMP_DOWN_ACCEL: 30,           // scripted "down" accel during a player jump
+  ROT_SLERP_RATE: 12,            // rad/s body quaternion align to local up
+  LAUNCH_MIN_KB: 6,              // m/s knockback magnitude that triggers launched
+  LAUNCH_DRAG: 0.98,             // per-60Hz-frame velocity multiplier in launched
+  RETURN_ACCEL: 40,              // m/s² pull during returning
+  RETURN_VEL_CAP: 25,            // m/s speed cap during returning
+};
+if (typeof window !== 'undefined') {
+  window.__planet = Object.assign({}, DEFAULTS, window.__planet || {});
+}
 
-export function makePlanetGravity(level, game) {
-  const G = 1.0;             // global tuning constant
-  const STICK_BONUS = 1.0;   // grounded multiplier (1.0 = off; raise once solver is stable)
-  return function applyPlanetGravity() {
+// Constant-pull halo gravity for NON-PLAYER dynamic bodies. Players are driven
+// by the magnetic state machine in Stickman._move (no physics force).
+//
+// Per body: sum over each planet of:
+//   if r >= haloRadius:   contribution = 0
+//   else:                 contribution = pullStrength * taper * unit(planet.center - body)
+//   taper = 1 inside the inner 90% of halo, linearly drops to 0 over outer 10%.
+// Debris-style bodies (crates, ragdoll segments) multiply pull by DEBRIS_MUL so
+// they settle instead of orbiting forever.
+export function makeProjectileGravity(level, game) {
+  return function applyProjectileGravity() {
     const planets = level.planets;
     if (!planets.length) return;
-    const pickPlanet = (px, py) => {
-      let best = null, bestD2 = Infinity;
+    const T = window.__planet ?? DEFAULTS;
+    const taperFrac = T.EDGE_TAPER_FRAC ?? 0.10;
+    const debrisMul = T.DEBRIS_MUL ?? 0.5;
+
+    const applyTo = (body, mul) => {
+      if (!body || body.mass === 0 || body.sleepState === CANNON.Body.SLEEPING) return;
+      let fx = 0, fy = 0;
       for (const p of planets) {
-        const dx = p.cx - px, dy = p.cy - py;
-        const d2 = dx * dx + dy * dy;
-        if (d2 > p.haloRadius * p.haloRadius) continue;
-        if (d2 < bestD2) { bestD2 = d2; best = p; }
+        const dx = p.cx - body.position.x;
+        const dy = p.cy - body.position.y;
+        const r = Math.hypot(dx, dy);
+        if (r < 0.05) continue;
+        if (r >= p.haloRadius) continue;
+        const t = r / p.haloRadius;
+        let k = 1;
+        if (t > 1 - taperFrac) k = (1 - t) / taperFrac;
+        const a = (p.pullStrength ?? T.PROJECTILE_PULL_DEFAULT) * k * mul;
+        const inv = 1 / r;
+        fx += dx * inv * a;
+        fy += dy * inv * a;
       }
-      return best;
+      body.force.x += body.mass * fx;
+      body.force.y += body.mass * fy;
     };
-    const applyTo = (body, isPlayer = false) => {
-      if (!body || body.mass === 0) return;
-      const planet = pickPlanet(body.position.x, body.position.y);
-      if (!planet) return;
-      const dx = planet.cx - body.position.x;
-      const dy = planet.cy - body.position.y;
-      const r = Math.hypot(dx, dy);
-      if (r < 0.05) return;          // singularity guard
-      // Inverse-linear: a = G * mass / r. No 1/r² blow-up.
-      let aMag = (G * (planet.mass ?? 60)) / r;
-      if (isPlayer && body.userData?.stickman?.grounded) aMag *= STICK_BONUS;
-      const ux = dx / r, uy = dy / r;
-      body.force.x += body.mass * ux * aMag;
-      body.force.y += body.mass * uy * aMag;
-    };
+
     for (const b of level.physics.world.bodies) {
       if (b.type !== CANNON.Body.DYNAMIC) continue;
-      if (b.userData?.kind === 'projectile') continue;
-      applyTo(b, b.userData?.kind === 'player');
+      const kind = b.userData?.kind;
+      if (kind === 'player') continue;            // players are scripted, not forced
+      if (kind === 'projectile') continue;        // handled below from game.projectiles
+      // crates, ragdoll segments, meteor bodies registered as DYNAMIC fall here
+      applyTo(b, debrisMul);
     }
     if (game?.projectiles) {
       for (const pr of game.projectiles) {
         if (pr.dead || !pr.body) continue;
-        applyTo(pr.body, false);
+        applyTo(pr.body, 1.0);
       }
     }
   };
