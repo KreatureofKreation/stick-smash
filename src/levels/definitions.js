@@ -726,9 +726,9 @@ export const LEVELS = [
   },
 
   // ---------------------------------------------------------------------
-  // PLANET TEST — single-planet curved-gravity sandbox (DEV).
-  // Iterate planet physics in isolation. One planet, no meteors, generous
-  // kill bound. Once feel is dialed, scale up to the full 6-planet system.
+  // PLANET TEST — 6-planet curved-gravity arena (DEV).
+  // Two anchor planets (pullStrength 18) + four moons (pullStrength 10).
+  // killBound x:30 y:25. Spawns placed one radius above each planet.
   // ---------------------------------------------------------------------
   {
     id: 'planettest',
@@ -739,21 +739,30 @@ export const LEVELS = [
     cameraClamp: { x: [-30, 30], y: [-25, 25], zoom: [12, 32] },
     killBound: { x: 30, y: 25 },
     planets: [
-      { id: 'p1', cx: 0, cy: 0, radius: 5.0, mantleRadius: 3.3, coreRadius: 1.6, mass: 167 },
+      { id: 'p1', cx: -12, cy:   0, radius: 5.0, mantleRadius: 3.3, coreRadius: 1.6, mass: 167, pullStrength: 18 },
+      { id: 'p2', cx:  12, cy:   4, radius: 4.5, mantleRadius: 3.0, coreRadius: 1.5, mass: 130, pullStrength: 18 },
+      { id: 'p3', cx:   0, cy:  -8, radius: 2.5, mantleRadius: 1.7, coreRadius: 0.8, mass:  40, pullStrength: 10 },
+      { id: 'p4', cx: -22, cy:   8, radius: 3.0, mantleRadius: 2.0, coreRadius: 1.0, mass:  55, pullStrength: 10 },
+      { id: 'p5', cx:  22, cy: -10, radius: 3.0, mantleRadius: 2.0, coreRadius: 1.0, mass:  55, pullStrength: 10 },
+      { id: 'p6', cx:   0, cy:  12, radius: 2.0, mantleRadius: 1.4, coreRadius: 0.6, mass:  25, pullStrength: 10 },
     ],
     tiles: [],
     hazards: [],
     spawns: [
-      { x: 0, y:  6.8 },
-      { x: 0, y: -6.8 },
-      { x:  6.8, y: 0 },
-      { x: -6.8, y: 0 },
+      { x: -12, y:  6.5 },   // above p1
+      { x:  12, y:  9.5 },   // above p2
+      { x:   0, y: -11.0 },  // above p3
+      { x: -22, y: 11.5 },   // above p4
+      { x:  22, y: -7.0 },   // above p5
+      { x:   0, y: 14.5 },   // above p6
     ],
     weaponSpawns: [
-      { x: 0, y:  6.8 },
-      { x: 0, y: -6.8 },
-      { x:  6.8, y: 0 },
-      { x: -6.8, y: 0 },
+      { x: -12, y:  6.5 },
+      { x:  12, y:  9.5 },
+      { x:   0, y: -11.0 },
+      { x: -22, y: 11.5 },
+      { x:  22, y: -7.0 },
+      { x:   0, y: 14.5 },
     ],
     background: [
       bgGlow(0, 18, 30, 1.0, 0x4d4080, -16),
@@ -1131,7 +1140,7 @@ export const LEVELS = [
     cameraClamp: { x: [-30, 30], y: [-25, 25], zoom: [12, 30] },
     killBound: { x: 30, y: 25 },
     planets: [
-      { id: 'p1', cx: 0, cy: 0, radius: 5.0, mantleRadius: 3.5, coreRadius: 1.6, mass: 40 },
+      { id: 'p1', cx: 0, cy: 0, radius: 5.0, mantleRadius: 3.5, coreRadius: 1.6, mass: 40, pullStrength: 18 },
     ],
     tiles: [],
     hazards: [],
