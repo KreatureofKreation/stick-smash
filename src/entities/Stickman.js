@@ -629,6 +629,14 @@ export class Stickman {
 
   _updateGroundCheck() {
     if (this.game?.level?.curvedGravity) {
+      // launched / returning: never grounded, no raycast — body is free-flying.
+      if (this._planetMode === 'launched' || this._planetMode === 'returning') {
+        this._currentPlanetRef = null;
+        this.grounded = false;
+        this.groundNormalY = 1;
+        this.coyote = Math.max(0, this.coyote - this._dt);
+        return;
+      }
       this._currentPlanetRef = this._currentPlanet();
       const planet = this._currentPlanetRef;
       if (!planet) {
