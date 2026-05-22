@@ -8,6 +8,7 @@ const DEFAULTS = {
   // Player-side magnetic-gravity tunables (read by Stickman._movePlanetMagnetic).
   JUMP_DOWN_ACCEL: 30,           // scripted "down" accel during a player jump
   AIR_ACCEL: 18,                 // mid-air tangential accel (rad/s²)
+  RADIAL_STIFFNESS: 14,          // walking surface-spring gain (velocity = err × this)
   ROT_SLERP_RATE: 12,            // rad/s body quaternion align to local up
   LAUNCH_MIN_KB: 6,              // m/s knockback magnitude that triggers launched
   LAUNCH_DRAG: 0.98,             // per-60Hz-frame velocity multiplier in launched

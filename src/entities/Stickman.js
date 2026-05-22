@@ -1515,13 +1515,9 @@ export class Stickman {
       const r = Math.hypot(dx, dy) || 1;
       const ux = dx / r, uy = dy / r;
       const tx = -uy, ty = ux;
+      const surfaceR = planet.radius + CAPSULE_OFFSET;
 
-      // Hard radial snap: lock to surface + capsule offset.
-      const surfaceR = planet.radius + CAPSULE_OFFSET;  // 0.95 matches existing capsule offset
-      this.body.position.x = planet.cx + ux * surfaceR;
-      this.body.position.y = planet.cy + uy * surfaceR;
-
-      // Velocity: kill radial, keep tangential.
+      // Velocity: tangential component (kept) + radial component (sprung).
       const vT = this.body.velocity.x * tx + this.body.velocity.y * ty;
 
       // Tangential accel toward target.
@@ -1530,16 +1526,25 @@ export class Stickman {
       const targetT = moveX * speedMaxC;
       const dvT = targetT - vT;
       const stepT = clamp(dvT, -accelC * dt, accelC * dt);
-      const newVT = vT + stepT;
-      this.body.velocity.x = newVT * tx;
-      this.body.velocity.y = newVT * ty;
+      let newVT = vT + stepT;
 
-      // Friction when idle.
+      // Friction when idle — tangential only.
       if (Math.abs(moveX) < 0.05) {
-        const k = Math.pow(0.001, dt);
-        this.body.velocity.x *= k;
-        this.body.velocity.y *= k;
+        newVT *= Math.pow(0.001, dt);
       }
+
+      // Radial: spring toward the surface in VELOCITY space instead of a hard
+      // position write. Physics owns the position, so render interpolation
+      // stays smooth — the old per-tick position snap fought the fixed-step
+      // accumulator (0/1/2 substeps per frame) and produced visible judder.
+      // The surface sphere collider still backstops descent.
+      const RADIAL_STIFFNESS = T.RADIAL_STIFFNESS ?? 14;
+      const radialErr = surfaceR - r;                       // + = need to move outward
+      const vRSpring = clamp(radialErr * RADIAL_STIFFNESS, -8, 8);
+
+      this.body.velocity.x = newVT * tx + vRSpring * ux;
+      this.body.velocity.y = newVT * ty + vRSpring * uy;
+
       if (Math.abs(newVT) > 0.2) this.facing = Math.sign(newVT) || this.facing;
 
       // Jump → switch to jumping.
