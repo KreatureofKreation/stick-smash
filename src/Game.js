@@ -578,7 +578,10 @@ export class Game {
     const Cls = pickRandomSpawn();
     const isPickup = PICKUP_CLASSES.includes(Cls);
     // Sky drops only for weapons (have physics bodies). Pickups go to spawn pads.
-    const fromSky = opts.fromSky ?? (!isPickup && Math.random() < 0.6);
+    // On curved-gravity levels pad spawns are always used — sky drops at y=16 are
+    // meaningless when weapons need to land on planet surfaces.
+    const curved = !!this.level?.curvedGravity;
+    const fromSky = curved ? false : (opts.fromSky ?? (!isPickup && Math.random() < 0.6));
     let x, y;
     if (fromSky) {
       const players = this.players.filter(p => p?.alive);
