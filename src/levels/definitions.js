@@ -851,8 +851,8 @@ export const LEVELS = [
   // ---------------------------------------------------------------------
   {
     id: 'planettest',
-    name: 'Planet Test',
-    bgColor: 0x000010,
+    name: 'Orbit',
+    bgColor: 0x0b0a1e,
     gravity: 0,
     curvedGravity: true,
     cameraClamp: { x: [-30, 30], y: [-25, 25], zoom: [12, 32] },
@@ -885,14 +885,30 @@ export const LEVELS = [
       { x: -12.96, y:   7.50 },  // above p6
     ],
     background: [
-      bgGlow(0, 18, 30, 1.0, 0x4d4080, -16),
+      // Nebula wash — large soft glows give depth + contrast so dark weapons
+      // and stickmen read against the starfield instead of vanishing on black.
+      bgGlow(2, 2, 40, 30, 0x171232, -19),        // base indigo wash
+      bgGlow(-12, 13, 28, 12, 0x2c1d58, -18),     // purple band
+      bgGlow(13, -9, 26, 11, 0x123848, -18),      // teal band
+      bgGlow(-15, -13, 18, 8, 0x3c1842, -17.5),   // magenta pocket
+      bgGlow(16, 16, 16, 7, 0x1d2a5e, -17.5),     // blue pocket
+      // Distant gas giant with a faint ring, upper-left.
+      bgSphere(-23, 19, 3.4, 0x2a3a6a, -19, { emissive: 0x223058, emissiveIntensity: 0.4 }),
+      bgDisc(-23, 19, 5.0, 0x3a4a8a, -18.9, { emissiveIntensity: 0.12 }),
+      // Stars — varied size + slight colour twinkle for a richer field.
       ...(() => {
         const stars = [];
         const seeds = [
-          [-22, 8], [-16, 18], [-10, -16], [-4, 22], [4, -22], [10, 16], [16, -8], [22, 12],
-          [-26, -10], [26, -10], [-20, 22], [20, 22], [0, 24], [0, -24], [-24, 0], [24, 0],
+          [-22, 8, 0.20, 0xffffff], [-16, 18, 0.14, 0xbfd4ff], [-10, -16, 0.22, 0xffffff],
+          [-4, 22, 0.12, 0xfff0c0], [4, -22, 0.18, 0xffffff], [10, 16, 0.16, 0xc8d8ff],
+          [16, -8, 0.22, 0xffffff], [22, 12, 0.13, 0xffe0e8], [-26, -10, 0.18, 0xffffff],
+          [26, -10, 0.15, 0xbfd4ff], [-20, 22, 0.12, 0xffffff], [20, 22, 0.20, 0xfff0c0],
+          [0, 24, 0.16, 0xffffff], [0, -24, 0.14, 0xc8d8ff], [-24, 0, 0.22, 0xffffff],
+          [24, 0, 0.18, 0xffffff], [-7, 5, 0.10, 0xffffff], [8, -3, 0.10, 0xbfd4ff],
+          [-14, -4, 0.12, 0xffffff], [15, 5, 0.11, 0xffe0e8], [6, 9, 0.10, 0xffffff],
+          [-18, 12, 0.13, 0xffffff], [18, -14, 0.12, 0xc8d8ff], [3, 17, 0.10, 0xffffff],
         ];
-        for (const [x, y] of seeds) stars.push(bgGlow(x, y, 0.18, 0.18, 0xffffff, -17));
+        for (const [x, y, s, c] of seeds) stars.push(bgGlow(x, y, s, s, c, -16.8));
         return stars;
       })(),
     ],

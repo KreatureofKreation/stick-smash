@@ -103,12 +103,31 @@ export class Weapon {
       this._floatUX = Math.cos(ang);
       this._floatUY = Math.sin(ang);
       this._floatAngle = ang + Math.PI / 2;   // tangent to the surface
+      // Visibility halo — dark weapons vanish against the black starfield, so
+      // sit a soft emissive disc behind the pickup so it always reads.
+      if (!this._floatHalo) {
+        const halo = new THREE.Mesh(
+          new THREE.CircleGeometry(0.62, 24),
+          new THREE.MeshBasicMaterial({ color: 0x7fd4ff, transparent: true, opacity: 0.4, depthWrite: false }),
+        );
+        halo.position.set(0, 0, -0.25);
+        this.mesh.add(halo);
+        this._floatHalo = halo;
+      }
     }
     return this;
   }
 
   attachTo(player) {
     this.holder = player;
+    // Drop the floating state + visibility halo once picked up.
+    this._floating = false;
+    if (this._floatHalo) {
+      this.mesh.remove(this._floatHalo);
+      this._floatHalo.geometry.dispose();
+      this._floatHalo.material.dispose();
+      this._floatHalo = null;
+    }
     if (this.body) {
       this.game.physics.remove(this.body);
       this.body = null;
@@ -238,6 +257,11 @@ export class Weapon {
         this._floatZ,
       );
       this.mesh.rotation.set(0, 0, this._floatAngle);
+      if (this._floatHalo) {
+        // Counter-rotate the halo so it stays a steady disc, and pulse it.
+        this._floatHalo.rotation.z = -this._floatAngle;
+        this._floatHalo.material.opacity = 0.28 + Math.sin(performance.now() * 0.004) * 0.14;
+      }
       this.life -= dt;
       if (this.life <= 0) this.destroy();
     } else if (this.body && !this.holder) {
