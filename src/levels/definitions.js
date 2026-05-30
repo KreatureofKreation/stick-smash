@@ -637,82 +637,130 @@ export const LEVELS = [
   },
 
   // ---------------------------------------------------------------------
-  // VOLCANO — flank ledges around an open magma pit. Tiers spaced
-  // properly, hazard density reduced from previous draft.
+  // VOLCANO — "Eruption" king-of-the-hill. Central rising-lava pool
+  // periodically floods the low flanks, forcing players to scramble UP
+  // toward the exposed summit. Summit holds the prize weapon.
+  //
+  // Rising-lava math (flood line):
+  //   Pool center y = -3, half-h = 1.5  →  base top = -1.5
+  //   rise.height = 6  →  flood top = -1.5 + 6 = +4.5
+  //   All spawns sit on tiles whose surface (y+0.5) > 4.5, i.e. tile y >= 5.
+  //   Low flank pads (y=0, y=3) flood during eruption — risky weapon spots,
+  //   no player spawns.
   // ---------------------------------------------------------------------
   {
     id: 'volcano',
     name: 'Volcano',
-    bgColor: 0x2a0814,
+    bgColor: 0x1e0608,
     tiles: [
-      // Flank floor pads (left & right, with center pit open to lava below).
-      ...row(0, -14, -7, { material: 'stone', hp: 70, color: 0x3a2018 }),
-      ...row(0,  7, 14, { material: 'stone', hp: 70, color: 0x3a2018 }),
-      ...tough(-1, -14, -7, { color: 0x1a0e08 }),
-      ...tough(-1,  7, 14, { color: 0x1a0e08 }),
-      // Lower flank platforms (y=3).
-      ...row(3, -11, -8, { material: 'stone', hp: 50, color: 0x2a1810 }),
-      ...row(3,  8, 11, { material: 'stone', hp: 50, color: 0x2a1810 }),
-      // Mid-altitude bridge platforms (y=6) — span out toward the pit.
-      ...row(6, -7, -5, { material: 'stone', hp: 40, color: 0x2a1810 }),
-      ...row(6,  5,  7, { material: 'stone', hp: 40, color: 0x2a1810 }),
-      // Crater rim (y=9) and summit (y=11).
-      { x: -3, y: 9, material: 'stone', hp: 50, color: 0x1a0e08 },
-      { x:  3, y: 9, material: 'stone', hp: 50, color: 0x1a0e08 },
-      { x:  0, y: 11, material: 'stone', hp: 70, color: 0x1a0e08 },
-      // Glowing molten rocks — brittle.
-      { x: -9, y: 4, shape: 'sphere', radius: 0.45, material: 'stone', hp: 20, color: 0xff4422 },
-      { x:  9, y: 4, shape: 'sphere', radius: 0.45, material: 'stone', hp: 20, color: 0xff4422 },
+      // ── Low flank pads (y=0) — flood during eruption, risky weapon spots ──
+      ...row(0, -14, -9, { material: 'stone', hp: 60, color: 0x3a1a10 }),
+      ...row(0,   9, 14, { material: 'stone', hp: 60, color: 0x3a1a10 }),
+      ...tough(-1, -14, -9, { color: 0x1a0c08 }),
+      ...tough(-1,   9, 14, { color: 0x1a0c08 }),
+
+      // ── Stepped cone — lower-mid steps (y=3) — also flood during eruption ──
+      ...row(3, -11, -8, { material: 'stone', hp: 50, color: 0x2e1610 }),
+      ...row(3,   8, 11, { material: 'stone', hp: 50, color: 0x2e1610 }),
+
+      // ── Stepped cone — safe steps (y=5, just above flood line 4.5) ──
+      // Tile top = 5.5, well above 4.5. First safe ledge players escape to.
+      ...row(5, -9, -6, { material: 'stone', hp: 50, color: 0x281410 }),
+      ...row(5,  6,  9, { material: 'stone', hp: 50, color: 0x281410 }),
+
+      // ── Upper cone steps (y=8) ──
+      ...row(8, -6, -4, { material: 'stone', hp: 45, color: 0x221010 }),
+      ...row(8,  4,  6, { material: 'stone', hp: 45, color: 0x221010 }),
+
+      // ── Summit platform (y=11) — king-of-the-hill prize ──
+      ...row(11, -3, 3, { material: 'stone', hp: 80, color: 0x1a0c08 }),
+
+      // ── Crater-rim spikes (just below summit on both sides) ──
+      // These are solid static tile props to give the crater rim visual bulk.
+      { x: -5, y: 9,  shape: 'box', w: 0.6, h: 1.4, material: 'stone', hp: 40, color: 0x180c06 },
+      { x:  5, y: 9,  shape: 'box', w: 0.6, h: 1.4, material: 'stone', hp: 40, color: 0x180c06 },
+
+      // ── Brittle glowing molten rocks on mid ledges (y=5 zone) ──
+      { x: -7,  y: 6, shape: 'sphere', radius: 0.42, material: 'stone', hp: 18, color: 0xff4422 },
+      { x:  7,  y: 6, shape: 'sphere', radius: 0.42, material: 'stone', hp: 18, color: 0xff4422 },
+      // Extra ember boulders on upper steps.
+      { x: -5,  y: 9, shape: 'sphere', radius: 0.38, material: 'stone', hp: 15, color: 0xff5533 },
+      { x:  5,  y: 9, shape: 'sphere', radius: 0.38, material: 'stone', hp: 15, color: 0xff5533 },
     ],
     hazards: [
-      // Open central magma pit (and bottom kill plane).
-      { kind: 'lava', x: 0, y: -2, w: 14, h: 3.0, dps: 60 },
-      { kind: 'lava', x: 0, y: -7, w: 50, h: 2.0, dps: 100 },
-      // Slope-guard lava streams (between lower and mid flanks).
-      { kind: 'lava', x: -7, y: 1.4, w: 1.2, h: 0.8, dps: 45 },
-      { kind: 'lava', x:  7, y: 1.4, w: 1.2, h: 0.8, dps: 45 },
-      // Falling magma pendulums from the crater (two, opposite phase).
-      { kind: 'pendulum', x: -1, y: 14, length: 5, amplitude: Math.PI / 3.5, speed: 1.2 },
-      { kind: 'pendulum', x:  1, y: 14, length: 5, amplitude: Math.PI / 3.5, speed: 1.2, phase: Math.PI },
-      // Crater-rim spike rocks.
-      { kind: 'spike', x: -5, y: 7.5, w: 1.4 },
-      { kind: 'spike', x:  5, y: 7.5, w: 1.4 },
+      // ── Central rising-lava pool — the eruption heartbeat ──
+      // Base center y=-3, h=3.0  →  base top at y=-1.5.
+      // Floods +6 units  →  crest at y=4.5, clearing the low flanks/steps.
+      // Period 12 s: dwell ~3 s at bottom, surge up, dwell ~3 s at top, recede.
+      { kind: 'lava', x: 0, y: -3, w: 20, h: 3.0, dps: 70,
+        rise: { height: 6, period: 12, phase: 0 } },
+
+      // ── Kill plane far below ──
+      { kind: 'lava', x: 0, y: -10, w: 50, h: 2.0, dps: 999 },
+
+      // ── Crater-rim spike hazards (flanking the summit) ──
+      { kind: 'spike', x: -4, y: 12.5, w: 1.6 },
+      { kind: 'spike', x:  4, y: 12.5, w: 1.6 },
+
+      // ── Two pendulum magma globs near the upper cone ──
+      // Anchored above the summit, swinging down across the upper steps.
+      { kind: 'pendulum', x: -2, y: 17, length: 5.5, amplitude: Math.PI / 3, speed: 1.1 },
+      { kind: 'pendulum', x:  2, y: 17, length: 5.5, amplitude: Math.PI / 3, speed: 1.1, phase: Math.PI },
     ],
     spawns: [
-      { x: -12, y: 1 }, { x: 12, y: 1 },
-      { x: -10, y: 4 }, { x: 10, y: 4 },
-      { x: -6, y: 7 }, { x: 6, y: 7 },
+      // All spawns on tiles whose surface > flood line (4.5).
+      // y=5 tiles: surface = 5.5 > 4.5  ✓
+      { x: -8, y: 6 }, { x: 8, y: 6 },   // safe step y=5 (stand at y=6)
+      { x: -7, y: 6 }, { x: 7, y: 6 },   // same safe ledge, spread
+      // y=8 tiles: surface = 8.5  ✓
+      { x: -5, y: 9 }, { x: 5, y: 9 },   // upper cone
+      // Summit: surface = 11.5  ✓
       { x: 0, y: 12 },
     ],
     weaponSpawns: [
-      { x: 0, y: 12 },                        // crater prize
-      { x: -6, y: 7 }, { x: 6, y: 7 },
-      { x: -10, y: 4 }, { x: 10, y: 4 },
+      // Summit prize — most exposed, king-of-the-hill reward.
+      { x: 0, y: 12 },
+      // Mid-cone safe weapons.
+      { x: -5, y: 9 }, { x: 5, y: 9 },
+      // Risky low-flank weapons — grab fast, they flood!
       { x: -12, y: 1 }, { x: 12, y: 1 },
+      { x: -10, y: 4 }, { x: 10, y: 4 },
     ],
     background: [
-      bg(0, 24, 60, 6, 0x4a0a18, -14),
-      bg(0, 18, 60, 6, 0x802818, -14),
-      bg(0, 13, 60, 4, 0xc04018, -14),
-      bg(0, 9,  60, 3, 0xd86028, -14),
-      bg(0, 14, 18, 1.5, 0x180a08, -10),
-      bg(0, 12, 22, 1.5, 0x180a08, -10),
-      bg(0, 10, 26, 1.5, 0x180a08, -10),
-      bg(0, 8,  30, 1.5, 0x180a08, -10),
-      bg(0, 6,  34, 1.5, 0x180a08, -10),
-      bg(0, 4,  38, 1.5, 0x180a08, -10),
-      bgGlow(0, 16, 4,   1.2, 0xffaa22, -9.5),
-      bgGlow(0, 17, 2.5, 0.8, 0xffdd44, -9.5),
-      bg(-1, 22, 4, 4, 0x1a0a08, -9),
-      bg(1,  26, 5, 4, 0x100604, -9),
-      bg(-2, 29, 7, 3, 0x080404, -9),
-      bgGlow(-5, 7, 1.0, 6, 0xff5520, -9.5),
-      bgGlow(5,  7, 1.0, 6, 0xff5520, -9.5),
-      bgGlow(0, -1, 60, 3, 0xc02810, -11),
-      bgGlow(-9, 16, 0.15, 0.15, 0xffaa44, -10.5),
-      bgGlow(-3, 19, 0.15, 0.15, 0xffaa44, -10.5),
-      bgGlow(4,  17, 0.15, 0.15, 0xffaa44, -10.5),
-      bgGlow(9,  20, 0.15, 0.15, 0xffaa44, -10.5),
+      // Sky gradient — deep red/black.
+      bg(0, 20, 60, 12, 0x3c0808, -14),
+      bg(0, 10, 60,  8, 0x600e10, -14),
+      bg(0,  3, 60,  6, 0x901820, -13),
+      // Volcano silhouette cone.
+      bg(0, 18, 20,  2.0, 0x180806, -10),
+      bg(0, 16, 24,  2.0, 0x180806, -10),
+      bg(0, 14, 28,  2.0, 0x180806, -10),
+      bg(0, 12, 32,  2.0, 0x180806, -10),
+      bg(0, 10, 36,  2.0, 0x180806, -10),
+      bg(0,  8, 40,  2.0, 0x180806, -10),
+      bg(0,  6, 44,  2.0, 0x180806, -10),
+      // Crater glow.
+      bgGlow(0, 18, 6,   1.4, 0xff6600, -9.5),
+      bgGlow(0, 19, 3.5, 0.9, 0xffcc22, -9.4),
+      bgGlow(0, 20, 2.0, 0.6, 0xffffff, -9.3),
+      // Lava pool glow from below.
+      bgGlow(0, -1, 22, 2.5, 0xdd3308, -11),
+      // Side lava streams on the cone flanks.
+      bgGlow(-8, 10, 0.9, 8, 0xff5511, -9.5),
+      bgGlow( 8, 10, 0.9, 8, 0xff5511, -9.5),
+      bgGlow(-5, 14, 0.7, 5, 0xff7722, -9.4),
+      bgGlow( 5, 14, 0.7, 5, 0xff7722, -9.4),
+      // Ember sparks floating up.
+      bgGlow(-11, 17, 0.15, 0.15, 0xffaa44, -10.5),
+      bgGlow(-4,  22, 0.15, 0.15, 0xffcc55, -10.5),
+      bgGlow( 3,  19, 0.15, 0.15, 0xffaa44, -10.5),
+      bgGlow( 9,  24, 0.15, 0.15, 0xffcc55, -10.5),
+      bgGlow(-7,  25, 0.15, 0.15, 0xffaa44, -10.5),
+      bgGlow( 6,  21, 0.15, 0.15, 0xff8833, -10.5),
+      // Smoke plumes (dark spheres at high altitude).
+      bgSphere(-3, 26, 2.2, 0x1a0a08, -12),
+      bgSphere( 2, 29, 2.8, 0x120806, -12),
+      bgSphere(-1, 32, 3.5, 0x0e0604, -12),
     ],
   },
 
