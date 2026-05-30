@@ -649,21 +649,18 @@ export class Stickman {
       const dy = this.body.position.y - planet.cy;
       const r = Math.hypot(dx, dy) || 1;
       const ux = dx / r, uy = dy / r;
-      const top = { x: this.body.position.x, y: this.body.position.y, z: 0 };
-      const bot = {
-        x: this.body.position.x - ux * 0.95,
-        y: this.body.position.y - uy * 0.95,
-        z: 0,
-      };
-      const hit = this.world.raycast(top, bot, { mask: COL_GROUPS.WORLD });
-      const groundedRaw = !!hit;
-      const lockActive = performance.now() < (this._jumpLockUntil || 0);
-      // FIX I1: use radial outward velocity, not world-y, for the rising check.
-      const vR = this.body.velocity.x * ux + this.body.velocity.y * uy;
-      const rising = vR > 0.5;
-      const jumpLocked = lockActive && rising;
-      this.grounded = groundedRaw && !jumpLocked;
-      this.groundNormalY = hit ? hit.hitNormalWorld.y : 1;
+      // Grounded is authoritative on the magnetic state machine: 'walking'
+      // means the body is held on the surface by the radial spring, so it IS
+      // grounded. ('launched'/'returning' already early-returned as airborne;
+      // 'jumping' is the only other state and is airborne by definition.)
+      //
+      // The old approach raycast 0.95m inward, but the walking spring rests the
+      // body at exactly radius + 0.95, so the ray ended ON the surface boundary
+      // and grazed/missed — leaving grounded false while standing, which made
+      // the rig play its airborne tucked-knee pose ("mid-jump forever").
+      this.grounded = this._planetMode === 'walking';
+      // Ground normal points radially outward from the planet centre.
+      this.groundNormalY = uy;
       if (this.grounded && !this.prevGrounded) {
         this.airJumpsLeft = this.airJumps;
       }
