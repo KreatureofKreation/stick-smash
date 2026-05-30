@@ -3,6 +3,9 @@ import * as CANNON from 'cannon-es';
 import { COL_GROUPS } from '../physics/PhysicsWorld.js';
 import { audio } from '../audio/Audio.js';
 
+// Module-level temp vector for getWorldPosition — avoids per-call allocation.
+const _projTmp = new THREE.Vector3();
+
 // Generic projectile: physics sphere + visual mesh + on-hit callback.
 export class Projectile {
   constructor(game, opts) {
@@ -266,7 +269,7 @@ export class Projectile {
       if (player.weapon.swingTimer > 0) continue;
       // Punching with empty hands also reflects; same skip rule.
       if (player.attackTimer > 0) continue;
-      const hand = player.rig?.handR?.position;
+      const hand = player.rig?.handR?.getWorldPosition(_projTmp);
       const hx = hand?.x ?? (player.position.x + player.facing * 0.4);
       const hy = hand?.y ?? (player.position.y + 0.6);
       const dx = p.x - hx, dy = p.y - hy;

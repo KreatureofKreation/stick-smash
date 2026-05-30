@@ -3,6 +3,10 @@ import * as CANNON from 'cannon-es';
 import { COL_GROUPS } from '../physics/PhysicsWorld.js';
 import { lerp } from '../util/math.js';
 
+// Module-level temp vectors for getWorldPosition — avoids per-call allocation.
+const _wpnTmp  = new THREE.Vector3(); // used in updateMesh
+const _wpnTmp2 = new THREE.Vector3(); // used in _muzzlePos (distinct to avoid clobber)
+
 // Base weapon class. Subclasses define visual mesh, fire behavior, etc.
 // Weapons have two "modes": world (free body that can be picked up) and held (parented to player hand).
 
@@ -97,7 +101,8 @@ export class Weapon {
   // so the weapon visibly tracks the hand (which moves with springs/wobble).
   updateMesh(player) {
     if (!player) return;
-    const hand = player.rig?.handR?.position;
+    const handJoint = player.rig?.handR;
+    const hand = handJoint ? handJoint.getWorldPosition(_wpnTmp) : null;
     const facing = player.facing;
     const handX = hand ? hand.x : player.position.x + facing * 0.3;
     const handY = hand ? hand.y : player.position.y + 0.65;
@@ -209,7 +214,8 @@ export class Weapon {
   // uses this default.
   _muzzlePos(player) {
     const aim = this.effectiveAimDir ?? player.aimDir;
-    const handR = player.rig?.handR?.position;
+    const handRJoint = player.rig?.handR;
+    const handR = handRJoint ? handRJoint.getWorldPosition(_wpnTmp2) : null;
     if (handR) {
       return { x: handR.x + aim.x * this.barrelOffset, y: handR.y + aim.y * this.barrelOffset };
     }

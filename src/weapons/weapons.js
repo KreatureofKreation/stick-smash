@@ -7,6 +7,10 @@ import { rand, TAU } from '../util/math.js';
 import { COL_GROUPS } from '../physics/PhysicsWorld.js';
 import { spawnFirePatch } from './fx/FirePatch.js';
 
+// Module-level temp vectors for getWorldPosition — avoids per-call allocation.
+const _w2a = new THREE.Vector3(); // DualPistols handR / Sniper muzzle
+const _w2b = new THREE.Vector3(); // DualPistols handL
+
 // === MELEE ===
 
 export class Sword extends Weapon {
@@ -114,7 +118,7 @@ export class Bat extends Weapon {
             this.hits.add(p.id);
             audio.bonk();
             this.game.fx.camera.punch(0.45);
-            this.game.hitStop(0.07);
+            this.game.hitStop?.(0.07);
           }
         }
         // Bat is the BEST projectile reflector — wider arc.
@@ -1139,8 +1143,8 @@ export class DualPistols extends Weapon {
     this.mesh.rotation.set(0, 0, 0);
     this.mesh.quaternion.identity();
     this.mesh.scale.set(1, 1, 1);
-    const handR = player.rig?.handR?.position;
-    const handL = player.rig?.handL?.position;
+    const handR = player.rig?.handR?.getWorldPosition(_w2a);
+    const handL = player.rig?.handL?.getWorldPosition(_w2b);
     const aim = player.aimDir;
     const ang = Math.atan2(aim.y, aim.x);
     const facing = player.facing;
@@ -1362,7 +1366,8 @@ export class SniperRifle extends Weapon {
     // Mesh layout: barrel cylinder centered at local x=0.78 with length
     // 0.95 → tip at local x ≈ 1.27 (matches the muzzle puff mesh).
     const aim = this.effectiveAimDir ?? player.aimDir;
-    const handR = player.rig?.handR?.position;
+    const handRJoint = player.rig?.handR;
+    const handR = handRJoint ? handRJoint.getWorldPosition(_w2a) : null;
     if (handR) {
       const tipDist = 1.27;
       return { x: handR.x + aim.x * tipDist, y: handR.y + aim.y * tipDist };
@@ -2141,7 +2146,7 @@ export class Boomerang extends Weapon {
       gravity: false, life: 1.6, radius: 0.1, color: 0xc88240,
       mesh: { geometry: new THREE.TorusGeometry(0.18, 0.04, 6, 12, Math.PI), material: new THREE.MeshLambertMaterial({ color: 0xc88240 }) },
     });
-    proj.body.angularVelocity.set(0, 25, 0);
+    proj.body.angularVelocity.set(0, 0, 25);
     audio.swing();
   }
 }
@@ -2543,7 +2548,7 @@ export class FlameSword extends Weapon {
             this.hits.add(p.id);
             this.game.fx.particles.burst(p.position.x, p.position.y + 0.4, 0, { count: 14, speed: 5, color: 0xff5500 });
             this.game.fx.camera.punch(0.25);
-            this.game.hitStop(0.04);
+            this.game.hitStop?.(0.04);
           }
         }
         this._reflectProjectiles(cx, cy, 1.2);
@@ -2826,7 +2831,7 @@ export class Kamehameha extends Weapon {
     audio.sweep(220, 60, 1.0, 'sawtooth', 0.4);
     audio.explode();
     this.game.fx.camera.punch(1.0);
-    this.game.hitStop(0.12);
+    this.game.hitStop?.(0.12);
     const ax = this._lockedAim.x, ay = this._lockedAim.y;
     // Sub-B recoil-jump — opposite aim direction. Y kept full (no damping)
     // so shooting straight down recoil-jumps straight up — the whole
@@ -2937,7 +2942,7 @@ export class Nuke extends Weapon {
       game.fx.particles.smokePuff(x, y, 0, 0x222222);
       for (let i = 0; i < 20; i++) game.fx.particles.smokePuff(x + rand(-3, 3), y + rand(0, 5), 0, 0x444444);
       game.fx.camera.punch(1.2);
-      game.hitStop(0.18);
+      game.hitStop?.(0.18);
       audio.explode(); audio.explode(); audio.sweep(60, 20, 0.8, 'sawtooth', 0.5);
       const radius = 9;
       for (const p of game.players) {

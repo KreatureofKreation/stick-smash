@@ -427,7 +427,7 @@ export const LEVELS = [
     spawns: [
       { x: -8, y: 1 }, { x: 8, y: 1 },
       { x: -6, y: 4 }, { x: 6, y: 4 },
-      { x: 0, y: 13 },
+      { x: -1, y: 13 }, { x: 1, y: 13 },   // two summit spawns (row(12,-1,1) surface=12.5)
     ],
     weaponSpawns: [
       { x: 0, y: 13 },
@@ -709,9 +709,9 @@ export const LEVELS = [
     ],
     spawns: [
       // All spawns on tiles whose surface > flood line (4.5).
-      // y=5 tiles: surface = 5.5 > 4.5  ✓
-      { x: -8, y: 6 }, { x: 8, y: 6 },   // safe step y=5 (stand at y=6)
-      { x: -7, y: 6 }, { x: 7, y: 6 },   // same safe ledge, spread
+      // y=5 tiles: surface = 5.5 > 4.5  ✓  (tiles span x: -9..-6 left, 6..9 right)
+      { x: -9, y: 6 }, { x: 9, y: 6 },   // outer safe-step edges
+      { x: -6, y: 6 }, { x: 6, y: 6 },   // inner safe-step edges — spread ~3 apart
       // y=8 tiles: surface = 8.5  ✓
       { x: -5, y: 9 }, { x: 5, y: 9 },   // upper cone
       // Summit: surface = 11.5  ✓
