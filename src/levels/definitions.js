@@ -675,17 +675,16 @@ export const LEVELS = [
       // ── Summit platform (y=11) — king-of-the-hill prize ──
       ...row(11, -3, 3, { material: 'stone', hp: 80, color: 0x1a0c08 }),
 
-      // ── Crater-rim spikes (just below summit on both sides) ──
-      // These are solid static tile props to give the crater rim visual bulk.
-      { x: -5, y: 9,  shape: 'box', w: 0.6, h: 1.4, material: 'stone', hp: 40, color: 0x180c06 },
-      { x:  5, y: 9,  shape: 'box', w: 0.6, h: 1.4, material: 'stone', hp: 40, color: 0x180c06 },
+      // ── Crater-rim bulk (flanking the summit, clear of spawn tiles) ──
+      // Solid static props giving the rim visual mass. Placed at (±4, 10.2)
+      // between the upper step and the summit — NOT on the upper-cone spawns
+      // at (±5, 9), which they previously overlapped.
+      { x: -4, y: 10.2, shape: 'box', w: 0.6, h: 1.4, material: 'stone', hp: 40, color: 0x180c06 },
+      { x:  4, y: 10.2, shape: 'box', w: 0.6, h: 1.4, material: 'stone', hp: 40, color: 0x180c06 },
 
-      // ── Brittle glowing molten rocks on mid ledges (y=5 zone) ──
+      // ── Brittle glowing molten rocks — destructible cover on the mid ledges ──
       { x: -7,  y: 6, shape: 'sphere', radius: 0.42, material: 'stone', hp: 18, color: 0xff4422 },
       { x:  7,  y: 6, shape: 'sphere', radius: 0.42, material: 'stone', hp: 18, color: 0xff4422 },
-      // Extra ember boulders on upper steps.
-      { x: -5,  y: 9, shape: 'sphere', radius: 0.38, material: 'stone', hp: 15, color: 0xff5533 },
-      { x:  5,  y: 9, shape: 'sphere', radius: 0.38, material: 'stone', hp: 15, color: 0xff5533 },
     ],
     hazards: [
       // ── Central rising-lava pool — the eruption heartbeat ──

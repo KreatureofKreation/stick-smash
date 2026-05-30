@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { COL_GROUPS } from '../../physics/PhysicsWorld.js';
+import { audio } from '../../audio/Audio.js';
 
 // One round destructible body. Owns annular-wedge tiles for crust + mantle and
 // a single core sphere. Wedges register into level.tiles using composite ids
@@ -286,5 +287,26 @@ export class Planet {
     this.radius = this.coreRadius;
     // Brighten the core glow to read as "exposed".
     if (this.coreMesh?.material) this.coreMesh.material.emissiveIntensity = 2.4;
+    this._eruptJuice();
+  }
+
+  // Feedback for the moment a planet's crust is fully stripped and the molten
+  // core is exposed. Without this the peel is silent + invisible; players miss
+  // that the planet just became a death trap. Debris ring off the old crust
+  // silhouette + a fireball pop at the core + camera kick + a crunchy sound.
+  _eruptJuice() {
+    const fx = this.level?.fx;
+    if (fx?.particles) {
+      const N = 20;
+      for (let i = 0; i < N; i++) {
+        const a = (i / N) * Math.PI * 2;
+        const ex = this.cx + Math.cos(a) * this.baseRadius;
+        const ey = this.cy + Math.sin(a) * this.baseRadius;
+        fx.particles.debris(ex, ey, 0, this.crustColor, 3);
+      }
+      fx.particles.burst(this.cx, this.cy, 0, { count: 26, speed: 10, color: 0xff5522 });
+    }
+    fx?.camera?.punch?.(0.5);
+    audio.break?.();
   }
 }
