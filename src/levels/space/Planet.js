@@ -27,6 +27,8 @@ export class Planet {
     this.wedges = [];     // populated by _buildCrust / _buildMantle
     this.coreBody = null;
     this.coreMesh = null;
+    this.crustAlive = this.crustWedges;  // count of un-destroyed crust wedges; hits 0 → peel
+    this.molten = false;                 // true after crust is fully stripped
   }
 
   get haloRadius() { return this.radius * this.haloMul; }
@@ -242,6 +244,43 @@ export class Planet {
       },
     };
     body.userData = { kind: 'tile', tile: wedge };
+
+    // Crust wedges notify the planet when destroyed so it can track crustAlive
+    // and trigger the lava-peel when the last one goes.
+    if (kind === 'crust') {
+      const _origDestroy = wedge.destroy.bind(wedge);
+      wedge.destroy = function () {
+        _origDestroy();
+        this.planet._onCrustDestroyed();
+      };
+    }
+
     return wedge;
+  }
+
+  _onCrustDestroyed() {
+    if (this.molten) return;
+    this.crustAlive--;
+    if (this.crustAlive <= 0) this._peel();
+  }
+
+  _peel() {
+    if (this.molten) return;
+    this.molten = true;
+    // Destroy any remaining mantle wedges (now above the new surface).
+    for (const w of this.wedges) {
+      if (w.kind === 'mantle' && w.hp > 0) w.destroy();
+    }
+    // Shrink the solid surface collider to the core so players descend onto lava.
+    if (this.surfaceBody) this.level.physics.remove(this.surfaceBody);
+    const body = new CANNON.Body({ mass: 0, collisionFilterGroup: COL_GROUPS.WORLD, collisionFilterMask: -1 });
+    body.addShape(new CANNON.Sphere(this.coreRadius));
+    body.position.set(this.cx, this.cy, 0);
+    this.level.physics.add(body);
+    this.surfaceBody = body;
+    // The walking spring targets planet.radius — lower it to the core surface.
+    this.radius = this.coreRadius;
+    // Brighten the core glow to read as "exposed".
+    if (this.coreMesh?.material) this.coreMesh.material.emissiveIntensity = 2.4;
   }
 }
