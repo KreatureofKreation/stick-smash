@@ -52,16 +52,36 @@ export class Weapon {
     this.mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: 0x888888 }));
   }
 
+  // Nearest planet to a point (curved-gravity levels only). Used to orient a
+  // floating weapon tangent to the surface it hovers over.
+  _nearestPlanet(x, y) {
+    const planets = this.game.level?.planets;
+    if (!planets || !planets.length) return null;
+    let best = null, bd = Infinity;
+    for (const p of planets) {
+      const dx = p.cx - x, dy = p.cy - y, d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; best = p; }
+    }
+    return best;
+  }
+
   // Spawn into world as pickup
   spawnAt(x, y, z = 0) {
     this.game.scene.add(this.mesh);
+    // On curved-gravity (planet) levels, dynamic weapon bodies get pulled by
+    // the planet gravity and skitter / fly off the curved surface. Instead
+    // spawn them as a STATIC floating pickup at the spawn point (like the
+    // power-ups): a mass-0 trigger body so it stays put and players pass
+    // through it, picked up by the existing proximity check.
+    const curved = !!this.game.level?.curvedGravity;
     const body = new CANNON.Body({
-      mass: this.gravity ? 1.5 : 0,
+      mass: (this.gravity && !curved) ? 1.5 : 0,
       material: this.game.physics.materials.prop,
       collisionFilterGroup: COL_GROUPS.WEAPON,
       collisionFilterMask: COL_GROUPS.WORLD | COL_GROUPS.PLAYER,
       linearDamping: 0.2,
       angularDamping: 0.4,
+      isTrigger: curved,
     });
     // Box collider 0.6×0.16×0.16m. Y-extent intentionally low so player
     // walking INTO the side rolls the capsule over the top (standable
@@ -72,6 +92,18 @@ export class Weapon {
     this.game.physics.add(body);
     this.body = body;
     this.life = 30;
+
+    this._floating = curved;
+    if (curved) {
+      this._floatX = x; this._floatY = y; this._floatZ = z;
+      // Orient the weapon tangent to the planet it hovers over so it lies
+      // parallel to the surface, and bob it along the outward radial.
+      const pl = this._nearestPlanet(x, y);
+      const ang = pl ? Math.atan2(y - pl.cy, x - pl.cx) : Math.PI / 2;
+      this._floatUX = Math.cos(ang);
+      this._floatUY = Math.sin(ang);
+      this._floatAngle = ang + Math.PI / 2;   // tangent to the surface
+    }
     return this;
   }
 
@@ -195,7 +227,20 @@ export class Weapon {
 
   // World tick — update mesh from body if free.
   worldTick(dt) {
-    if (this.body && !this.holder) {
+    if (this._floating && this.body && !this.holder) {
+      // Floating planet pickup — hover + bob along the outward radial, lie
+      // tangent to the surface. The body stays static at the spawn point;
+      // only the mesh animates.
+      const bob = Math.sin(performance.now() * 0.003) * 0.12;
+      this.mesh.position.set(
+        this._floatX + this._floatUX * bob,
+        this._floatY + this._floatUY * bob,
+        this._floatZ,
+      );
+      this.mesh.rotation.set(0, 0, this._floatAngle);
+      this.life -= dt;
+      if (this.life <= 0) this.destroy();
+    } else if (this.body && !this.holder) {
       const p = this.body.position;
       const q = this.body.quaternion;
       this.mesh.position.set(p.x, p.y, p.z);
