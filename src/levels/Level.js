@@ -314,22 +314,29 @@ export class Hazard {
       this.body = body;
       this.pointDown = down;
     } else if (this.kind === 'saw') {
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.1, 8, 16), new THREE.MeshLambertMaterial({ color: 0xcccccc }));
+      // Blade radius — opts.radius scales the whole saw (mesh + collider) so a
+      // level can drop in a giant centerpiece sweeping blade, not just the
+      // default small patrol saw.
+      const R = opts.radius ?? 0.55;
+      const teethCount = Math.max(12, Math.round(R * 22));
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(R * 0.9, R * 0.18, 8, 20), new THREE.MeshLambertMaterial({ color: 0xcccccc }));
       const teeth = new THREE.Group();
-      for (let i = 0; i < 12; i++) {
-        const t = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.2, 4), new THREE.MeshLambertMaterial({ color: 0xeeeeee }));
-        const a = (i / 12) * Math.PI * 2;
-        t.position.set(Math.cos(a) * 0.55, Math.sin(a) * 0.55, 0);
+      for (let i = 0; i < teethCount; i++) {
+        const t = new THREE.Mesh(new THREE.ConeGeometry(R * 0.18, R * 0.36, 4), new THREE.MeshLambertMaterial({ color: 0xeeeeee }));
+        const a = (i / teethCount) * Math.PI * 2;
+        t.position.set(Math.cos(a) * R, Math.sin(a) * R, 0);
         t.rotation.z = a - Math.PI / 2;
         teeth.add(t);
       }
-      const grp = new THREE.Group(); grp.add(ring, teeth);
+      const hub = new THREE.Mesh(new THREE.CircleGeometry(R * 0.55, 18), new THREE.MeshLambertMaterial({ color: 0x6a7078 }));
+      const grp = new THREE.Group(); grp.add(hub, ring, teeth);
       grp.position.set(this.x, this.y, 0);
       scene.add(grp);
       this.mesh = grp; this.spinning = grp;
+      this.sawR = R;
 
       const body = new CANNON.Body({ mass: 0, isTrigger: true, collisionFilterGroup: COL_GROUPS.HAZARD });
-      body.addShape(new CANNON.Sphere(0.55));
+      body.addShape(new CANNON.Sphere(R));
       body.position.set(this.x, this.y, 0);
       body.userData = { kind: 'hazard', hazard: this };
       world.add(body);
