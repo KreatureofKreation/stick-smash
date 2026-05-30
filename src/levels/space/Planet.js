@@ -29,8 +29,10 @@ export class Planet {
     this.wedges = [];     // populated by _buildCrust / _buildMantle
     this.coreBody = null;
     this.coreMesh = null;
-    this.crustAlive = this.crustWedges;  // count of un-destroyed crust wedges; hits 0 → peel
-    this.molten = false;                 // true after crust is fully stripped
+    this.crustAlive = this.crustWedges;   // un-destroyed crust wedges; 0 → expose mantle
+    this.mantleAlive = this.mantleWedges; // un-destroyed mantle wedges; 0 → expose core
+    this.peelStage = 0;                   // 0 = crust, 1 = mantle exposed, 2 = molten core
+    this.molten = false;                  // true once peeled to the core (stage 2)
   }
 
   get haloRadius() { return this.baseRadius * this.haloMul; }
@@ -250,60 +252,90 @@ export class Planet {
     };
     body.userData = { kind: 'tile', tile: wedge };
 
-    // Crust wedges notify the planet when destroyed so it can track crustAlive
-    // and trigger the lava-peel when the last one goes.
+    // Crust + mantle wedges notify the planet when destroyed so it can peel
+    // the surface down one layer at a time (crust → walkable mantle → molten
+    // core). Players walk on each exposed layer until it too is stripped.
     if (kind === 'crust') {
       const _origDestroy = wedge.destroy.bind(wedge);
-      wedge.destroy = function () {
-        _origDestroy();
-        this.planet._onCrustDestroyed();
-      };
+      wedge.destroy = function () { _origDestroy(); this.planet._onCrustDestroyed(); };
+    } else if (kind === 'mantle') {
+      const _origDestroy = wedge.destroy.bind(wedge);
+      wedge.destroy = function () { _origDestroy(); this.planet._onMantleDestroyed(); };
     }
 
     return wedge;
   }
 
   _onCrustDestroyed() {
-    if (this.molten) return;
+    if (this.peelStage >= 1) return;
     this.crustAlive--;
-    if (this.crustAlive <= 0) this._peel();
+    if (this.crustAlive <= 0) this._peelToMantle();
   }
 
-  _peel() {
-    if (this.molten) return;
-    this.molten = true;
-    // Destroy any remaining mantle wedges (now above the new surface).
-    for (const w of this.wedges) {
-      if (w.kind === 'mantle' && w.hp > 0) w.destroy();
-    }
-    // Shrink the solid surface collider to the core so players descend onto lava.
+  _onMantleDestroyed() {
+    this.mantleAlive--;
+    // Only the core-peel once the mantle is actually the exposed surface.
+    if (this.peelStage === 1 && this.mantleAlive <= 0) this._peelToCore();
+  }
+
+  // Swap the solid surface collider for a smaller sphere and lower the radius
+  // the walking spring targets, so players descend onto the newly-exposed layer.
+  _shrinkSurface(newRadius) {
     if (this.surfaceBody) this.level.physics.remove(this.surfaceBody);
     const body = new CANNON.Body({ mass: 0, collisionFilterGroup: COL_GROUPS.WORLD, collisionFilterMask: -1 });
-    body.addShape(new CANNON.Sphere(this.coreRadius));
+    body.addShape(new CANNON.Sphere(newRadius));
     body.position.set(this.cx, this.cy, 0);
     this._world.add(body);
     this.surfaceBody = body;
-    // The walking spring targets planet.radius — lower it to the core surface.
-    this.radius = this.coreRadius;
-    // Brighten the core glow to read as "exposed".
+    this.radius = newRadius;   // walking spring targets radius + CAPSULE_OFFSET
+  }
+
+  // Stage 1: crust fully stripped → expose the mantle as a new walkable surface.
+  // The mantle wedges stay (they're now the visible/standable shell and can be
+  // shot to advance to stage 2). NOT molten yet — the mantle is solid rock.
+  _peelToMantle() {
+    if (this.peelStage >= 1) return;
+    this.peelStage = 1;
+    this._shrinkSurface(this.mantleRadius);
+    this._layerJuice(this.crustColor, this.baseRadius);
+  }
+
+  // Stage 2: mantle stripped → expose the molten core. Surface shrinks to the
+  // core, planet goes molten (walkers burn — see Stickman walking branch).
+  _peelToCore() {
+    if (this.peelStage >= 2) return;
+    this.peelStage = 2;
+    this.molten = true;
+    for (const w of this.wedges) {
+      if (w.kind === 'mantle' && w.hp > 0) w.destroy();
+    }
+    this._shrinkSurface(this.coreRadius);
     if (this.coreMesh?.material) this.coreMesh.material.emissiveIntensity = 2.4;
     this._eruptJuice();
   }
 
-  // Feedback for the moment a planet's crust is fully stripped and the molten
-  // core is exposed. Without this the peel is silent + invisible; players miss
-  // that the planet just became a death trap. Debris ring off the old crust
-  // silhouette + a fireball pop at the core + camera kick + a crunchy sound.
+  // Lighter feedback for stripping a layer (crust→mantle): a debris ring off
+  // the old silhouette + a small camera kick + a crack.
+  _layerJuice(color, ringRadius) {
+    const fx = this.level?.fx;
+    if (fx?.particles) {
+      const N = 16;
+      for (let i = 0; i < N; i++) {
+        const a = (i / N) * Math.PI * 2;
+        fx.particles.debris(this.cx + Math.cos(a) * ringRadius, this.cy + Math.sin(a) * ringRadius, 0, color, 3);
+      }
+    }
+    fx?.camera?.punch?.(0.3);
+    audio.break?.();
+  }
+
+  // Full eruption feedback for exposing the molten core (stage 2). Debris ring
+  // + fireball pop + camera kick + crunch so players read the planet becoming
+  // a death trap.
   _eruptJuice() {
     const fx = this.level?.fx;
     if (fx?.particles) {
-      const N = 20;
-      for (let i = 0; i < N; i++) {
-        const a = (i / N) * Math.PI * 2;
-        const ex = this.cx + Math.cos(a) * this.baseRadius;
-        const ey = this.cy + Math.sin(a) * this.baseRadius;
-        fx.particles.debris(ex, ey, 0, this.crustColor, 3);
-      }
+      this._layerJuice(this.mantleColor, this.mantleRadius);
       fx.particles.burst(this.cx, this.cy, 0, { count: 26, speed: 10, color: 0xff5522 });
     }
     fx?.camera?.punch?.(0.5);

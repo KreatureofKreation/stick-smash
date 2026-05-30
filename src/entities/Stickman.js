@@ -1511,7 +1511,10 @@ export class Stickman {
       const dx = px - planet.cx, dy = py - planet.cy;
       const r = Math.hypot(dx, dy) || 1;
       const ux = dx / r, uy = dy / r;
-      const tx = -uy, ty = ux;
+      // Tangent is CLOCKWISE (uy, -ux): pressing right (moveX>0) moves the
+      // player screen-right when on top of a planet. The CCW tangent felt
+      // flipped (right key sent you screen-left at the top).
+      const tx = uy, ty = -ux;
       const surfaceR = planet.radius + CAPSULE_OFFSET;
 
       // Velocity: tangential component (kept) + radial component (sprung).
@@ -1599,7 +1602,7 @@ export class Stickman {
       const dx = px - planet.cx, dy = py - planet.cy;
       const r = Math.hypot(dx, dy) || 1;
       const ux = dx / r, uy = dy / r;
-      const tx = -uy, ty = ux;
+      const tx = uy, ty = -ux;   // clockwise — matches walking control direction
       // Scripted down accel toward the captured planet.
       this.body.velocity.x -= ux * JUMP_DOWN_ACCEL * dt;
       this.body.velocity.y -= uy * JUMP_DOWN_ACCEL * dt;
