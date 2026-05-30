@@ -16,6 +16,24 @@ const LIMB_PAD = 0.06;
 // physics module into the rig — rig stays display-only.
 const WORLD_MASK = 0x0001;
 
+// Animation feel tunables — live-tunable via window.__anim so the feel can be
+// tightened in-browser without a rebuild (e.g. `window.__anim.RUN_LEAN = 0.45`
+// then watch it live). Defaults below are a tightened first pass: weightier
+// landings, snappier lean/squash, a takeoff pop, a calmer idle. Lower *_LAMBDA
+// = faster (snappier) convergence.
+const ANIM_DEFAULTS = {
+  LAND_WEIGHT: 1.35,      // landing squash + hip-dip weight (was ~1.0)
+  TILT_LAMBDA: 0.00004,   // body-lean damp; smaller = snappier (was 0.0001)
+  SQUASH_LAMBDA: 0.0004,  // squash damp; smaller = snappier (was 0.0008)
+  RUN_LEAN: 0.36,         // forward lean per unit speed (was 0.28)
+  BOB_AMT: 0.13,          // hip bob amplitude (was 0.10)
+  TAKEOFF_POP: 0.22,      // extra upward stretch pulse on jump takeoff
+  IDLE_DRIFT: 0.4,        // idle phase drift scale; lower = calmer arms (was 1.0)
+};
+const ANIM = (typeof window !== 'undefined')
+  ? (window.__anim = Object.assign({}, ANIM_DEFAULTS, window.__anim || {}))
+  : ANIM_DEFAULTS;
+
 function makeLimb(radius, length, mat) {
   const g = new THREE.CylinderGeometry(radius, radius, length, 8, 1, false);
   g.translate(0, length / 2, 0);
@@ -687,7 +705,7 @@ export class StickmanRig {
     this._strikePose = strikePose; // expose to leg/arm code below without reresolving
 
     // Body tilt — stronger forward lean when sprinting.
-    this.bodyTiltTarget = clamp(speed * 0.28, -0.5, 0.5);
+    this.bodyTiltTarget = clamp(speed * (ANIM.RUN_LEAN ?? 0.28), -0.6, 0.6);
     if (strikePose) {
       // Move-driven lean owns the body. Generic attack lean is skipped.
     } else if (params.attack) {
@@ -737,7 +755,7 @@ export class StickmanRig {
       // Pose contributes leanZ — apply on top of base lean, snap directly.
       this.bodyTilt = this.bodyTiltTarget + this.facing * strikePose.leanZ;
     } else {
-      this.bodyTilt = damp(this.bodyTilt, this.bodyTiltTarget, 0.0001, dt);
+      this.bodyTilt = damp(this.bodyTilt, this.bodyTiltTarget, ANIM.TILT_LAMBDA ?? 0.0001, dt);
     }
     this.hitTilt = damp(this.hitTilt, 0, 0.001, dt);
 
@@ -747,10 +765,16 @@ export class StickmanRig {
       // Use last frame's downward vy as impact intensity (vy here can already
       // be 0 if physics resolved on this tick, so use _lastVy fallback).
       const impactVy = Math.min(0, this._lastVy * 7.5);
-      this._landImpact = clamp(-impactVy * 0.06, 0, 1.1);
+      this._landImpact = clamp(-impactVy * 0.06 * (ANIM.LAND_WEIGHT ?? 1), 0, 1.3);
+    } else if (!params.grounded && this._wasGrounded && vy > 2) {
+      // Takeoff — quick upward stretch pulse as the legs push off, so jumps
+      // launch with snap instead of a constant pose.
+      this._takeoffPop = (ANIM.TAKEOFF_POP ?? 0.22);
     }
     this._wasGrounded = params.grounded;
     this._landImpact = damp(this._landImpact, 0, 0.0001, dt); // fast decay
+    if (this._takeoffPop === undefined) this._takeoffPop = 0;
+    this._takeoffPop = damp(this._takeoffPop, 0, 0.0002, dt); // ~0.2s pop
 
     // Idle breathing — slow sine when standing still so the stance breathes
     // rather than freezes. Phase advances regardless; amplitude gates on idle.
@@ -774,7 +798,8 @@ export class StickmanRig {
     if (this._hitSquash === undefined) this._hitSquash = 0;
     this._hitSquash = damp(this._hitSquash, 0, 0.00005, dt);
     squashTarget *= 1 - this._hitSquash * 0.18;
-    this.squash = damp(this.squash, squashTarget, 0.0008, dt);
+    squashTarget += this._takeoffPop;   // stretch up on jump takeoff
+    this.squash = damp(this.squash, squashTarget, ANIM.SQUASH_LAMBDA ?? 0.0008, dt);
 
     // Throw windup — Stickman sets params.throwWindup 0..1 to telegraph a throw.
     this._throwAnticipation = damp(this._throwAnticipation, params.throwWindup ?? 0, 0.0004, dt);
@@ -792,8 +817,8 @@ export class StickmanRig {
     } else if (!params.grounded) {
       this.walkPhase += dt * 6;
     } else {
-      // Idle: slow drift just to keep arms breathing.
-      this.walkPhase += dt * 1.0;
+      // Idle: slow drift just to keep arms breathing. IDLE_DRIFT calms it.
+      this.walkPhase += dt * 1.0 * (ANIM.IDLE_DRIFT ?? 1);
     }
     // Expose for the leg-target code below.
     this._targetStride = targetStride;
@@ -802,9 +827,9 @@ export class StickmanRig {
     // Hip in WORLD or LOCAL space (caller decides via pos).
     // Hip bob: vertical bounce — one dip per step. Run gets a heavier bounce.
     const runBoost = clamp(speedMag * 1.2, 0, 1.0);
-    const bob = (params.grounded ? Math.abs(Math.sin(this.walkPhase)) : 0) * speedMag * 0.10 * (1 + runBoost * 0.4);
+    const bob = (params.grounded ? Math.abs(Math.sin(this.walkPhase)) : 0) * speedMag * (ANIM.BOB_AMT ?? 0.10) * (1 + runBoost * 0.4);
     const crouchDrop = this.crouchAmount * 0.5;
-    const landDrop = this._landImpact * 0.18;
+    const landDrop = this._landImpact * 0.22;   // hip dips on touchdown (weight)
     const hipX = pos.x;
     // Hip-foot reach budget: feet sit at pos.y - 0.75 (capsule bottom).
     // Legs are 1.00m total. Hip at pos.y + 0.25 → diff 1.00m → legs read
