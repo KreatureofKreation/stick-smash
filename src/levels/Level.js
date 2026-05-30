@@ -275,6 +275,13 @@ export class Hazard {
       body.userData = { kind: 'hazard', hazard: this };
       world.add(body);
       this.body = body;
+      // Optional rising/falling lava — periodically floods up then recedes.
+      // opts.rise = { height, period, phase? }. Height in world units, period
+      // in seconds for a full up+down cycle. The DoT trigger + mesh move
+      // together so the danger zone always matches the visible magma.
+      this.rise = opts.rise ?? null;
+      this._riseBaseY = this.y;
+      this._riseT = (opts.rise?.phase ?? 0);
     } else if (this.kind === 'spike') {
       const grp = new THREE.Group();
       const count = Math.max(1, Math.round(this.w / 0.3));
@@ -477,6 +484,18 @@ export class Hazard {
   update(dt) {
     if (this.kind === 'lava' && this.mesh) {
       this.mesh.material.emissiveIntensity = 0.8 + Math.sin(performance.now() * 0.003) * 0.3;
+      // Rising lava: smooth ease up to full height then back down. Uses a
+      // raised-cosine so the magma dwells briefly at the top + bottom of the
+      // cycle (telegraphs the flood) rather than snapping through.
+      if (this.rise) {
+        this._riseT += dt;
+        const period = this.rise.period ?? 10;
+        const phase = (this._riseT / period) * Math.PI * 2;
+        const lvl = (1 - Math.cos(phase)) * 0.5;           // 0..1..0
+        const y = this._riseBaseY + lvl * (this.rise.height ?? 4);
+        this.mesh.position.y = y;
+        if (this.body) this.body.position.y = y;
+      }
     }
     if (this.kind === 'saw') {
       this.spinning.rotation.z += dt * 18;
