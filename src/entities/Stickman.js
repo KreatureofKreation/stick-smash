@@ -1547,11 +1547,17 @@ export class Stickman {
 
       if (Math.abs(newVT) > 0.2) this.facing = Math.sign(newVT) || this.facing;
 
+      // Molten lava damage: if the planet has been peeled to its core, walkers burn.
+      if (planet.molten && this.alive && this.invuln <= 0) {
+        const MOLTEN_DPS = T.MOLTEN_DPS ?? 60;
+        this.takeDamage(MOLTEN_DPS * dt, { attacker: null, weapon: 'lava' });
+      }
+
       // Jump → switch to jumping.
       const wantJump = this.input.jumpPressed && performance.now() >= (this._jumpInputCooldown || 0);
       if (wantJump) {
         if (this.charging) this._clearCombatState();
-        const jumpSpeed = 8;
+        const jumpSpeed = T.JUMP_SPEED ?? 12;
         // Replace radial component with jumpSpeed outward; preserve tangential.
         this.body.velocity.x = newVT * tx + jumpSpeed * ux;
         this.body.velocity.y = newVT * ty + jumpSpeed * uy;
@@ -1596,7 +1602,7 @@ export class Stickman {
 
       // Tangential mid-air control — small fraction of ground accel.
       const vT = this.body.velocity.x * tx + this.body.velocity.y * ty;
-      const speedMaxAir = 4.0;
+      const speedMaxAir = T.AIR_SPEED_MAX ?? 6;
       const targetT = moveX * speedMaxAir;
       const dvT = targetT - vT;
       const stepT = clamp(dvT, -AIR_ACCEL * dt, AIR_ACCEL * dt);
