@@ -1500,8 +1500,8 @@ export class Stickman {
   // orbital escape velocity — that bug is impossible by construction here.
   _movePlanetMagnetic(dt, moveX, boosted, flying) {
     const T = window.__planet ?? {};
-    const JUMP_DOWN_ACCEL = T.JUMP_DOWN_ACCEL ?? 30;
-    const AIR_ACCEL = T.AIR_ACCEL ?? 18;
+    const JUMP_DOWN_ACCEL = T.JUMP_DOWN_ACCEL ?? 14;
+    const AIR_ACCEL = T.AIR_ACCEL ?? 24;
     const CAPSULE_OFFSET = 0.95;  // matches existing _updateGroundCheck capsule offset
     const mode = this._planetMode;
 

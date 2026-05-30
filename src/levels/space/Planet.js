@@ -12,6 +12,7 @@ export class Planet {
     this.cx = cfg.cx;
     this.cy = cfg.cy;
     this.radius = cfg.radius;
+    this.baseRadius = cfg.radius;
     this.mantleRadius = cfg.mantleRadius ?? cfg.radius * 0.65;
     this.coreRadius = cfg.coreRadius ?? cfg.radius * 0.3;
     this.mass = cfg.mass ?? cfg.radius * cfg.radius * cfg.radius * 1.0;
@@ -31,7 +32,7 @@ export class Planet {
     this.molten = false;                 // true after crust is fully stripped
   }
 
-  get haloRadius() { return this.radius * this.haloMul; }
+  get haloRadius() { return this.baseRadius * this.haloMul; }
 
   build(scene, world) {
     this._buildSurface(scene, world);
@@ -55,6 +56,7 @@ export class Planet {
     body.position.set(this.cx, this.cy, 0);
     world.add(body);
     this.surfaceBody = body;
+    this._world = world;
   }
 
   destroy() {
@@ -115,7 +117,9 @@ export class Planet {
       kind: 'lava', x: this.cx, y: this.cy, w: r * 2, h: r * 2,
       dps: 60, body, mesh,
       kb: { x: 0, y: 0 },
+      planetRef: this,
       contactPlayer(player, dt) {
+        if (this.planetRef?.molten) return;   // molten DoT handled by the walking branch
         if (player.invuln > 0 || !player.alive) return;
         player.takeDamage(this.dps * dt, { attacker: null, weapon: 'lava' });
       },
@@ -276,7 +280,7 @@ export class Planet {
     const body = new CANNON.Body({ mass: 0, collisionFilterGroup: COL_GROUPS.WORLD, collisionFilterMask: -1 });
     body.addShape(new CANNON.Sphere(this.coreRadius));
     body.position.set(this.cx, this.cy, 0);
-    this.level.physics.add(body);
+    this._world.add(body);
     this.surfaceBody = body;
     // The walking spring targets planet.radius — lower it to the core surface.
     this.radius = this.coreRadius;

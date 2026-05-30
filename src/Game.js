@@ -592,7 +592,7 @@ export class Game {
       // Static pad. If the pad's tile column was destroyed, fall back to a
       // safe sky-drop column instead of dropping into the void.
       const sp = this.level.randomWeaponSpawn();
-      if (this._hasGroundBelow(sp.x, sp.y, 20)) {
+      if (curved || this._hasGroundBelow(sp.x, sp.y, 20)) {
         x = sp.x; y = sp.y;
       } else {
         x = this._safeDropX(sp.x);
