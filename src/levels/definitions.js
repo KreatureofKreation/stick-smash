@@ -737,32 +737,33 @@ export const LEVELS = [
     gravity: 0,
     curvedGravity: true,
     cameraClamp: { x: [-30, 30], y: [-25, 25], zoom: [12, 32] },
-    killBound: { x: 30, y: 25 },
+    killBound: { x: 24, y: 22 },
+    meteorShower: { activateAfter: 20, interval: [6, 11], perShower: [1, 3] },
     planets: [
-      { id: 'p1', cx: -12, cy:   0, radius: 5.0, mantleRadius: 3.3, coreRadius: 1.6, mass: 167, pullStrength: 18 },
-      { id: 'p2', cx:  12, cy:   4, radius: 4.5, mantleRadius: 3.0, coreRadius: 1.5, mass: 130, pullStrength: 18 },
-      { id: 'p3', cx:   0, cy:  -8, radius: 2.5, mantleRadius: 1.7, coreRadius: 0.8, mass:  40, pullStrength: 10 },
-      { id: 'p4', cx: -22, cy:   8, radius: 3.0, mantleRadius: 2.0, coreRadius: 1.0, mass:  55, pullStrength: 10 },
-      { id: 'p5', cx:  22, cy: -10, radius: 3.0, mantleRadius: 2.0, coreRadius: 1.0, mass:  55, pullStrength: 10 },
-      { id: 'p6', cx:   0, cy:  12, radius: 2.0, mantleRadius: 1.4, coreRadius: 0.6, mass:  25, pullStrength: 10 },
+      { id: 'p1', cx:  0,   cy:  11,  radius: 3.5, mantleRadius: 2.1,  coreRadius: 1.12, pullStrength: 16, haloMul: 4.5, crustHp: 90 },
+      { id: 'p2', cx:  9.5, cy:  5.5, radius: 2.5, mantleRadius: 1.5,  coreRadius: 0.8,  pullStrength: 16, haloMul: 4.5, crustHp: 24 },
+      { id: 'p3', cx:  9.5, cy: -5.5, radius: 2.5, mantleRadius: 1.5,  coreRadius: 0.8,  pullStrength: 16, haloMul: 4.5, crustHp: 24 },
+      { id: 'p4', cx:  0,   cy: -11,  radius: 3.5, mantleRadius: 2.1,  coreRadius: 1.12, pullStrength: 16, haloMul: 4.5, crustHp: 90 },
+      { id: 'p5', cx: -9.5, cy: -5.5, radius: 2.5, mantleRadius: 1.5,  coreRadius: 0.8,  pullStrength: 16, haloMul: 4.5, crustHp: 24 },
+      { id: 'p6', cx: -9.5, cy:  5.5, radius: 2.5, mantleRadius: 1.5,  coreRadius: 0.8,  pullStrength: 16, haloMul: 4.5, crustHp: 24 },
     ],
     tiles: [],
     hazards: [],
     spawns: [
-      { x: -12, y:  6.5 },   // above p1
-      { x:  12, y:  9.5 },   // above p2
-      { x:   0, y: -11.0 },  // above p3
-      { x: -22, y: 11.5 },   // above p4
-      { x:  22, y: -7.0 },   // above p5
-      { x:   0, y: 14.5 },   // above p6
+      { x:   0,    y:  16.00 },  // above p1 (0,11) r3.5 dir(0,1)
+      { x:  12.96, y:   7.50 },  // above p2 (9.5,5.5) r2.5 dir(0.865,0.501)
+      { x:  12.96, y:  -7.50 },  // above p3 (9.5,-5.5) r2.5 dir(0.865,-0.501)
+      { x:   0,    y: -16.00 },  // above p4 (0,-11) r3.5 dir(0,-1)
+      { x: -12.96, y:  -7.50 },  // above p5 (-9.5,-5.5) r2.5 dir(-0.865,-0.501)
+      { x: -12.96, y:   7.50 },  // above p6 (-9.5,5.5) r2.5 dir(-0.865,0.501)
     ],
     weaponSpawns: [
-      { x: -12, y:  6.5 },
-      { x:  12, y:  9.5 },
-      { x:   0, y: -11.0 },
-      { x: -22, y: 11.5 },
-      { x:  22, y: -7.0 },
-      { x:   0, y: 14.5 },
+      { x:   0,    y:  16.00 },  // above p1
+      { x:  12.96, y:   7.50 },  // above p2
+      { x:  12.96, y:  -7.50 },  // above p3
+      { x:   0,    y: -16.00 },  // above p4
+      { x: -12.96, y:  -7.50 },  // above p5
+      { x: -12.96, y:   7.50 },  // above p6
     ],
     background: [
       bgGlow(0, 18, 30, 1.0, 0x4d4080, -16),

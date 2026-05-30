@@ -1500,8 +1500,8 @@ export class Stickman {
   // orbital escape velocity — that bug is impossible by construction here.
   _movePlanetMagnetic(dt, moveX, boosted, flying) {
     const T = window.__planet ?? {};
-    const JUMP_DOWN_ACCEL = T.JUMP_DOWN_ACCEL ?? 30;
-    const AIR_ACCEL = T.AIR_ACCEL ?? 18;
+    const JUMP_DOWN_ACCEL = T.JUMP_DOWN_ACCEL ?? 14;
+    const AIR_ACCEL = T.AIR_ACCEL ?? 24;
     const CAPSULE_OFFSET = 0.95;  // matches existing _updateGroundCheck capsule offset
     const mode = this._planetMode;
 
@@ -1547,11 +1547,17 @@ export class Stickman {
 
       if (Math.abs(newVT) > 0.2) this.facing = Math.sign(newVT) || this.facing;
 
+      // Molten lava damage: if the planet has been peeled to its core, walkers burn.
+      if (planet.molten && this.alive && this.invuln <= 0) {
+        const MOLTEN_DPS = T.MOLTEN_DPS ?? 60;
+        this.takeDamage(MOLTEN_DPS * dt, { attacker: null, weapon: 'lava' });
+      }
+
       // Jump → switch to jumping.
       const wantJump = this.input.jumpPressed && performance.now() >= (this._jumpInputCooldown || 0);
       if (wantJump) {
         if (this.charging) this._clearCombatState();
-        const jumpSpeed = 8;
+        const jumpSpeed = T.JUMP_SPEED ?? 12;
         // Replace radial component with jumpSpeed outward; preserve tangential.
         this.body.velocity.x = newVT * tx + jumpSpeed * ux;
         this.body.velocity.y = newVT * ty + jumpSpeed * uy;
@@ -1568,20 +1574,27 @@ export class Stickman {
 
     // --- JUMPING ---
     if (mode === 'jumping') {
-      // Planet hand-off: stay stuck to source planet until we've left its halo,
-      // then re-target the nearest planet. Lets jumps cross between bodies
-      // without yanking sideways early in the arc.
+      // Planet hand-off: once we've climbed off the source surface, re-target
+      // whichever planet is now NEAREST. Halos overlap (neighbours are closer
+      // than the source's own halo radius), so waiting to exit the source halo
+      // never fires — you'd reach the neighbour while still "owned" by the
+      // source and get dragged back. Switching on nearest-center (with a small
+      // hysteresis margin) makes the floaty arc hand off at the midpoint and
+      // land you on the neighbour. A straight-up jump stays nearest its own
+      // planet the whole arc, so it falls back home — as intended.
       let planet = this._modeStickPlanet ?? this._nearestPlanet();
       if (!planet) return;
       if (this._modeStickPlanet) {
-        const sx = this.body.position.x - this._modeStickPlanet.cx;
-        const sy = this.body.position.y - this._modeStickPlanet.cy;
-        const sd = Math.hypot(sx, sy);
-        if (sd > this._modeStickPlanet.haloRadius) {
+        const sp = this._modeStickPlanet;
+        const sd = Math.hypot(this.body.position.x - sp.cx, this.body.position.y - sp.cy);
+        if (sd > sp.radius + 1.0) {            // actually airborne off the source
           const near = this._nearestPlanet();
-          if (near && near !== this._modeStickPlanet) {
-            planet = near;
-            this._modeStickPlanet = near;
+          if (near && near !== sp) {
+            const nd = Math.hypot(this.body.position.x - near.cx, this.body.position.y - near.cy);
+            if (nd < sd - 0.5) {               // a different planet is genuinely closer
+              planet = near;
+              this._modeStickPlanet = near;
+            }
           }
         }
       }
@@ -1596,7 +1609,7 @@ export class Stickman {
 
       // Tangential mid-air control — small fraction of ground accel.
       const vT = this.body.velocity.x * tx + this.body.velocity.y * ty;
-      const speedMaxAir = 4.0;
+      const speedMaxAir = T.AIR_SPEED_MAX ?? 6;
       const targetT = moveX * speedMaxAir;
       const dvT = targetT - vT;
       const stepT = clamp(dvT, -AIR_ACCEL * dt, AIR_ACCEL * dt);

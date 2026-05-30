@@ -6,8 +6,11 @@ const DEFAULTS = {
   EDGE_TAPER_FRAC: 0.10,         // last 10% of halo radius tapers from full → 0
   DEBRIS_MUL: 0.5,               // softer pull for crates/ragdoll/debris bodies
   // Player-side magnetic-gravity tunables (read by Stickman._movePlanetMagnetic).
-  JUMP_DOWN_ACCEL: 30,           // scripted "down" accel during a player jump
-  AIR_ACCEL: 18,                 // mid-air tangential accel (rad/s²)
+  JUMP_SPEED: 12,                // outward launch speed on jump (m/s)
+  AIR_SPEED_MAX: 6,              // max tangential speed mid-air (m/s)
+  MOLTEN_DPS: 60,                // lava DoT applied to walkers on a molten planet (hp/s)
+  JUMP_DOWN_ACCEL: 14,           // scripted "down" accel during a player jump
+  AIR_ACCEL: 24,                 // mid-air tangential accel (rad/s²)
   RADIAL_STIFFNESS: 14,          // walking surface-spring gain (velocity = err × this)
   ROT_SLERP_RATE: 12,            // rad/s body quaternion align to local up
   LAUNCH_MIN_KB: 6,              // m/s knockback magnitude that triggers launched
