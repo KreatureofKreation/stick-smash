@@ -2023,8 +2023,15 @@ export class Stickman {
       this.aimDir.set(this.facing, 0);
     }
 
-    // Kill box — instakill when launched outside the play area.
-    if (this.position.y < -16 || this.position.y > 32 || Math.abs(this.position.x) > 30) {
+    // Kill box — instakill when launched outside the play area. Defer to the
+    // level's killBound when present (the planet ring extends to y≈-15.5, so a
+    // hardcoded y<-16 was instakilling players on the bottom planet). Falls
+    // back to the legacy flat-level bounds otherwise.
+    const _kb = this.game?.level?.killBound;
+    const _kxLim = _kb ? _kb.x : 30;
+    const _kyLo = _kb ? -_kb.y : -16;
+    const _kyHi = _kb ? _kb.y : 32;
+    if (this.position.y < _kyLo || this.position.y > _kyHi || Math.abs(this.position.x) > _kxLim) {
       const px = this.position.x;
       this.die('void');
       // Freeze ragdoll and park it far below the play area until respawn.

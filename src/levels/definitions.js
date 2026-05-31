@@ -831,8 +831,11 @@ export const LEVELS = [
     bgColor: 0x0a1024,
     gravity: 0,
     curvedGravity: true,
-    cameraClamp: { x: [-30, 30], y: [-25, 25], zoom: [12, 32] },
-    killBound: { x: 24, y: 22 },
+    cameraClamp: { x: [-30, 30], y: [-27, 27], zoom: [12, 32] },
+    // Bottom/top planet surfaces sit at y≈±15.5; the knockback reel-back caps
+    // at ≈±22.5. Keep the kill bound past that so normal hits survive, while
+    // truly huge hits can still ring a player out.
+    killBound: { x: 26, y: 26 },
     meteorShower: { activateAfter: 20, interval: [6, 11], perShower: [1, 3] },
     planets: [
       { id: 'p1', cx:  0,   cy:  11,  radius: 3.5, mantleRadius: 2.1,  coreRadius: 1.12, pullStrength: 16, haloMul: 4.5, crustHp: 90, mantleHp: 80 },
