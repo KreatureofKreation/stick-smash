@@ -351,7 +351,9 @@ export class Stickman {
       const mag = Math.hypot(vx, vy);
       if (mag > LAUNCH_MIN_KB) {
         this._planetMode = 'launched';
-        this._launchTimer = clamp(mag * 0.04, 0.3, 1.2);
+        // Shorter free-flight so big hits don't strand the player drifting in
+        // space — the distance cap + snappy return finish the job.
+        this._launchTimer = clamp(mag * 0.028, 0.22, 0.6);
         this._modeStickPlanet = null;
       }
     }
@@ -1645,11 +1647,17 @@ export class Stickman {
 
     // --- LAUNCHED ---
     if (mode === 'launched') {
-      const LAUNCH_DRAG = T.LAUNCH_DRAG ?? 0.98;
+      const LAUNCH_DRAG = T.LAUNCH_DRAG ?? 0.94;
       this.body.velocity.x *= Math.pow(LAUNCH_DRAG, dt * 60);
       this.body.velocity.y *= Math.pow(LAUNCH_DRAG, dt * 60);
       this._launchTimer -= dt;
-      if (this._launchTimer <= 0) {
+      // Distance cap — don't let a hit fling the player deep into space and
+      // leave them drifting for seconds. Once they've travelled past
+      // LAUNCH_MAX_DIST from the nearest surface, reel them straight back.
+      const LAUNCH_MAX_DIST = T.LAUNCH_MAX_DIST ?? 7;
+      const np = this._nearestPlanet();
+      const farOut = np && (Math.hypot(this.body.position.x - np.cx, this.body.position.y - np.cy) - np.radius) > LAUNCH_MAX_DIST;
+      if (this._launchTimer <= 0 || farOut) {
         this._planetMode = 'returning';
       }
       return;
@@ -1657,8 +1665,8 @@ export class Stickman {
 
     // --- RETURNING ---
     if (mode === 'returning') {
-      const RETURN_ACCEL = T.RETURN_ACCEL ?? 40;
-      const RETURN_VEL_CAP = T.RETURN_VEL_CAP ?? 25;
+      const RETURN_ACCEL = T.RETURN_ACCEL ?? 70;
+      const RETURN_VEL_CAP = T.RETURN_VEL_CAP ?? 34;
       const planet = this._nearestPlanet();
       if (!planet) return;
       const px = this.body.position.x, py = this.body.position.y;
@@ -1673,7 +1681,10 @@ export class Stickman {
         this.body.velocity.x *= f;
         this.body.velocity.y *= f;
       }
-      if (r < planet.haloRadius) {
+      // Stay in the strong-pull return until CLOSE to the surface, then hand to
+      // jumping for the final landing. (Switching at the huge halo radius left
+      // the slow jumping down-accel to finish the trip — seconds of drift.)
+      if (r < planet.radius + 2.5) {
         this._planetMode = 'jumping';
         this._modeStickPlanet = planet;
       }
