@@ -14,9 +14,10 @@ const DEFAULTS = {
   RADIAL_STIFFNESS: 14,          // walking surface-spring gain (velocity = err × this)
   ROT_SLERP_RATE: 12,            // rad/s body quaternion align to local up
   LAUNCH_MIN_KB: 6,              // m/s knockback magnitude that triggers launched
-  LAUNCH_DRAG: 0.98,             // per-60Hz-frame velocity multiplier in launched
-  RETURN_ACCEL: 40,              // m/s² pull during returning
-  RETURN_VEL_CAP: 25,            // m/s speed cap during returning
+  LAUNCH_DRAG: 0.94,             // per-60Hz-frame velocity multiplier in launched
+  LAUNCH_MAX_DIST: 7,            // m past the surface before a launch reels back
+  RETURN_ACCEL: 70,              // m/s² pull during returning (snappy reel-back)
+  RETURN_VEL_CAP: 34,            // m/s speed cap during returning
 };
 if (typeof window !== 'undefined') {
   window.__planet = Object.assign({}, DEFAULTS, window.__planet || {});
