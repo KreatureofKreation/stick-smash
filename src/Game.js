@@ -314,6 +314,7 @@ export class Game {
     for (let i = 0; i < 3; i++) this._spawnRandomItem();
 
     this.gameCam.setTargets(this.players);
+    this.gameCam.setLocal(this.localPlayer);
     // Snap camera to hero spawn so we don't zoom in dramatically from origin.
     if (this.localPlayer) {
       this.gameCam.center.set(this.localPlayer.position.x, this.localPlayer.position.y + 1.2, 0);

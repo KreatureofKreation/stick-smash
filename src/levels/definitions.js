@@ -862,27 +862,37 @@ export const LEVELS = [
     ],
     background: [
       // ── Orbiting above a big sunlit planet — its curve fills the lower frame.
-      // Atmosphere halo: a circle slightly larger than the planet so a soft
-      // ring of glow peeks around its limb (round, not a horizontal bar).
-      bgDisc(0, -36, 35.5, 0x6ec8e6, -20.2, { emissiveIntensity: 0.35 }),
-      bgDisc(0, -36, 33.4, 0x3a7fb0, -20.1, { emissiveIntensity: 0.3 }),
-      // Huge planet body low in view (top of the sphere arcs across y≈-4).
-      bgSphere(0, -36, 32, 0x274c6e, -20, { emissive: 0x123048, emissiveIntensity: 0.5 }),
-      // Distant sun, upper-right — the light source.
-      bgGlow(21, 18, 8, 8, 0xfff0c4, -19),
-      bgSphere(21, 18, 1.9, 0xffe9a0, -18.9, { emissive: 0xffdf86, emissiveIntensity: 1.4 }),
-      // Sparse stars in the upper space (above the horizon only).
+      // Full-sky starfield FIRST (furthest back), filling every part of the
+      // sky above the planet's limb — not just the top strip.
       ...(() => {
         const stars = [];
-        const seeds = [
-          [-23, 20, 0.16], [-15, 22, 0.12], [-8, 18, 0.13], [-2, 23, 0.10],
-          [6, 21, 0.12], [13, 22, 0.11], [-26, 14, 0.14], [27, 11, 0.12],
-          [-19, 16, 0.10], [3, 16, 0.10], [-12, 14, 0.11], [10, 16, 0.10],
-          [-5, 13, 0.09], [17, 14, 0.10],
-        ];
-        for (const [x, y, s] of seeds) stars.push(bgGlow(x, y, s, s, 0xffffff, -18.5));
+        const cxp = 0, cyp = -36, rp = 33.0;   // planet centre + skip radius
+        let k = 7;
+        for (let gx = -30; gx <= 30; gx += 3.2) {
+          for (let gy = -3; gy <= 25; gy += 2.6) {
+            k = (k * 1103515245 + 12345) & 0x7fffffff;   // deterministic LCG
+            const x = gx + ((k >> 4) % 100 / 100 - 0.5) * 2.6;
+            const y = gy + ((k >> 9) % 100 / 100 - 0.5) * 2.2;
+            const dx = x - cxp, dy = y - cyp;
+            if (dx * dx + dy * dy < rp * rp) continue;    // inside planet → skip
+            const s = 0.07 + ((k >> 14) % 7) * 0.017;     // 0.07..0.17
+            const c = [0xffffff, 0xbfd4ff, 0xfff0c8, 0xc8d8ff][(k >> 18) % 4];
+            stars.push(bgGlow(x, y, s, s, c, -21));
+          }
+        }
         return stars;
       })(),
+      // Atmosphere: a thick OPAQUE bright band ringing the planet (discs sized
+      // just larger than the body, solid colour, high emissive so it reads as a
+      // real glowing shell, not a faint see-through halo).
+      bgDisc(0, -36, 36.0, 0x2e7fb8, -20.3, { emissiveIntensity: 0.7 }),
+      bgDisc(0, -36, 34.2, 0x7fd8f4, -20.2, { emissiveIntensity: 1.0 }),
+      // Huge planet body low in view (top of the sphere arcs across y≈-4).
+      bgSphere(0, -36, 33.4, 0x274c6e, -20, { emissive: 0x123048, emissiveIntensity: 0.5 }),
+      // Distant sun, upper-right — round glow (disc, not a box) + bright core.
+      bgDisc(21, 18, 4.6, 0xfff0c4, -19.1, { emissiveIntensity: 0.9 }),
+      bgDisc(21, 18, 3.0, 0xfff6dc, -19.05, { emissiveIntensity: 1.2 }),
+      bgSphere(21, 18, 1.9, 0xffe9a0, -19, { emissive: 0xffdf86, emissiveIntensity: 1.5 }),
     ],
   },
 

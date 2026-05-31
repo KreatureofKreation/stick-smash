@@ -12,9 +12,11 @@ export class GameCamera {
     this.zoom = 14;
     this.zoomTarget = 14;
     this.targets = [];
+    this.localTarget = null;
   }
 
   setTargets(arr) { this.targets = arr; }
+  setLocal(t) { this.localTarget = t; }
 
   update(dt) {
     // Per-level clamp override. Read once for use across the auto-fit pass
@@ -47,6 +49,19 @@ export class GameCamera {
       const spreadX = maxX - minX, spreadY = maxY - minY;
       const fitZoom = clamp(Math.max(spreadX * 0.7, spreadY * 1.2) + 10, clampZ[0], clampZ[1]);
       this.zoomTarget = fitZoom;
+      // Keep the local player framed. On big arenas (e.g. the Orbit ring) a
+      // spread-out group pushes the fit centre far from a player at the edge,
+      // so they end up tiny/off-screen — "can't see yourself". Bias the centre
+      // toward the local player so they always sit well inside the frame.
+      const lt = this.localTarget;
+      if (lt && lt.alive && n > 1) {
+        const lp = lt.position;
+        if (Math.abs(lp.x) <= skipX && lp.y <= skipYHi && lp.y >= skipYLo) {
+          const b = 0.55;   // 0 = pure group centre, 1 = lock to local player
+          this.target.x = this.target.x * (1 - b) + lp.x * b;
+          this.target.y = this.target.y * (1 - b) + (lp.y + 1.2) * b;
+        }
+      }
     }
 
     this.center.x = damp(this.center.x, this.target.x, 0.0001, dt);
