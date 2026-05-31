@@ -887,8 +887,13 @@ export const LEVELS = [
       // real glowing shell, not a faint see-through halo).
       bgDisc(0, -36, 36.0, 0x2e7fb8, -20.3, { emissiveIntensity: 0.7 }),
       bgDisc(0, -36, 34.2, 0x7fd8f4, -20.2, { emissiveIntensity: 1.0 }),
-      // Huge planet body low in view (top of the sphere arcs across y≈-4).
-      bgSphere(0, -36, 33.4, 0x274c6e, -20, { emissive: 0x123048, emissiveIntensity: 0.5 }),
+      // Huge planet body low in view (top arcs across y≈-2.6). MUST be a FLAT
+      // disc, not a sphere: a sphere this large (r33) bulges forward to +z and
+      // pokes through the z=0 play plane, occluding the lower game planets +
+      // players behind blue. A disc stays flat at its z. Two stacked discs give
+      // a subtle top-lit gradient.
+      bgDisc(0, -36, 33.4, 0x21425f, -20, { emissiveIntensity: 0.35 }),
+      bgDisc(0, -34.2, 32.0, 0x2e5c82, -19.98, { emissiveIntensity: 0.4 }),
       // Distant sun, upper-right — round glow (disc, not a box) + bright core.
       bgDisc(21, 18, 4.6, 0xfff0c4, -19.1, { emissiveIntensity: 0.9 }),
       bgDisc(21, 18, 3.0, 0xfff6dc, -19.05, { emissiveIntensity: 1.2 }),
