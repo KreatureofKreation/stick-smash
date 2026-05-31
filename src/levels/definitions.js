@@ -862,17 +862,12 @@ export const LEVELS = [
     ],
     background: [
       // ── Orbiting above a big sunlit planet — its curve fills the lower frame.
+      // Atmosphere halo: a circle slightly larger than the planet so a soft
+      // ring of glow peeks around its limb (round, not a horizontal bar).
+      bgDisc(0, -36, 35.5, 0x6ec8e6, -20.2, { emissiveIntensity: 0.35 }),
+      bgDisc(0, -36, 33.4, 0x3a7fb0, -20.1, { emissiveIntensity: 0.3 }),
       // Huge planet body low in view (top of the sphere arcs across y≈-4).
       bgSphere(0, -36, 32, 0x274c6e, -20, { emissive: 0x123048, emissiveIntensity: 0.5 }),
-      // Cloud / latitude bands across the planet face.
-      bgGlow(-2, -9,  44, 3, 0x35617f, -19.8),
-      bgGlow(5, -15, 44, 4, 0x2b5070, -19.8),
-      bgGlow(-6, -21, 44, 5, 0x244660, -19.8),
-      // Sunlit limb — warm highlight on the planet's upper-right edge.
-      bgGlow(12, -5, 26, 9, 0x5a93c0, -19.6),
-      // Atmosphere rim — bright cyan arc along the horizon (great contrast).
-      bgGlow(0, -3, 62, 6, 0x6ec8e6, -19.4),
-      bgGlow(0, -1, 66, 3, 0xb4e8f6, -19.2),
       // Distant sun, upper-right — the light source.
       bgGlow(21, 18, 8, 8, 0xfff0c4, -19),
       bgSphere(21, 18, 1.9, 0xffe9a0, -18.9, { emissive: 0xffdf86, emissiveIntensity: 1.4 }),
