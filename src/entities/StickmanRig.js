@@ -41,6 +41,11 @@ const ANIM_DEFAULTS = {
   STRIKE_OVERSHOOT: 0.10,  // follow-through bump: hand cracks past target then settles
   LIGHT_PHASE_W1: 0.30, LIGHT_PHASE_W2: 0.65,   // light windup/strike split (live-tunable)
   HEAVY_PHASE_W1: 0.50, HEAVY_PHASE_W2: 0.72,   // heavy windup/strike split (live-tunable)
+  // Walk feel tunables
+  WALK_HIP_SWAY: 0.06,    // side-to-side hip translation per speed unit (0 = off)
+  WALK_ARM_SWING: 1.0,    // arm counter-swing amplitude scale (1.0 = identity)
+  // Jump/land tunables
+  TAKEOFF_CROUCH: 0.10,   // hip-dip depth on jump takeoff (legs pre-compress before stretch)
 };
 const ANIM = (typeof window !== 'undefined')
   ? (window.__anim = Object.assign({}, ANIM_DEFAULTS, window.__anim || {}))
@@ -692,6 +697,10 @@ export class StickmanRig {
     // Idle breathing phase — slow sine drives hip/torso/arm micro-motion
     // when standing still so the stance never feels frozen.
     this._breath = 0;
+    // Jump takeoff crouch — set on grounded→airborne for a brief pre-compress.
+    // Decays fast so it reads as a quick crouch→stretch, not a delayed jump.
+    this._takeoffCrouch = 0;
+
     // Throw windup arm rear-back amount, 0..1. Driven by Stickman via params.
     this._throwAnticipation = 0;
 
@@ -860,11 +869,18 @@ export class StickmanRig {
       // Takeoff — quick upward stretch pulse as the legs push off, so jumps
       // launch with snap instead of a constant pose.
       this._takeoffPop = (ANIM.TAKEOFF_POP ?? 0.22);
+      // Brief leg pre-compress: hip dips for ~2 frames then releases into the
+      // stretch. Starts positive (crouch), decays very fast. Does NOT add input
+      // latency — the impulse has already fired; this is cosmetic only.
+      if (this._takeoffCrouch === undefined) this._takeoffCrouch = 0;
+      this._takeoffCrouch = (ANIM.TAKEOFF_CROUCH ?? 0.10);
     }
     this._wasGrounded = params.grounded;
     this._landImpact = damp(this._landImpact, 0, 0.0001, dt); // fast decay
     if (this._takeoffPop === undefined) this._takeoffPop = 0;
     this._takeoffPop = damp(this._takeoffPop, 0, 0.0002, dt); // ~0.2s pop
+    if (this._takeoffCrouch === undefined) this._takeoffCrouch = 0;
+    this._takeoffCrouch = damp(this._takeoffCrouch, 0, 0.00008, dt); // fast ~2-frame decay
 
     // Idle breathing — slow sine when standing still so the stance breathes
     // rather than freezes. Phase advances regardless; amplitude gates on idle.
@@ -920,12 +936,21 @@ export class StickmanRig {
     const bob = (params.grounded ? Math.abs(Math.sin(this.walkPhase)) : 0) * speedMag * (ANIM.BOB_AMT ?? 0.10) * (1 + runBoost * 0.4);
     const crouchDrop = this.crouchAmount * 0.5;
     const landDrop = this._landImpact * 0.22;   // hip dips on touchdown (weight)
-    const hipX = pos.x;
+    // Takeoff crouch: brief hip-dip (~2 frames) before takeoff stretch.
+    // Reads as legs compressing before push-off. Decays very fast so it
+    // doesn't linger into the air or affect apex feel.
+    const takeoffCrouchDrop = (this._takeoffCrouch ?? 0) * 0.18;
+    // Hip sway: pelvis shifts toward the planted foot each step. Scales with
+    // speed so it's invisible at idle but clearly reads at walk/run. The sin()
+    // peak at phase=π/2 (foot planted) shifts hip toward stance side.
+    // Facing-signed so it mirrors correctly when facing left.
+    const hipSway = Math.sin(this.walkPhase) * speedMag * (ANIM.WALK_HIP_SWAY ?? 0.06) * this.facing;
+    const hipX = pos.x + (params.grounded ? hipSway : 0);
     // Hip-foot reach budget: feet sit at pos.y - 0.75 (capsule bottom).
     // Legs are 1.00m total. Hip at pos.y + 0.25 → diff 1.00m → legs read
     // essentially straight at idle (IK clamps to maxReach 0.99). Bob/crouch
     // /land drop hip from there to flex knees on impact and during stride.
-    const hipY = pos.y + 0.25 - bob - crouchDrop - landDrop + breathBob;
+    const hipY = pos.y + 0.25 - bob - crouchDrop - landDrop - takeoffCrouchDrop + breathBob;
     const hipZ = pos.z;
     this._hip.set(hipX, hipY, hipZ);
 
@@ -1311,7 +1336,8 @@ export class StickmanRig {
       // hang at standstill: at runBlend=0, hand drops directly below
       // shoulder with no forward push so idle reads as relaxed-at-sides
       // instead of stiff-braced-forward.
-      const armSw = Math.sin(phase + Math.PI) * stepAmp * swingDir;
+      const _armSwingR = (ANIM.WALK_ARM_SWING ?? 1.0);
+      const armSw = Math.sin(phase + Math.PI) * stepAmp * swingDir * _armSwingR;
       const fwdBoost = Math.max(0, armSw);
       const runBlend = clamp(stepAmp * 1.6, 0, 1);
       // Idle baseline at -0.88 (was -0.55): with arms 0.45+0.45 = 0.90m, a
@@ -1361,7 +1387,8 @@ export class StickmanRig {
       handLX = sLX + this.facing * 0.18;
       handLY = sLY - 0.25;
     } else {
-      const armSw = Math.sin(phase) * stepAmp * swingDir;
+      const _armSwingL = (ANIM.WALK_ARM_SWING ?? 1.0);
+      const armSw = Math.sin(phase) * stepAmp * swingDir * _armSwingL;
       const fwdBoost = Math.max(0, armSw);
       const runBlend = clamp(stepAmp * 1.6, 0, 1);
       // Idle baseline at -0.88 (was -0.55): with arms 0.45+0.45 = 0.90m, a
@@ -1382,6 +1409,25 @@ export class StickmanRig {
       const _sr = (typeof window !== 'undefined' ? (window.__anim?.STRIKE_REACH ?? 1) : 1);
       handLX = sLX + this.facing * strikePose.armLX * _sr;
       handLY = sLY + strikePose.armLY * _sr;
+    }
+
+    // Land catch — on hard landings bias both arms downward/outward to brace,
+    // so a heavy touchdown reads with weight (hands drop instinctively).
+    // Only applies when grounded, not attacking or grabbed/holding, and only
+    // when impact is significant (> 0.4). Stays within arm amplitude budget.
+    if (params.grounded && this._landImpact > 0.4
+        && !strikePose
+        && params.armPoseR !== 'aim' && params.armPoseR !== 'attack'
+        && params.armPoseR !== 'strikePosed' && params.armPoseR !== 'grab'
+        && params.armPoseR !== 'hold') {
+      const catchAmt = clamp((this._landImpact - 0.4) / 0.6, 0, 1) * this._landImpact;
+      // Pull both hands down and slightly outward — brace posture.
+      const catchDropY = catchAmt * 0.38;
+      const catchOutX  = catchAmt * 0.14 * this.facing;
+      handRX = lerp(handRX, handRX - catchOutX, catchAmt);
+      handRY = lerp(handRY, handRY - catchDropY, catchAmt);
+      handLX = lerp(handLX, handLX + catchOutX, catchAmt);
+      handLY = lerp(handLY, handLY - catchDropY, catchAmt);
     }
 
     // Slide arm drift — both arms trail behind body.
