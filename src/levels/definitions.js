@@ -226,122 +226,104 @@ export const LEVELS = [
   },
 
   // ---------------------------------------------------------------------
-  // SAW MILL — "The Cutting Floor". Vertical, threat-dense interior.
-  // Asymmetric: left deck wider than right. A central saw-pit with lava
-  // below splits the floor. Stepped platforms climb to a guarded catwalk
-  // prize, with two pendulum blades sweeping the mid-tier crossing.
+  // SAW MILL — "The Mill". Chaos-hazard arena dominated by ONE giant
+  // sweeping saw blade that owns the entire floor. Players hop to side
+  // ledges / a center perch to survive, drop back for weapons.
+  // ZERO pendulums. Dynamic logs get flung as chaos objects.
   //
   // Layout tiers (y coords):
-  //   y=0   Left ground deck  x:-13..-2  (12 tiles)
-  //   y=0   Right ground deck x:2..9     (8 tiles)
-  //   y=-2  Pit floor         x:-1..1    (saw here)
-  //   y=3   Left step         x:-11..-7  (5 tiles)
-  //   y=3   Right step        x:5..9     (5 tiles)
-  //   y=6   Left high perch   x:-13..-9  (5 tiles)
-  //   y=6   Right high perch  x:8..12    (5 tiles)
-  //   y=7   Left bridge       x:-6..-4   (3 tiles — catwalk approach)
-  //   y=7   Right bridge      x:4..6     (3 tiles)
-  //   y=9   Central catwalk   x:-4..5    (10 tiles — prize, saw patrol)
-  //   y=11  Crossbeam         x:-7..7    (pendulum anchors)
+  //   y=0   Solid floor      x:-15..15  (destructible wood + metal subfloor)
+  //   y=4   Side safe ledges x:-15..-12 left, 12..15 right (OUTSIDE saw reach)
+  //   y=4   Mid steps        x:-7..-4 left, 4..7 right (ABOVE saw kill top 3.1)
+  //   y=7   Center perch     x:-2..2   (prize — saw passes underneath)
+  //
+  // Giant saw envelope: center x:0, y:0.9, radius:2.2, patrol ±9
+  //   Kill sphere top = 0.9+2.2 = 3.1 → nothing standable below y≈3.5
+  //   Kill sphere x-reach at extremes = ±9 ± 2.2 = ±11.2
+  //   Safe floor x: |x|>=12 (side ledges); safe above y=3.5 anywhere
   // ---------------------------------------------------------------------
   {
     id: 'sawmill',
     name: 'Saw Mill',
     bgColor: 0x0c1a18,
+    killBound: { x: 18, y: 14 },
     tiles: [
-      // ── Ground floor ──
-      // Left ground deck (wider — asymmetric).
-      ...row(0, -13, -2, { material: 'wood', hp: 40, color: 0x8a5a30 }),
-      ...tough(-1, -13, -2, { color: 0x3a2810 }),
-      // Right ground deck (narrower).
-      ...row(0, 2, 9, { material: 'wood', hp: 40, color: 0x7a5228 }),
-      ...tough(-1, 2, 9, { color: 0x3a2810 }),
-      // Pit floor (narrow — sat under the gap, supports pit saw).
-      ...tough(-2, -2, 2, { color: 0x1a1008 }),
+      // ── Solid floor ──
+      ...row(0, -15, 15, { material: 'wood', hp: 35, color: 0x8a5a30 }),
+      ...tough(-1, -15, 15, { color: 0x4a4a52 }),
 
-      // ── Left climbing route ──
-      // Step 1: left step platform (y=3, directly above left deck).
-      ...row(3, -11, -7, { material: 'wood', hp: 30, color: 0x9a6030 }),
-      // Support struts under left step.
-      { x: -11, y: 1.5, shape: 'box', w: 0.4, h: 2.5, material: 'metal', hp: 80, color: 0x4a505c },
-      { x:  -7, y: 1.5, shape: 'box', w: 0.4, h: 2.5, material: 'metal', hp: 80, color: 0x4a505c },
-      // Step 2: left high perch (y=6).
-      ...row(6, -13, -9, { material: 'metal', hp: 55, color: 0x6a7080 }),
-      // Step 3: left catwalk bridge (y=7 — narrows the gap to the central catwalk).
-      ...row(7, -6, -4, { material: 'metal', hp: 45, color: 0x7a8090 }),
+      // ── Safe SIDE LEDGES (y=4) — outside saw reach (|x|>11.2) ──
+      ...row(4, -15, -12, { material: 'metal', hp: 60, color: 0x6a7080 }),
+      ...row(4,  12,  15, { material: 'metal', hp: 60, color: 0x6a7080 }),
+      // Support pillars under side ledges.
+      { x: -15, y: 2.0, shape: 'box', w: 0.5, h: 3.5, material: 'metal', hp: 90, color: 0x4a505c },
+      { x: -12, y: 2.0, shape: 'box', w: 0.5, h: 3.5, material: 'metal', hp: 90, color: 0x4a505c },
+      { x:  12, y: 2.0, shape: 'box', w: 0.5, h: 3.5, material: 'metal', hp: 90, color: 0x4a505c },
+      { x:  15, y: 2.0, shape: 'box', w: 0.5, h: 3.5, material: 'metal', hp: 90, color: 0x4a505c },
 
-      // ── Right climbing route ──
-      // Step 1: right step platform (y=3).
-      ...row(3, 5, 9, { material: 'wood', hp: 30, color: 0x9a6030 }),
-      // Support struts under right step.
-      { x: 5, y: 1.5, shape: 'box', w: 0.4, h: 2.5, material: 'metal', hp: 80, color: 0x4a505c },
-      { x: 9, y: 1.5, shape: 'box', w: 0.4, h: 2.5, material: 'metal', hp: 80, color: 0x4a505c },
-      // Step 2: right high perch (y=6).
-      ...row(6, 8, 12, { material: 'metal', hp: 55, color: 0x6a7080 }),
-      // Step 3: right catwalk bridge (y=7).
-      ...row(7, 4, 6, { material: 'metal', hp: 45, color: 0x7a8090 }),
+      // ── MID STEPS (y=4, nearer center — above saw kill top 3.1) ──
+      // Tile surface = 4.5 > 3.1 — players standing here are above the saw.
+      ...row(4, -7, -4, { material: 'wood', hp: 30, color: 0x9a6030 }),
+      ...row(4,  4,  7, { material: 'wood', hp: 30, color: 0x9a6030 }),
+      // Struts under mid steps.
+      { x: -7, y: 2.0, shape: 'box', w: 0.4, h: 3.5, material: 'metal', hp: 70, color: 0x4a505c },
+      { x: -4, y: 2.0, shape: 'box', w: 0.4, h: 3.5, material: 'metal', hp: 70, color: 0x4a505c },
+      { x:  4, y: 2.0, shape: 'box', w: 0.4, h: 3.5, material: 'metal', hp: 70, color: 0x4a505c },
+      { x:  7, y: 2.0, shape: 'box', w: 0.4, h: 3.5, material: 'metal', hp: 70, color: 0x4a505c },
 
-      // ── Central catwalk (prize tier, y=9) ──
-      ...row(9, -4, 5, { material: 'metal', hp: 70, color: 0x808890 }),
-      // Catwalk support pillars rising from the bridge tiles.
-      { x: -4, y: 8.0, shape: 'box', w: 0.4, h: 1.8, material: 'metal', hp: 100, color: 0x505860 },
-      { x:  5, y: 8.0, shape: 'box', w: 0.4, h: 1.8, material: 'metal', hp: 100, color: 0x505860 },
+      // ── CENTER PRIZE PERCH (y=7) — saw passes far below ──
+      ...row(7, -2, 2, { material: 'metal', hp: 70, color: 0x808890 }),
+      // Perch support pillar.
+      { x: 0, y: 5.5, shape: 'box', w: 0.5, h: 2.5, material: 'metal', hp: 100, color: 0x505860 },
 
-      // ── Crossbeam (pendulum anchor, y=11) ──
-      { x: 0, y: 11, shape: 'box', w: 16, h: 0.5, material: 'metal', hp: 200, color: 0x404850 },
+      // ── DYNAMIC LOGS — rolling chaos on the floor ──
+      // Placed outside saw center but in the sweep path — they get flung.
+      { x: -6,  y: 0.55, shape: 'cylinder', radius: 0.45, w: 1, h: 0.9,
+        material: 'wood', hp: 25, color: 0x9a6030, dynamic: true, tileMass: 6 },
+      { x:  6,  y: 0.55, shape: 'cylinder', radius: 0.45, w: 1, h: 0.9,
+        material: 'wood', hp: 25, color: 0x9a6030, dynamic: true, tileMass: 6 },
+      { x: -9,  y: 0.55, shape: 'cylinder', radius: 0.45, w: 1, h: 0.9,
+        material: 'wood', hp: 25, color: 0x8a5828, dynamic: true, tileMass: 6 },
+      { x:  9,  y: 0.55, shape: 'cylinder', radius: 0.45, w: 1, h: 0.9,
+        material: 'wood', hp: 25, color: 0x8a5828, dynamic: true, tileMass: 6 },
 
-      // ── Log piles on decks (physics cover) ──
-      // Left deck log pile.
-      { x: -10, y: 0.6, shape: 'cylinder', w: 1, h: 1, radius: 0.5, material: 'wood', hp: 22, color: 0x8a5828 },
-      { x:  -9, y: 1.1, shape: 'cylinder', w: 1, h: 1, radius: 0.5, material: 'wood', hp: 22, color: 0xa06030 },
-      { x:  -8, y: 0.6, shape: 'cylinder', w: 1, h: 1, radius: 0.5, material: 'wood', hp: 22, color: 0x9a5828 },
-      // Right deck log pile.
-      { x: 5, y: 0.6, shape: 'cylinder', w: 1, h: 1, radius: 0.5, material: 'wood', hp: 22, color: 0x8a5828 },
-      { x: 6, y: 1.1, shape: 'cylinder', w: 1, h: 1, radius: 0.5, material: 'wood', hp: 22, color: 0xa06030 },
-
-      // ── Pit side walls (visual framing) ──
-      { x: -2, y: -0.5, shape: 'box', w: 0.4, h: 1.0, material: 'metal', hp: 100, color: 0x303840 },
-      { x:  2, y: -0.5, shape: 'box', w: 0.4, h: 1.0, material: 'metal', hp: 100, color: 0x303840 },
+      // ── Static log-pile cover on the side ledges ──
+      { x: -14, y: 4.6, shape: 'cylinder', radius: 0.4, w: 0.9, h: 0.8,
+        material: 'wood', hp: 22, color: 0xa06030 },
+      { x:  14, y: 4.6, shape: 'cylinder', radius: 0.4, w: 0.9, h: 0.8,
+        material: 'wood', hp: 22, color: 0xa06030 },
     ],
     hazards: [
-      // ── Saw-pit ── patrolling saw at pit floor level.
-      { kind: 'saw', x: 0, y: -1.2, w: 4 },
-      // Lava plane at the very bottom — kill floor.
+      // ── THE CENTERPIECE: giant saw blade sweeping the entire floor ──
+      // Patrol span w:18 → sweeps x∈[-9,9] at y=0.9.
+      // Kill sphere r2.2 → top=3.1, so nothing standable/spawnable below y=3.5
+      // that is within |x|<11.2.
+      { kind: 'saw', x: 0, y: 0.9, w: 18, radius: 2.2 },
+      // Kill plane far below.
       { kind: 'lava', x: 0, y: -5, w: 44, h: 1.4, dps: 60 },
-
-      // ── Left step saw — patrols the left step platform ──
-      { kind: 'saw', x: -9, y: 3.8, w: 3 },
-
-      // ── Central catwalk saw — guards the prize ──
-      { kind: 'saw', x: 0.5, y: 9.8, w: 8 },
-
-      // ── Two pendulum blades hung from the crossbeam ──
-      // Sweeps over the left catwalk bridge / high-perch crossing.
-      { kind: 'pendulum', x: -5, y: 10.7, length: 3.5, amplitude: Math.PI / 2.8, speed: 1.4, phase: 0.0 },
-      // Sweeps over the right catwalk bridge / high-perch crossing.
-      { kind: 'pendulum', x:  5, y: 10.7, length: 3.5, amplitude: Math.PI / 2.8, speed: 1.2, phase: Math.PI },
     ],
-    // ── Spawns — ALL on solid ground (verified below) ──
-    //   Left deck tiles span x:-13..-2 y=0 → spawns at y=1 (0.5m above tile top)
-    //   Right deck tiles span x:2..9 y=0   → spawns at y=1
-    //   Left step y=3 → spawn at y=4
-    //   Right step y=3 → spawn at y=4
-    //   Central catwalk y=9 → spawn at y=10
+    // ── Spawns — ALL clear of saw envelope ──
+    //   Side ledges y=4 (surface 4.5): |x|=12..15 → |x|>11.2 ✓ above saw top 3.1 ✓
+    //   Mid steps y=4 (surface 4.5): surface 4.5>3.1 ✓ (safe above saw)
+    //   Center perch y=7 (surface 7.5): far above saw ✓
+    //   Floor corners |x|=13, y=1: |x|=13>11.2 ✓ (outside saw x-reach)
     spawns: [
-      { x: -11, y: 1 },   // left deck, clear of log pile
-      { x:  -4, y: 1 },   // left deck, near pit edge (but tile exists at x=-4 y=0)
-      { x:   6, y: 1 },   // right deck
-      { x:  -9, y: 4 },   // left step platform (tile x:-11..-7 y=3)
-      { x:   7, y: 4 },   // right step platform (tile x:5..9 y=3)
-      { x:   1, y: 10 },  // central catwalk (tile x:-4..5 y=9)
+      { x: -14, y: 5 },   // left side ledge (tile x:-15..-12, y=4)
+      { x:  13, y: 5 },   // right side ledge (tile x:12..15, y=4)
+      { x:  -6, y: 5 },   // left mid step (tile x:-7..-4, y=4)
+      { x:   5, y: 5 },   // right mid step (tile x:4..7, y=4)
+      { x:   0, y: 8 },   // center perch (tile x:-2..2, y=7)
+      { x: -13, y: 1 },   // far floor left (|x|=13>11.2, outside saw sweep)
+      { x:  13, y: 1 },   // far floor right
     ],
     weaponSpawns: [
-      { x:   1, y: 10 },  // PRIZE — catwalk (guarded by saw + pendulums)
-      { x: -11, y: 7 },   // left high perch (tile x:-13..-9 y=6)
-      { x:  10, y: 7 },   // right high perch (tile x:8..12 y=6)
-      { x:  -9, y: 4 },   // left step (risky — saw patrols here)
-      { x:  -6, y: 1 },   // left deck
-      { x:   4, y: 1 },   // right deck
+      { x:   0, y: 8 },   // PRIZE — center perch
+      { x: -14, y: 5 },   // left side ledge
+      { x:  14, y: 5 },   // right side ledge
+      { x:  -5, y: 5 },   // left mid step
+      { x:   5, y: 5 },   // right mid step
+      { x: -13, y: 1 },   // floor corner (risky — near saw)
+      { x:  13, y: 1 },   // floor corner (risky — near saw)
     ],
     background: [
       // Dark mill interior sky gradient.
