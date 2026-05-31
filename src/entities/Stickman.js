@@ -237,7 +237,7 @@ export class Stickman {
     this._grabEscape = 0;           // 0..1 struggle progress while grabbed
     this._grabStartT = 0;           // performance.now() when grab began
     this._grabImmuneUntil = 0;      // re-grab immunity after a mash-break
-    this._grabMashPrev = null;      // last-frame input snapshot for edge detection
+    this._grabMashPrev = { jump: false, attack: false, grab: false, dir: 0 };  // last-frame input snapshot for edge detection
     // Throw windup — when grabbing button released with throw intent, queue a
     // windup. Arm rears back over the shoulder, then release fires the throw.
     this._throwWindupT = 0;
@@ -813,7 +813,11 @@ export class Stickman {
   _grabBody(body, smTarget) {
     this.grabbing = body;
     this._grabStartT = performance.now();
-    if (smTarget) smTarget._grabEscape = 0;
+    if (smTarget) {
+      smTarget._grabEscape = 0;
+      const m = smTarget._grabMashPrev;
+      m.jump = false; m.attack = false; m.grab = false; m.dir = 0;
+    }
     if (smTarget) {
       const wasDead = smTarget.state === STATE.DEAD;
       smTarget.grabbedBy = this;
@@ -1858,15 +1862,15 @@ export class Stickman {
     const decay = A.GRAB_ESCAPE_DECAY ?? 0.25;
     // Count fresh input edges as struggle.
     const i = this.input;
-    const prev = this._grabMashPrev ?? {};
+    const prev = this._grabMashPrev;
     let mashed = 0;
     if (i.jumpPressed && !prev.jump) mashed++;
     if (i.attackPressed && !prev.attack) mashed++;
     if (i.grabPressed && !prev.grab) mashed++;
     // direction flips count too (wiggle the stick)
     const dir = Math.sign(i.moveX || 0);
-    if (dir !== 0 && dir !== (prev.dir ?? 0)) mashed++;
-    this._grabMashPrev = { jump: i.jumpPressed, attack: i.attackPressed, grab: i.grabPressed, dir };
+    if (dir !== 0 && dir !== prev.dir) mashed++;
+    prev.jump = i.jumpPressed; prev.attack = i.attackPressed; prev.grab = i.grabPressed; prev.dir = dir;
     this._grabEscape = clamp(this._grabEscape + mashed * gain - decay * dt, 0, 1);
     if (this._grabEscape >= 1) {
       const g = this.grabbedBy;

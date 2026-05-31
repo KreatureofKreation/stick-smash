@@ -111,7 +111,7 @@ function phaseSplit(t, w1, w2) {
   if (t < w1) { const w = t / Math.max(0.0001, w1); return { p: 0, w, e: w * w * (3 - 2 * w) }; }
   if (t < w2) {
     const w = (t - w1) / Math.max(0.0001, w2 - w1);
-    const o = (typeof window !== 'undefined' ? (window.__anim?.STRIKE_OVERSHOOT ?? 0.10) : 0.10);
+    const o = ANIM.STRIKE_OVERSHOOT ?? 0.10;
     const eb = 1 - Math.pow(1 - w, 3);          // ease-out cubic base (0→1)
     const over = Math.sin(w * Math.PI) * o;      // 0 at ends, peak mid → overshoot bump
     return { p: 1, w, e: eb + over };
@@ -872,7 +872,6 @@ export class StickmanRig {
       // Brief leg pre-compress: hip dips for ~2 frames then releases into the
       // stretch. Starts positive (crouch), decays very fast. Does NOT add input
       // latency — the impulse has already fired; this is cosmetic only.
-      if (this._takeoffCrouch === undefined) this._takeoffCrouch = 0;
       this._takeoffCrouch = (ANIM.TAKEOFF_CROUCH ?? 0.10);
     }
     this._wasGrounded = params.grounded;
@@ -1193,7 +1192,7 @@ export class StickmanRig {
     // Strike pose leg overrides (e.g. knee, flying-knee, dive, slide-kick).
     // These run AFTER kicking so pose-specific arcs take precedence.
     if (strikePose) {
-      const _sr = (typeof window !== 'undefined' ? (window.__anim?.STRIKE_REACH ?? 1) : 1);
+      const _sr = ANIM.STRIKE_REACH ?? 1;
       if (strikePose.legRX !== undefined) {
         footRX = hipX + this.facing * strikePose.legRX * _sr;
         footRY = baseFootY + strikePose.legRY * _sr;
@@ -1258,7 +1257,7 @@ export class StickmanRig {
     } else if (params.armPoseR === 'strikePosed') {
       // Pose offsets are absolute relative to shoulder. Lean is applied earlier
       // (snapped onto bodyTilt) so we don't repeat it here.
-      const _sr = (typeof window !== 'undefined' ? (window.__anim?.STRIKE_REACH ?? 1) : 1);
+      const _sr = ANIM.STRIKE_REACH ?? 1;
       handRX = sRX + this.facing * strikePose.armRX * _sr;
       handRY = sRY + strikePose.armRY * _sr;
     } else if (params.armPoseR === 'attack') {
@@ -1406,7 +1405,7 @@ export class StickmanRig {
 
     // Apply strikePose left-arm override (e.g. two-handed moves like poseBlowAway / poseAxe).
     if (strikePose && strikePose.armLX !== undefined) {
-      const _sr = (typeof window !== 'undefined' ? (window.__anim?.STRIKE_REACH ?? 1) : 1);
+      const _sr = ANIM.STRIKE_REACH ?? 1;
       handLX = sLX + this.facing * strikePose.armLX * _sr;
       handLY = sLY + strikePose.armLY * _sr;
     }
@@ -1420,14 +1419,15 @@ export class StickmanRig {
         && params.armPoseR !== 'aim' && params.armPoseR !== 'attack'
         && params.armPoseR !== 'strikePosed' && params.armPoseR !== 'grab'
         && params.armPoseR !== 'hold') {
-      const catchAmt = clamp((this._landImpact - 0.4) / 0.6, 0, 1) * this._landImpact;
+      const catchWeight = clamp((this._landImpact - 0.4) / 0.6, 0, 1);
+      const catchScale  = Math.min(this._landImpact, 1.0);
       // Pull both hands down and slightly outward — brace posture.
-      const catchDropY = catchAmt * 0.38;
-      const catchOutX  = catchAmt * 0.14 * this.facing;
-      handRX = lerp(handRX, handRX - catchOutX, catchAmt);
-      handRY = lerp(handRY, handRY - catchDropY, catchAmt);
-      handLX = lerp(handLX, handLX + catchOutX, catchAmt);
-      handLY = lerp(handLY, handLY - catchDropY, catchAmt);
+      const catchDropY = catchWeight * catchScale * 0.38;
+      const catchOutX  = catchWeight * catchScale * 0.14 * this.facing;
+      handRX = handRX - catchOutX;
+      handRY = handRY - catchDropY;
+      handLX = handLX + catchOutX;
+      handLY = handLY - catchDropY;
     }
 
     // Slide arm drift — both arms trail behind body.
