@@ -29,6 +29,13 @@ const ANIM_DEFAULTS = {
   BOB_AMT: 0.13,          // hip bob amplitude (was 0.10)
   TAKEOFF_POP: 0.22,      // extra upward stretch pulse on jump takeoff
   IDLE_DRIFT: 0.4,        // idle phase drift scale; lower = calmer arms (was 1.0)
+  // Escapable grab tunables
+  GRAB_MASH_GAIN: 0.12,   // escape added per fresh input edge while grabbed
+  GRAB_ESCAPE_DECAY: 0.25,// escape/sec passive decay (must keep mashing)
+  GRAB_MAX_HOLD: 2.5,     // s before a grab auto-breaks
+  GRAB_BREAK_KB: 7,       // shove speed on a mash-break
+  GRAB_IMMUNE: 0.6,       // s of re-grab immunity for the escapee
+  GRAB_HIT_BREAK_KB: 6,   // grabber knockback magnitude that breaks the grab
 };
 const ANIM = (typeof window !== 'undefined')
   ? (window.__anim = Object.assign({}, ANIM_DEFAULTS, window.__anim || {}))
@@ -864,6 +871,15 @@ export class StickmanRig {
     // Clamp so torso never flies off
     this._torsoOffsetX = clamp(this._torsoOffsetX, -0.4, 0.4);
     this._torsoOffsetY = clamp(this._torsoOffsetY, -0.3, 0.3);
+
+    // Grab struggle — quick shake scaling with escape progress so a grabbed
+    // player visibly fights to get free.
+    const struggle = params.struggle ?? 0;
+    if (struggle > 0.01) {
+      const s = Math.sin(this.t * 40) * struggle * 0.18;
+      this.bodyTilt += s;
+      this._torsoOffsetX += Math.sin(this.t * 33) * struggle * 0.06;
+    }
 
     // Torso direction (with wobble offset on torso tip)
     const torsoUpX = Math.sin(this.bodyTilt);

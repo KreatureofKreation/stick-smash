@@ -234,6 +234,10 @@ export class Stickman {
     this.grabConstraint = null;
     this.grabbedBy = null;          // stickman holding us
     this.grabReachTimer = 0;        // 0..GRAB_REACH_DUR while reaching for a grab
+    this._grabEscape = 0;           // 0..1 struggle progress while grabbed
+    this._grabStartT = 0;           // performance.now() when grab began
+    this._grabImmuneUntil = 0;      // re-grab immunity after a mash-break
+    this._grabMashPrev = null;      // last-frame input snapshot for edge detection
     // Throw windup — when grabbing button released with throw intent, queue a
     // windup. Arm rears back over the shoulder, then release fires the throw.
     this._throwWindupT = 0;
@@ -342,6 +346,11 @@ export class Stickman {
     this.body.velocity.x = vx;
     this.body.velocity.y = vy;
     this.hitstun = Math.max(this.hitstun, stun);
+    // Getting hit hard while holding someone breaks the grab.
+    if (this.grabbing) {
+      const A = window.__anim ?? {};
+      if (Math.hypot(vx, vy) > (A.GRAB_HIT_BREAK_KB ?? 6)) this._breakGrab('hit');
+    }
     // Magnetic-gravity levels: large knockbacks enter 'launched' mode so the
     // player isn't snapped back to the surface instantly. Threshold and timer
     // come from the magnetic-gravity spec.
@@ -751,6 +760,7 @@ export class Stickman {
     for (const p of players) {
       if (!p || p === this) continue;
       if (p.state === STATE.GRABBED) continue;
+      if (performance.now() < (p._grabImmuneUntil ?? 0)) continue;
       if (p.grabbing) continue;          // can't grab someone already grabbing another
       // Skip alive invulnerable players. Dead bodies are always grabbable.
       if (p.state !== STATE.DEAD && p.invuln > 0) continue;
@@ -802,6 +812,8 @@ export class Stickman {
 
   _grabBody(body, smTarget) {
     this.grabbing = body;
+    this._grabStartT = performance.now();
+    if (smTarget) smTarget._grabEscape = 0;
     if (smTarget) {
       const wasDead = smTarget.state === STATE.DEAD;
       smTarget.grabbedBy = this;
@@ -1821,6 +1833,12 @@ export class Stickman {
   _carryGrabbedFollow() {
     // When holding another stickman, position the constraint anchor in front of us.
     if (!this.grabConstraint) return;
+    const A = window.__anim ?? {};
+    const maxHold = (A.GRAB_MAX_HOLD ?? 2.5) * 1000;
+    if (this._grabStartT && performance.now() - this._grabStartT > maxHold) {
+      this._breakGrab('timeout');
+      return;
+    }
     // Throw windup lifts the held body up-and-behind the shoulder so the
     // physical body matches the rig's rear-back arm pose. Without this the
     // body floats in front while the rig pulls back — looks disconnected.
@@ -1832,6 +1850,50 @@ export class Stickman {
     // grip reads as "I'm holding you" instead of "we both face the same way."
     const sm = this.grabbing?.userData?.stickman;
     if (sm) sm.facing = -this.facing;
+  }
+
+  _updateGrabEscape(dt) {
+    const A = window.__anim ?? {};
+    const gain = A.GRAB_MASH_GAIN ?? 0.12;
+    const decay = A.GRAB_ESCAPE_DECAY ?? 0.25;
+    // Count fresh input edges as struggle.
+    const i = this.input;
+    const prev = this._grabMashPrev ?? {};
+    let mashed = 0;
+    if (i.jumpPressed && !prev.jump) mashed++;
+    if (i.attackPressed && !prev.attack) mashed++;
+    if (i.grabPressed && !prev.grab) mashed++;
+    // direction flips count too (wiggle the stick)
+    const dir = Math.sign(i.moveX || 0);
+    if (dir !== 0 && dir !== (prev.dir ?? 0)) mashed++;
+    this._grabMashPrev = { jump: i.jumpPressed, attack: i.attackPressed, grab: i.grabPressed, dir };
+    this._grabEscape = clamp(this._grabEscape + mashed * gain - decay * dt, 0, 1);
+    if (this._grabEscape >= 1) {
+      const g = this.grabbedBy;
+      if (g) g._breakGrab('escape', this);
+    }
+  }
+
+  _breakGrab(reason = 'escape', escapeeArg = null) {
+    const A = window.__anim ?? {};
+    const sm = escapeeArg ?? this.grabbing?.userData?.stickman;
+    // Drop the hold.
+    this.releaseGrab(0, 0);
+    if (!sm) return;
+    sm._grabEscape = 0;
+    if (reason === 'escape') {
+      // Shove the two apart + brief mutual stun; immunity so no instant re-grab.
+      const dir = Math.sign(sm.body.position.x - this.body.position.x) || (sm.facing) || 1;
+      const kb = A.GRAB_BREAK_KB ?? 7;
+      sm.applyKnockback(dir * kb, 3, 0.3);
+      this.applyKnockback(-dir * kb * 0.6, 2, 0.3);
+      sm._grabImmuneUntil = performance.now() + (A.GRAB_IMMUNE ?? 0.6) * 1000;
+    } else if (reason === 'timeout') {
+      const dir = Math.sign(sm.body.position.x - this.body.position.x) || sm.facing || 1;
+      sm.applyKnockback(dir * 3, 2, 0.2);
+      sm._grabImmuneUntil = performance.now() + (A.GRAB_IMMUNE ?? 0.6) * 1000;
+    }
+    // reason === 'hit' → just drop (handled by caller's knockback).
   }
 
   update(dt, ctx) {
@@ -1847,7 +1909,7 @@ export class Stickman {
     }
 
     if (this.state === STATE.GRABBED) {
-      // Struggle handled by grabber — body driven by constraint.
+      this._updateGrabEscape(dt);
       return;
     }
 
@@ -2163,6 +2225,7 @@ export class Stickman {
     params.physics = this.world;
     params.worldOriginX = rigInLocal ? this.body.position.x : 0;
     params.worldOriginY = rigInLocal ? this.body.position.y : 0;
+    params.struggle = (this.state === STATE.GRABBED) ? (this._grabEscape ?? 0) : 0;
     this.rig.update(rigPos, params);
 
     if (rigInLocal) {
