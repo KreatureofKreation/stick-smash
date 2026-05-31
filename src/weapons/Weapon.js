@@ -65,23 +65,22 @@ export class Weapon {
     return best;
   }
 
-  // Spawn into world as pickup
-  spawnAt(x, y, z = 0) {
+  // Spawn into world as pickup. opts.float = spawn as a STATIC floating pickup
+  // (planet levels only) — used for the INITIAL pad spawn so weapons don't get
+  // flung off the curved surface. Dropped/thrown weapons omit it and spawn as
+  // normal dynamic physics bodies so throwing works.
+  spawnAt(x, y, z = 0, opts = {}) {
     this.game.scene.add(this.mesh);
-    // On curved-gravity (planet) levels, dynamic weapon bodies get pulled by
-    // the planet gravity and skitter / fly off the curved surface. Instead
-    // spawn them as a STATIC floating pickup at the spawn point (like the
-    // power-ups): a mass-0 trigger body so it stays put and players pass
-    // through it, picked up by the existing proximity check.
     const curved = !!this.game.level?.curvedGravity;
+    const floatSpawn = curved && !!opts.float;
     const body = new CANNON.Body({
-      mass: (this.gravity && !curved) ? 1.5 : 0,
+      mass: (this.gravity && !floatSpawn) ? 1.5 : 0,
       material: this.game.physics.materials.prop,
       collisionFilterGroup: COL_GROUPS.WEAPON,
       collisionFilterMask: COL_GROUPS.WORLD | COL_GROUPS.PLAYER,
       linearDamping: 0.2,
       angularDamping: 0.4,
-      isTrigger: curved,
+      isTrigger: floatSpawn,
     });
     // Box collider 0.6×0.16×0.16m. Y-extent intentionally low so player
     // walking INTO the side rolls the capsule over the top (standable
@@ -93,8 +92,8 @@ export class Weapon {
     this.body = body;
     this.life = 30;
 
-    this._floating = curved;
-    if (curved) {
+    this._floating = floatSpawn;
+    if (floatSpawn) {
       this._floatX = x; this._floatY = y; this._floatZ = z;
       // Orient the weapon tangent to the planet it hovers over so it lies
       // parallel to the surface, and bob it along the outward radial.

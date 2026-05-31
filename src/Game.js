@@ -606,7 +606,11 @@ export class Game {
       this.pickups.push(item);
     } else {
       item = new Cls(this);
-      item.spawnAt(x, y, 0);
+      // On curved (planet) levels the INITIAL pad spawn floats statically so
+      // weapons don't get flung off the curved surface. Once picked up and
+      // dropped/thrown they revert to normal physics (dropAt doesn't pass
+      // float) so throwing works.
+      item.spawnAt(x, y, 0, { float: curved });
       this.weapons.push(item);
       // Give a slight initial spin so it tumbles down
       if (item.body && fromSky) item.body.angularVelocity.set(0, 0, rand(-3, 3));

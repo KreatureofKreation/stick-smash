@@ -828,7 +828,7 @@ export const LEVELS = [
   {
     id: 'planettest',
     name: 'Orbit',
-    bgColor: 0x0b0a1e,
+    bgColor: 0x0a1024,
     gravity: 0,
     curvedGravity: true,
     cameraClamp: { x: [-30, 30], y: [-25, 25], zoom: [12, 32] },
@@ -861,30 +861,31 @@ export const LEVELS = [
       { x: -12.96, y:   7.50 },  // above p6
     ],
     background: [
-      // Nebula wash — large soft glows give depth + contrast so dark weapons
-      // and stickmen read against the starfield instead of vanishing on black.
-      bgGlow(2, 2, 40, 30, 0x171232, -19),        // base indigo wash
-      bgGlow(-12, 13, 28, 12, 0x2c1d58, -18),     // purple band
-      bgGlow(13, -9, 26, 11, 0x123848, -18),      // teal band
-      bgGlow(-15, -13, 18, 8, 0x3c1842, -17.5),   // magenta pocket
-      bgGlow(16, 16, 16, 7, 0x1d2a5e, -17.5),     // blue pocket
-      // Distant gas giant with a faint ring, upper-left.
-      bgSphere(-23, 19, 3.4, 0x2a3a6a, -19, { emissive: 0x223058, emissiveIntensity: 0.4 }),
-      bgDisc(-23, 19, 5.0, 0x3a4a8a, -18.9, { emissiveIntensity: 0.12 }),
-      // Stars — varied size + slight colour twinkle for a richer field.
+      // ── Orbiting above a big sunlit planet — its curve fills the lower frame.
+      // Huge planet body low in view (top of the sphere arcs across y≈-4).
+      bgSphere(0, -36, 32, 0x274c6e, -20, { emissive: 0x123048, emissiveIntensity: 0.5 }),
+      // Cloud / latitude bands across the planet face.
+      bgGlow(-2, -9,  44, 3, 0x35617f, -19.8),
+      bgGlow(5, -15, 44, 4, 0x2b5070, -19.8),
+      bgGlow(-6, -21, 44, 5, 0x244660, -19.8),
+      // Sunlit limb — warm highlight on the planet's upper-right edge.
+      bgGlow(12, -5, 26, 9, 0x5a93c0, -19.6),
+      // Atmosphere rim — bright cyan arc along the horizon (great contrast).
+      bgGlow(0, -3, 62, 6, 0x6ec8e6, -19.4),
+      bgGlow(0, -1, 66, 3, 0xb4e8f6, -19.2),
+      // Distant sun, upper-right — the light source.
+      bgGlow(21, 18, 8, 8, 0xfff0c4, -19),
+      bgSphere(21, 18, 1.9, 0xffe9a0, -18.9, { emissive: 0xffdf86, emissiveIntensity: 1.4 }),
+      // Sparse stars in the upper space (above the horizon only).
       ...(() => {
         const stars = [];
         const seeds = [
-          [-22, 8, 0.20, 0xffffff], [-16, 18, 0.14, 0xbfd4ff], [-10, -16, 0.22, 0xffffff],
-          [-4, 22, 0.12, 0xfff0c0], [4, -22, 0.18, 0xffffff], [10, 16, 0.16, 0xc8d8ff],
-          [16, -8, 0.22, 0xffffff], [22, 12, 0.13, 0xffe0e8], [-26, -10, 0.18, 0xffffff],
-          [26, -10, 0.15, 0xbfd4ff], [-20, 22, 0.12, 0xffffff], [20, 22, 0.20, 0xfff0c0],
-          [0, 24, 0.16, 0xffffff], [0, -24, 0.14, 0xc8d8ff], [-24, 0, 0.22, 0xffffff],
-          [24, 0, 0.18, 0xffffff], [-7, 5, 0.10, 0xffffff], [8, -3, 0.10, 0xbfd4ff],
-          [-14, -4, 0.12, 0xffffff], [15, 5, 0.11, 0xffe0e8], [6, 9, 0.10, 0xffffff],
-          [-18, 12, 0.13, 0xffffff], [18, -14, 0.12, 0xc8d8ff], [3, 17, 0.10, 0xffffff],
+          [-23, 20, 0.16], [-15, 22, 0.12], [-8, 18, 0.13], [-2, 23, 0.10],
+          [6, 21, 0.12], [13, 22, 0.11], [-26, 14, 0.14], [27, 11, 0.12],
+          [-19, 16, 0.10], [3, 16, 0.10], [-12, 14, 0.11], [10, 16, 0.10],
+          [-5, 13, 0.09], [17, 14, 0.10],
         ];
-        for (const [x, y, s, c] of seeds) stars.push(bgGlow(x, y, s, s, c, -16.8));
+        for (const [x, y, s] of seeds) stars.push(bgGlow(x, y, s, s, 0xffffff, -18.5));
         return stars;
       })(),
     ],

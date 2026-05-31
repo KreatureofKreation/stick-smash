@@ -1123,9 +1123,9 @@ export class DualPistols extends Weapon {
       this._meshL.scale.set(1, 1, 1);
     }
   }
-  spawnAt(x, y, z = 0) {
+  spawnAt(x, y, z = 0, opts = {}) {
     this._packForWorld();
-    return super.spawnAt(x, y, z);
+    return super.spawnAt(x, y, z, opts);
   }
   dropAt(pos, vel) {
     this._packForWorld();
@@ -1881,9 +1881,9 @@ export class HulkHands extends Weapon {
       this._fistL.scale.set(-HULK_FIST_SCALE, HULK_FIST_SCALE, HULK_FIST_SCALE);
     }
   }
-  spawnAt(x, y, z = 0) {
+  spawnAt(x, y, z = 0, opts = {}) {
     this._packForWorld();
-    return super.spawnAt(x, y, z);
+    return super.spawnAt(x, y, z, opts);
   }
   dropAt(pos, vel) {
     this._packForWorld();
