@@ -619,93 +619,87 @@ export const LEVELS = [
   },
 
   // ---------------------------------------------------------------------
-  // VOLCANO — "Eruption" king-of-the-hill. Central rising-lava pool
-  // periodically floods the low flanks, forcing players to scramble UP
-  // toward the exposed summit. Summit holds the prize weapon.
+  // VOLCANO — "Caldera". Chaos-hazard arena dominated by a RISING LAVA
+  // pool that floods the arena on a cycle — the dominant clock. Players
+  // scramble up as lava rises, drop back as it recedes. Physics boulders
+  // tumble as extra chaos. ZERO pendulums.
   //
   // Rising-lava math (flood line):
-  //   Pool center y = -3, half-h = 1.5  →  base top = -1.5
-  //   rise.height = 6  →  flood top = -1.5 + 6 = +4.5
-  //   All spawns sit on tiles whose surface (y+0.5) > 4.5, i.e. tile y >= 5.
-  //   Low flank pads (y=0, y=3) flood during eruption — risky weapon spots,
-  //   no player spawns.
+  //   Pool center y=-3, h=3  →  base top = -3+1.5 = -1.5
+  //   rise.height=7, period=11  →  flood crest = -1.5+7 = 5.5
+  //   All spawns on surfaces > 5.8 (upper ledges y=8 surf=8.5, summit y=11 surf=11.5).
+  //   Low pads (y=0) and mid ledges (y=4) FLOOD — risky weapon spots, no spawns.
   // ---------------------------------------------------------------------
   {
     id: 'volcano',
     name: 'Volcano',
     bgColor: 0x1e0608,
+    killBound: { x: 18, y: 16 },
     tiles: [
-      // ── Low flank pads (y=0) — flood during eruption, risky weapon spots ──
-      ...row(0, -14, -9, { material: 'stone', hp: 60, color: 0x3a1a10 }),
-      ...row(0,   9, 14, { material: 'stone', hp: 60, color: 0x3a1a10 }),
-      ...tough(-1, -14, -9, { color: 0x1a0c08 }),
-      ...tough(-1,   9, 14, { color: 0x1a0c08 }),
+      // ── LOW pads (y=0) — flood every cycle, risky weapon spots ──
+      ...row(0, -15, -10, { material: 'stone', hp: 60, color: 0x3a1a10 }),
+      ...row(0,  10,  15, { material: 'stone', hp: 60, color: 0x3a1a10 }),
 
-      // ── Stepped cone — lower-mid steps (y=3) — also flood during eruption ──
-      ...row(3, -11, -8, { material: 'stone', hp: 50, color: 0x2e1610 }),
-      ...row(3,   8, 11, { material: 'stone', hp: 50, color: 0x2e1610 }),
+      // ── MID ledges (y=4) — flood at peak, risky ──
+      ...row(4, -12, -8, { material: 'stone', hp: 50, color: 0x2e1610 }),
+      ...row(4,   8, 12, { material: 'stone', hp: 50, color: 0x2e1610 }),
 
-      // ── Stepped cone — safe steps (y=5, just above flood line 4.5) ──
-      // Tile top = 5.5, well above 4.5. First safe ledge players escape to.
-      ...row(5, -9, -6, { material: 'stone', hp: 50, color: 0x281410 }),
-      ...row(5,  6,  9, { material: 'stone', hp: 50, color: 0x281410 }),
+      // ── UPPER ledges (y=8) — SAFE above flood crest 5.5 ──
+      // Tile surface = 8.5 > 5.8 ✓ — first safe tier.
+      ...row(8, -7, -4, { material: 'stone', hp: 50, color: 0x281410 }),
+      ...row(8,  4,  7, { material: 'stone', hp: 50, color: 0x281410 }),
 
-      // ── Upper cone steps (y=8) ──
-      ...row(8, -6, -4, { material: 'stone', hp: 45, color: 0x221010 }),
-      ...row(8,  4,  6, { material: 'stone', hp: 45, color: 0x221010 }),
-
-      // ── Summit platform (y=11) — king-of-the-hill prize ──
+      // ── SUMMIT (y=11) — prize, most exposed ──
       ...row(11, -3, 3, { material: 'stone', hp: 80, color: 0x1a0c08 }),
 
-      // ── Crater-rim bulk (flanking the summit, clear of spawn tiles) ──
-      // Solid static props giving the rim visual mass. Placed at (±4, 10.2)
-      // between the upper step and the summit — NOT on the upper-cone spawns
-      // at (±5, 9), which they previously overlapped.
-      { x: -4, y: 10.2, shape: 'box', w: 0.6, h: 1.4, material: 'stone', hp: 40, color: 0x180c06 },
-      { x:  4, y: 10.2, shape: 'box', w: 0.6, h: 1.4, material: 'stone', hp: 40, color: 0x180c06 },
+      // ── DYNAMIC BOULDERS on upper rim — roll/tumble as chaos objects ──
+      { x: -6, y: 8.6, shape: 'sphere', radius: 0.5,
+        material: 'stone', hp: 30, color: 0x5a3a2a, dynamic: true, tileMass: 8 },
+      { x:  6, y: 8.6, shape: 'sphere', radius: 0.5,
+        material: 'stone', hp: 30, color: 0x5a3a2a, dynamic: true, tileMass: 8 },
+      { x: -5, y: 8.6, shape: 'sphere', radius: 0.5,
+        material: 'stone', hp: 30, color: 0x4a2a1a, dynamic: true, tileMass: 8 },
+      { x:  5, y: 8.6, shape: 'sphere', radius: 0.5,
+        material: 'stone', hp: 30, color: 0x4a2a1a, dynamic: true, tileMass: 8 },
 
-      // ── Brittle glowing molten rocks — destructible cover on the mid ledges ──
-      { x: -7,  y: 6, shape: 'sphere', radius: 0.42, material: 'stone', hp: 18, color: 0xff4422 },
-      { x:  7,  y: 6, shape: 'sphere', radius: 0.42, material: 'stone', hp: 18, color: 0xff4422 },
+      // ── Brittle glowing molten rocks — static cover on mid ledges ──
+      { x: -9,  y: 5.0, shape: 'sphere', radius: 0.42, material: 'stone', hp: 18, color: 0xff4422 },
+      { x:  9,  y: 5.0, shape: 'sphere', radius: 0.42, material: 'stone', hp: 18, color: 0xff4422 },
     ],
     hazards: [
-      // ── Central rising-lava pool — the eruption heartbeat ──
-      // Base center y=-3, h=3.0  →  base top at y=-1.5.
-      // Floods +6 units  →  crest at y=4.5, clearing the low flanks/steps.
-      // Period 12 s: dwell ~3 s at bottom, surge up, dwell ~3 s at top, recede.
-      { kind: 'lava', x: 0, y: -3, w: 20, h: 3.0, dps: 70,
-        rise: { height: 6, period: 12, phase: 0 } },
+      // ── THE CENTERPIECE: central rising-lava pool — the eruption clock ──
+      // Base top at y=-1.5; flood crest at y=5.5 (drowns low+mid tiers).
+      // Period 11 s: dwell ~2.5 s bottom, surge, dwell ~2.5 s top, recede.
+      { kind: 'lava', x: 0, y: -3, w: 22, h: 3, dps: 70,
+        rise: { height: 7, period: 11 } },
 
       // ── Kill plane far below ──
       { kind: 'lava', x: 0, y: -10, w: 50, h: 2.0, dps: 999 },
 
-      // ── Crater-rim spike hazards (flanking the summit) ──
+      // ── Summit rim spikes ──
       { kind: 'spike', x: -4, y: 12.5, w: 1.6 },
       { kind: 'spike', x:  4, y: 12.5, w: 1.6 },
-
-      // ── Two pendulum magma globs near the upper cone ──
-      // Anchored above the summit, swinging down across the upper steps.
-      { kind: 'pendulum', x: -2, y: 17, length: 5.5, amplitude: Math.PI / 3, speed: 1.1 },
-      { kind: 'pendulum', x:  2, y: 17, length: 5.5, amplitude: Math.PI / 3, speed: 1.1, phase: Math.PI },
     ],
+    // ── Spawns — ALL on surfaces > 5.8 (above flood crest 5.5) ──
+    //   Upper ledges y=8: surface = 8.5 > 5.8 ✓
+    //   Summit y=11: surface = 11.5 > 5.8 ✓
     spawns: [
-      // All spawns on tiles whose surface > flood line (4.5).
-      // y=5 tiles: surface = 5.5 > 4.5  ✓  (tiles span x: -9..-6 left, 6..9 right)
-      { x: -9, y: 6 }, { x: 9, y: 6 },   // outer safe-step edges
-      { x: -6, y: 6 }, { x: 6, y: 6 },   // inner safe-step edges — spread ~3 apart
-      // y=8 tiles: surface = 8.5  ✓
-      { x: -5, y: 9 }, { x: 5, y: 9 },   // upper cone
-      // Summit: surface = 11.5  ✓
-      { x: 0, y: 12 },
+      { x: -6, y: 9 },   // upper left ledge (tile x:-7..-4, y=8, surface 8.5)
+      { x:  6, y: 9 },   // upper right ledge (tile x:4..7, y=8, surface 8.5)
+      { x: -5, y: 9 },   // upper left inner
+      { x:  5, y: 9 },   // upper right inner
+      { x: -2, y: 12 },  // summit left (tile x:-3..3, y=11, surface 11.5)
+      { x:  2, y: 12 },  // summit right
+      { x:  0, y: 12 },  // summit center
     ],
     weaponSpawns: [
-      // Summit prize — most exposed, king-of-the-hill reward.
-      { x: 0, y: 12 },
-      // Mid-cone safe weapons.
-      { x: -5, y: 9 }, { x: 5, y: 9 },
-      // Risky low-flank weapons — grab fast, they flood!
-      { x: -12, y: 1 }, { x: 12, y: 1 },
-      { x: -10, y: 4 }, { x: 10, y: 4 },
+      // Summit prize — most exposed king-of-the-hill reward.
+      { x:  0, y: 12 },
+      // Tempting mid-tier weapons — they flood at peak, grab fast!
+      { x: -10, y: 1 }, { x: 10, y: 1 },   // low pads
+      { x: -10, y: 5 }, { x: 10, y: 5 },   // mid ledges
+      // Safe upper weapons.
+      { x: -6, y: 9 }, { x: 6, y: 9 },
     ],
     background: [
       // Sky gradient — deep red/black.
