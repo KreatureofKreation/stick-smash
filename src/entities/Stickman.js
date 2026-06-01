@@ -2225,6 +2225,14 @@ export class Stickman {
     params.throwWindup = this._throwWindupT > 0 ? clamp(1 - this._throwWindupT / 0.10, 0, 1) : 0;
     params.angVz = this.body.angularVelocity?.z || 0;
     params.spinning = somersaulting;
+    // Charge wind-up — drives a held cock-back pose while charging a heavy on
+    // the ground, building with hold time (telegraph + drama). chargeProgress
+    // ramps 0→1 over ~0.45s of hold.
+    params.charging = this.charging && this.grounded && !this.weapon;
+    params.chargeProgress = this.charging
+      ? clamp((performance.now() - this.chargeStartedAt) / 1000 / 0.45, 0, 1)
+      : 0;
+    params.chargeDirY = this.input?.moveY ?? 0;
     params.dt = dt;
     params.physics = this.world;
     params.worldOriginX = rigInLocal ? this.body.position.x : 0;
