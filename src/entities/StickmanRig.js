@@ -303,38 +303,58 @@ function poseSpinBack(rig, params) {
   return { armRX, armRY, armLX, armLY, leanZ, footShift };
 }
 
+// Held cock-back pose while charging a ground heavy (no active move yet).
+// Loads the haymaker: rear fist drawn back + up behind the shoulder, torso
+// coiled away, lead hand guarding, legs braced wide and PLANTED. Builds with
+// chargeProgress; a faint tremble at full load sells the tension.
+function poseChargeWindup(rig, params) {
+  const c = clamp(params.chargeProgress ?? 0, 0, 1);
+  const tremble = c > 0.6 ? Math.sin((rig.t ?? 0) * 30) * (c - 0.6) * 0.07 : 0;
+  return {
+    armRX: 0.10 - 0.56 * c,          // rear fist cocks back behind the hip
+    armRY: -0.10 + 0.42 * c,         // and up behind the shoulder
+    armLX: -0.16,                    // lead guard at the chin
+    armLY: 0.10 + 0.12 * c,
+    leanZ: (-0.48 * c) + tremble,    // torso coils away, trembling at full load
+    legLX: -0.28, legLY: 0.0,        // braced wide stance, feet planted
+    legRX: 0.30,  legRY: 0.0,
+  };
+}
+
 function poseBlowAway(rig, params) {
-  // heavyNeutral — double-palm push. Both arms chamber back, then drive BOTH
-  // palms forward stacked with a big step-in, strong forward lean, slow committed recover.
+  // heavyNeutral — PLANTED HAYMAKER. The rear fist loops from way back, up,
+  // and over into a huge overhand swing across the centreline. Legs stay
+  // braced wide and planted the whole time (explicit leg targets → the
+  // footShift slide is skipped); power comes from torso whip + weight
+  // transfer, not a step.
   const t = clamp(params.attackProgress ?? 0, 0, 1);
   const ph = phaseSplit(t, ...HVY);
-  let armRX, armRY, armLX, armLY, leanZ, footShift;
+  // Planted wide brace throughout — feet do not translate.
+  const legLX = -0.30, legLY = 0.0, legRX = 0.32, legRY = 0.0;
+  let armRX, armRY, armLX, armLY, leanZ;
   if (ph.p === 0) {
-    // Long chamber: both arms pulled BACK and UP, torso winds back, weight loads rear
-    armRX = lerp(0.10, -0.48, ph.e);   // right arm coils back to shoulder height
-    armRY = lerp(-0.20, 0.55, ph.e);   // rises into chamber
-    armLX = lerp(-0.10, -0.48, ph.e);  // left mirrors right (symmetric two-hand chamber)
-    armLY = lerp(-0.20, 0.55, ph.e);
-    leanZ = lerp(0, -0.50, ph.e);      // big torso wind-back for a heavy
-    footShift = lerp(0, -0.20, ph.e);  // weight loads rear foot hard
+    // Wind back + up behind the hip, torso coils away, lead guard up.
+    armRX = lerp(0.10, -0.54, ph.e);
+    armRY = lerp(-0.10, 0.34, ph.e);   // cocked up-behind the shoulder
+    armLX = lerp(-0.16, -0.10, ph.e);  // lead guard near chin
+    armLY = lerp(-0.10, 0.26, ph.e);
+    leanZ = lerp(0, -0.58, ph.e);      // huge wind-back
   } else if (ph.p === 1) {
-    // Strike: BOTH palms shoot forward stacked, massive step-in, lean commits
-    armRX = lerp(-0.48, 0.86, ph.e);   // right palm drives full extension (budget)
-    armRY = lerp(0.55, 0.05, ph.e);    // drops to horizontal push height
-    armLX = lerp(-0.48, 0.75, ph.e);   // left slightly less extended (stacked)
-    armLY = lerp(0.55, 0.05, ph.e);
-    leanZ = lerp(-0.50, 0.60, ph.e);   // big lean into the shove
-    footShift = lerp(-0.20, 0.32, ph.e); // large step-in — covers distance
+    // Explosive looping overhand: sweeps from behind, up, over, slams forward.
+    armRX = lerp(-0.54, 0.80, ph.e);   // big horizontal sweep
+    armRY = lerp(0.34, -0.08, ph.e);   // arcs over the top down to contact
+    armLX = lerp(-0.10, -0.30, ph.e);  // guard pulls tight to the body
+    armLY = lerp(0.26, 0.05, ph.e);
+    leanZ = lerp(-0.58, 0.66, ph.e);   // torso whips through the swing
   } else {
-    // Slow recover — committed heavy settle
-    armRX = lerp(0.90, 0.15, ph.e);
-    armRY = lerp(0.05, -0.25, ph.e);
-    armLX = lerp(0.78, -0.15, ph.e);
+    // Heavy follow-through past contact, slow grounded settle.
+    armRX = lerp(0.80, 0.12, ph.e);
+    armRY = lerp(-0.08, -0.25, ph.e);
+    armLX = lerp(-0.30, -0.15, ph.e);
     armLY = lerp(0.05, -0.25, ph.e);
-    leanZ = lerp(0.60, 0.05, ph.e);    // holds forward lean a bit (committed weight)
-    footShift = lerp(0.32, 0.05, ph.e);
+    leanZ = lerp(0.66, 0.05, ph.e);
   }
-  return { armRX, armRY, armLX, armLY, leanZ, footShift };
+  return { armRX, armRY, armLX, armLY, leanZ, legLX, legLY, legRX, legRY };
 }
 
 function poseUppercut(rig, params) {
@@ -889,7 +909,11 @@ export class StickmanRig {
     // damp lag), and we skip the generic params.attack lean to avoid the
     // two-systems-fighting double-count.
     const moveId = params.moveId;
-    const strikePose = moveId ? STRIKE_POSES[moveId]?.(this, params) : null;
+    // Charge wind-up takes over the pose while holding a heavy (no active move
+    // yet) — a held cock-back that telegraphs the incoming haymaker.
+    const strikePose = moveId
+      ? STRIKE_POSES[moveId]?.(this, params)
+      : (params.charging ? poseChargeWindup(this, params) : null);
     this._strikePose = strikePose; // expose to leg/arm code below without reresolving
 
     // Body tilt — stronger forward lean when sprinting.
