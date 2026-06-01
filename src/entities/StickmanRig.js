@@ -37,13 +37,13 @@ const ANIM_DEFAULTS = {
   GRAB_IMMUNE: 0.6,       // s of re-grab immunity for the escapee
   GRAB_HIT_BREAK_KB: 6,   // grabber knockback magnitude that breaks the grab
   // Strike animation tunables
-  STRIKE_REACH: 1.0,       // uniform scale on strike-pose limb offsets (1.0 = identity)
-  STRIKE_OVERSHOOT: 0.10,  // follow-through bump: hand cracks past target then settles
+  STRIKE_REACH: 1.08,      // uniform scale on strike-pose limb offsets (bumped from 1.0)
+  STRIKE_OVERSHOOT: 0.16,  // follow-through bump: hand cracks past target then settles (bumped from 0.10)
   LIGHT_PHASE_W1: 0.30, LIGHT_PHASE_W2: 0.65,   // light windup/strike split (live-tunable)
   HEAVY_PHASE_W1: 0.50, HEAVY_PHASE_W2: 0.72,   // heavy windup/strike split (live-tunable)
   // Walk feel tunables
-  WALK_HIP_SWAY: 0.06,    // side-to-side hip translation per speed unit (0 = off)
-  WALK_ARM_SWING: 1.0,    // arm counter-swing amplitude scale (1.0 = identity)
+  WALK_HIP_SWAY: 0.09,    // side-to-side hip translation per speed unit (bumped from 0.06)
+  WALK_ARM_SWING: 1.2,    // arm counter-swing amplitude scale (bumped from 1.0)
   // Jump/land tunables
   TAKEOFF_CROUCH: 0.10,   // hip-dip depth on jump takeoff (legs pre-compress before stretch)
 };
@@ -128,262 +128,337 @@ const HVY  = [0.50, 0.72];
 const LAUN = [0.55, 0.75];
 
 function poseJab(rig, params) {
+  // Fast straight — short snappy chamber, explosive centerline extension,
+  // lead-hand guard stays tight, quick settle.
   const t = clamp(params.attackProgress ?? 0, 0, 1);
   const ph = phaseSplit(t, ...LITE);
-  let armRX, armRY, leanZ, armLX, armLY;
+  let armRX, armRY, leanZ, armLX, armLY, footShift;
   if (ph.p === 0) {
-    armRX = lerp(0.20, -0.40, ph.e);
-    armRY = lerp(-0.30, 0.50, ph.e);
-    armLX = lerp(-0.20, -0.15, ph.e);   // guard hand to chin
-    armLY = lerp(-0.30, 0.30, ph.e);
-    leanZ = lerp(0, -0.18, ph.e);
+    // Chamber: rear shoulder loads back, lead hand rises to chin-guard
+    armRX = lerp(0.10, -0.55, ph.e);   // lead fist retracts to chin-level
+    armRY = lerp(-0.25, 0.45, ph.e);
+    armLX = lerp(-0.20, -0.10, ph.e);  // guard snaps up to chin
+    armLY = lerp(-0.30, 0.38, ph.e);
+    leanZ = lerp(0, -0.22, ph.e);      // slight shoulder-load lean back
+    footShift = lerp(0, -0.06, ph.e);  // weight loads rear foot
   } else if (ph.p === 1) {
-    armRX = lerp(-0.40, 0.85, ph.e);    // whip forward
-    armRY = lerp(0.50, -0.10, ph.e);
-    armLX = lerp(-0.15, -0.30, ph.e);   // guard pulls in tight
-    armLY = lerp(0.30, 0.10, ph.e);
-    leanZ = lerp(-0.18, 0.30, ph.e);
+    // Strike: explosive centerline extension, guard locks at chin
+    // Note: phaseSplit e can reach ~1.16 at mid-strike (overshoot bump), so
+    // effective peak = end + (end-start)*0.16. Size accordingly.
+    armRX = lerp(-0.55, 0.82, ph.e);   // whip straight forward (budget: keep combined <1.0)
+    armRY = lerp(0.45, 0.05, ph.e);    // stays close to horizontal
+    armLX = lerp(-0.10, -0.28, ph.e);  // guard pulls in tight
+    armLY = lerp(0.38, 0.35, ph.e);    // stays at chin height
+    leanZ = lerp(-0.22, 0.28, ph.e);   // lead-shoulder drives forward
+    footShift = lerp(-0.06, 0.10, ph.e); // quick weight push
   } else {
-    armRX = lerp(0.85, 0.20, ph.e);
-    armRY = lerp(-0.10, -0.30, ph.e);
-    armLX = lerp(-0.30, -0.20, ph.e);
-    armLY = lerp(0.10, -0.30, ph.e);
-    leanZ = lerp(0.30, 0, ph.e);
+    // Settle: hand pulls back to a slightly different neutral (not dead snap)
+    armRX = lerp(0.90, 0.15, ph.e);
+    armRY = lerp(0.05, -0.20, ph.e);
+    armLX = lerp(-0.28, -0.18, ph.e);
+    armLY = lerp(0.35, 0.28, ph.e);    // guard hand rests a bit higher than start
+    leanZ = lerp(0.28, 0.05, ph.e);    // settle just past zero (follow-through)
+    footShift = lerp(0.10, 0, ph.e);
   }
-  return { armRX, armRY, armLX, armLY, leanZ };
+  return { armRX, armRY, armLX, armLY, leanZ, footShift };
 }
 
 function poseCross(rig, params) {
+  // Power straight — deep rear-hip load, long extension driven by full hip
+  // rotation, rear foot drives. The "money" punch — full commitment.
   const t = clamp(params.attackProgress ?? 0, 0, 1);
   const ph = phaseSplit(t, ...LITE);
-  let armRX, armRY, leanZ, armLX, armLY;
+  let armRX, armRY, leanZ, armLX, armLY, footShift;
   if (ph.p === 0) {
-    armRX = lerp(0.20, -0.50, ph.e);    // deeper rear-shoulder chamber
-    armRY = lerp(-0.30, 0.55, ph.e);
-    armLX = lerp(-0.20, 0.20, ph.e);    // lead hand chambers forward (jab-guard)
-    armLY = lerp(-0.30, 0.15, ph.e);
-    leanZ = lerp(0, -0.28, ph.e);
+    // Deep chamber: rear arm coils WAY back, torso winds hard, lead guard up
+    armRX = lerp(0.10, -0.65, ph.e);   // rear fist coils back past shoulder
+    armRY = lerp(-0.20, 0.60, ph.e);   // arm rises as it chambers
+    armLX = lerp(-0.20, 0.15, ph.e);   // lead arm holds guard forward
+    armLY = lerp(-0.30, 0.25, ph.e);
+    leanZ = lerp(0, -0.45, ph.e);      // deep torso wind-back (bigger than jab)
+    footShift = lerp(0, -0.14, ph.e);  // rear foot loads hard
   } else if (ph.p === 1) {
-    armRX = lerp(-0.50, 0.88, ph.e);    // long extension from hip-twist
-    armRY = lerp(0.55, -0.10, ph.e);
-    armLX = lerp(0.20, -0.25, ph.e);    // lead retracts to chin
-    armLY = lerp(0.15, 0.30, ph.e);
-    leanZ = lerp(-0.28, 0.40, ph.e);    // full hip rotation
+    // Strike: full hip rotation drives the long extension
+    armRX = lerp(-0.65, 0.82, ph.e);   // long extension from hip-wind uncoil (budget)
+    armRY = lerp(0.60, 0.02, ph.e);    // travels forward and slightly down
+    armLX = lerp(0.15, -0.32, ph.e);   // lead retracts sharply to chin
+    armLY = lerp(0.25, 0.38, ph.e);    // guard stays at chin height
+    leanZ = lerp(-0.45, 0.55, ph.e);   // massive hip rotation — full commit
+    footShift = lerp(-0.14, 0.22, ph.e); // rear foot drives into the punch
   } else {
-    armRX = lerp(0.88, 0.20, ph.e);
-    armRY = lerp(-0.10, -0.30, ph.e);
-    armLX = lerp(-0.25, -0.20, ph.e);
-    armLY = lerp(0.30, -0.30, ph.e);
-    leanZ = lerp(0.40, 0, ph.e);
+    // Settle: slightly past neutral — body still rotated, arm pulling back
+    armRX = lerp(0.90, 0.12, ph.e);
+    armRY = lerp(0.00, -0.22, ph.e);
+    armLX = lerp(-0.32, -0.18, ph.e);
+    armLY = lerp(0.38, 0.30, ph.e);
+    leanZ = lerp(0.55, 0.08, ph.e);    // settles just past zero
+    footShift = lerp(0.22, 0.05, ph.e);
   }
-  return { armRX, armRY, armLX, armLY, leanZ };
+  return { armRX, armRY, armLX, armLY, leanZ, footShift };
 }
 
 function poseHook(rig, params) {
+  // Horizontal arc — wide load to the side, whip a tight horizontal arc to
+  // centerline, strong torso rotation, off-arm counter-sweeps through center.
   const t = clamp(params.attackProgress ?? 0, 0, 1);
   const ph = phaseSplit(t, ...LITE);
-  let armRX, armRY, leanZ, armLX, armLY;
-  if (ph.p === 0) {
-    armRX = lerp(0.20, 0.55, ph.e);     // arm wide to the side
-    armRY = lerp(-0.30, 0.50, ph.e);
-    armLX = lerp(-0.20, -0.30, ph.e);   // off-arm sweeps opposite (rotational balance)
-    armLY = lerp(-0.30, 0.20, ph.e);
-    leanZ = lerp(0, 0.18, ph.e);
-  } else if (ph.p === 1) {
-    armRX = lerp(0.55, 0.85, ph.e);     // curves to centerline at chin
-    armRY = lerp(0.50, -0.05, ph.e);
-    armLX = lerp(-0.30, -0.05, ph.e);   // counter-sweeps back through center
-    armLY = lerp(0.20, -0.20, ph.e);
-    leanZ = lerp(0.18, 0.50, ph.e);
-  } else {
-    armRX = lerp(0.85, 0.20, ph.e);
-    armRY = lerp(-0.05, -0.30, ph.e);
-    armLX = lerp(-0.05, -0.20, ph.e);
-    armLY = lerp(-0.20, -0.30, ph.e);
-    leanZ = lerp(0.50, 0, ph.e);
-  }
-  return { armRX, armRY, armLX, armLY, leanZ };
-}
-
-function poseKnee(rig, params) {
-  const t = clamp(params.attackProgress ?? 0, 0, 1);
-  const ph = phaseSplit(t, ...LITE);
-  let legRX, legRY, leanZ;
-  if (ph.p === 0) {
-    legRX = lerp(0.20, 0.05, ph.e);
-    legRY = lerp(0, 0.25, ph.e);
-    leanZ = lerp(0, 0.18, ph.e);
-  } else if (ph.p === 1) {
-    legRX = lerp(0.05, 0.55, ph.e);
-    legRY = lerp(0.25, 0.45, ph.e);     // knee drives up to chest
-    leanZ = lerp(0.18, 0.12, ph.e);
-  } else {
-    legRX = lerp(0.55, 0.20, ph.e);
-    legRY = lerp(0.45, 0, ph.e);
-    leanZ = lerp(0.12, 0, ph.e);
-  }
-  // Both arms drop wide for balance during knee strike (hip-level grab posture).
-  const armSpread = ph.p === 1 ? ph.e : (ph.p === 2 ? 1 - ph.e : 0);
-  const armRX = 0.05 + armSpread * 0.20;
-  const armRY = 0.10 - armSpread * 0.30;
-  const armLX = -0.05 - armSpread * 0.20;
-  const armLY = 0.10 - armSpread * 0.30;
-  return { legRX, legRY, leanZ, armRX, armRY, armLX, armLY };
-}
-
-function poseSpinBack(rig, params) {
-  const t = clamp(params.attackProgress ?? 0, 0, 1);
-  const ph = phaseSplit(t, 0.42, 0.74);
   let armRX, armRY, leanZ, armLX, armLY, footShift;
   if (ph.p === 0) {
-    armRX = lerp(0.20, -0.55, ph.e);
-    armRY = lerp(-0.30, 0.55, ph.e);
-    armLX = lerp(-0.20, 0.30, ph.e);    // off-arm leads the spin
-    armLY = lerp(-0.30, 0.30, ph.e);
-    leanZ = lerp(0, -0.70, ph.e);       // wind up huge twist
-    footShift = lerp(0, -0.12, ph.e);
+    // Wide load: arm sweeps FAR to the outside, torso pre-rotates outward
+    armRX = lerp(0.10, 0.68, ph.e);    // arm opens wide to the side (silhouette read)
+    armRY = lerp(-0.25, 0.55, ph.e);   // rises as it loads
+    armLX = lerp(-0.20, -0.52, ph.e);  // counter-arm sweeps opposite direction hard
+    armLY = lerp(-0.30, 0.28, ph.e);
+    leanZ = lerp(0, 0.32, ph.e);       // torso pre-rotates outward (opens the arc)
+    footShift = lerp(0, -0.08, ph.e);  // plant foot loads
   } else if (ph.p === 1) {
-    armRX = lerp(-0.55, 0.85, ph.e);    // whip through big horizontal arc
-    armRY = lerp(0.55, 0.05, ph.e);
-    armLX = lerp(0.30, -0.40, ph.e);    // off-arm whips back the other way
-    armLY = lerp(0.30, 0.10, ph.e);
-    leanZ = lerp(-0.70, 0.80, ph.e);
-    footShift = lerp(-0.12, 0.20, ph.e);
+    // Arc: whip through horizontal arc to centerline, off-arm counter-sweeps back
+    armRX = lerp(0.68, 0.88, ph.e);    // arc tip reaches centerline (stay ≤0.95)
+    armRY = lerp(0.55, 0.08, ph.e);    // drops from high to level as it arcs
+    armLX = lerp(-0.52, 0.05, ph.e);   // counter-arm whips all the way through center
+    armLY = lerp(0.28, -0.30, ph.e);   // swings down as it passes
+    leanZ = lerp(0.32, 0.62, ph.e);    // full hip rotation — rotational punch
+    footShift = lerp(-0.08, 0.16, ph.e); // hip pivots
   } else {
-    armRX = lerp(0.85, 0.20, ph.e);
-    armRY = lerp(0.05, -0.30, ph.e);
-    armLX = lerp(-0.40, -0.20, ph.e);
-    armLY = lerp(0.10, -0.30, ph.e);
-    leanZ = lerp(0.80, 0, ph.e);
-    footShift = lerp(0.20, 0, ph.e);
-  }
-  return { armRX, armRY, armLX, armLY, leanZ, footShift };
-}
-
-function poseBlowAway(rig, params) {
-  const t = clamp(params.attackProgress ?? 0, 0, 1);
-  const ph = phaseSplit(t, ...HVY);
-  let armRX, armRY, armLX, armLY, leanZ, footShift;
-  if (ph.p === 0) {
-    armRX = lerp(0.20, -0.30, ph.e);
-    armRY = lerp(-0.30, 0.45, ph.e);
-    armLX = lerp(-0.20, -0.30, ph.e);
-    armLY = lerp(-0.30, 0.45, ph.e);
-    leanZ = lerp(0, -0.40, ph.e);
-    footShift = lerp(0, -0.15, ph.e);
-  } else if (ph.p === 1) {
-    armRX = lerp(-0.30, 0.88, ph.e);
-    armRY = lerp(0.45, -0.05, ph.e);
-    armLX = lerp(-0.30, 0.78, ph.e);    // both palms drive forward (stacked)
-    armLY = lerp(0.45, -0.05, ph.e);
-    leanZ = lerp(-0.40, 0.55, ph.e);
-    footShift = lerp(-0.15, 0.25, ph.e);// big step into the push
-  } else {
-    armRX = lerp(0.88, 0.20, ph.e);
-    armRY = lerp(-0.05, -0.30, ph.e);
-    armLX = lerp(0.78, -0.20, ph.e);
-    armLY = lerp(-0.05, -0.30, ph.e);
-    leanZ = lerp(0.55, 0, ph.e);
-    footShift = lerp(0.25, 0, ph.e);
-  }
-  return { armRX, armRY, armLX, armLY, leanZ, footShift };
-}
-
-function poseUppercut(rig, params) {
-  const t = clamp(params.attackProgress ?? 0, 0, 1);
-  const ph = phaseSplit(t, ...LAUN);
-  let armRX, armRY, armLX, armLY, leanZ, footShift;
-  if (ph.p === 0) {
-    armRX = lerp(0.20, -0.05, ph.e);
-    armRY = lerp(-0.30, -0.70, ph.e);   // drop into deep windup
-    armLX = lerp(-0.20, -0.25, ph.e);
-    armLY = lerp(-0.30, 0.10, ph.e);    // guard up
-    leanZ = lerp(0, -0.40, ph.e);
-    footShift = lerp(0, -0.10, ph.e);
-  } else if (ph.p === 1) {
-    armRX = lerp(-0.05, 0.45, ph.e);
-    armRY = lerp(-0.70, 0.85, ph.e);    // rocket arc up to overhead
-    armLX = lerp(-0.25, -0.35, ph.e);
-    armLY = lerp(0.10, 0.20, ph.e);
-    leanZ = lerp(-0.40, 0.10, ph.e);
-    footShift = lerp(-0.10, 0.16, ph.e);// explode off rear foot
-  } else {
-    armRX = lerp(0.45, 0.20, ph.e);
-    armRY = lerp(0.85, -0.30, ph.e);
-    armLX = lerp(-0.35, -0.20, ph.e);
-    armLY = lerp(0.20, -0.30, ph.e);
-    leanZ = lerp(0.10, 0, ph.e);
+    // Settle: past centerline, body carries the rotation momentum
+    armRX = lerp(0.88, 0.18, ph.e);
+    armRY = lerp(0.08, -0.22, ph.e);
+    armLX = lerp(0.05, -0.18, ph.e);
+    armLY = lerp(-0.30, -0.25, ph.e);
+    leanZ = lerp(0.62, 0.10, ph.e);    // settles with a bit of follow-through
     footShift = lerp(0.16, 0, ph.e);
   }
   return { armRX, armRY, armLX, armLY, leanZ, footShift };
 }
 
-function poseAxe(rig, params) {
+function poseKnee(rig, params) {
+  // Close knee strike — both hands grab-posture pull in, drive knee UP hard
+  // to chest height, body curls over the knee then settles. Close-range, vertical.
   const t = clamp(params.attackProgress ?? 0, 0, 1);
-  const ph = phaseSplit(t, ...HVY);
-  let armRX, armRY, armLX, armLY, leanZ;
+  const ph = phaseSplit(t, ...LITE);
+  let legRX, legRY, leanZ, armRX, armRY, armLX, armLY;
   if (ph.p === 0) {
-    armRX = lerp(0.20, 0.10, ph.e);
-    armRY = lerp(0.15, 0.80, ph.e);     // both hands raised overhead
-    armLX = lerp(-0.20, -0.10, ph.e);
-    armLY = lerp(0.15, 0.80, ph.e);
-    leanZ = lerp(0, -0.10, ph.e);
+    // Chamber: leg pulls back/in, arms pull into grab-clinch posture
+    legRX = lerp(0.20, -0.05, ph.e);   // foot sweeps back to load
+    legRY = lerp(0, 0.20, ph.e);       // slight knee-up
+    leanZ = lerp(0, 0.20, ph.e);       // body begins to curl forward
+    armRX = lerp(0.10, 0.32, ph.e);    // both arms reach forward to grab-pull
+    armRY = lerp(-0.20, 0.18, ph.e);
+    armLX = lerp(-0.10, -0.32, ph.e);
+    armLY = lerp(-0.20, 0.18, ph.e);
   } else if (ph.p === 1) {
-    armRX = lerp(0.10, 0.30, ph.e);
-    armRY = lerp(0.80, -0.25, ph.e);    // slam straight down
-    armLX = lerp(-0.10, 0.25, ph.e);
-    armLY = lerp(0.80, -0.25, ph.e);
-    leanZ = lerp(-0.10, 0.35, ph.e);    // body folds over the hammer
+    // Strike: knee ROCKETS upward to chest height, body curls over it
+    legRX = lerp(-0.05, 0.42, ph.e);   // knee drives forward and up
+    legRY = lerp(0.20, 0.80, ph.e);    // high knee — drives to chest level
+    leanZ = lerp(0.20, 0.05, ph.e);    // body folds forward over the knee
+    armRX = lerp(0.32, 0.22, ph.e);    // arms pull the target INTO the knee
+    armRY = lerp(0.18, -0.15, ph.e);   // pull down as knee drives up
+    armLX = lerp(-0.32, -0.22, ph.e);
+    armLY = lerp(0.18, -0.15, ph.e);
   } else {
-    armRX = lerp(0.30, 0.20, ph.e);
-    armRY = lerp(-0.25, -0.30, ph.e);
-    armLX = lerp(0.25, -0.20, ph.e);
-    armLY = lerp(-0.25, -0.30, ph.e);
-    leanZ = lerp(0.35, 0, ph.e);
+    // Settle: knee drops, arms relax
+    legRX = lerp(0.42, 0.20, ph.e);
+    legRY = lerp(0.80, 0, ph.e);
+    leanZ = lerp(0.05, 0, ph.e);
+    armRX = lerp(0.22, 0.08, ph.e);
+    armRY = lerp(-0.15, -0.20, ph.e);
+    armLX = lerp(-0.22, -0.08, ph.e);
+    armLY = lerp(-0.15, -0.20, ph.e);
   }
-  return { armRX, armRY, armLX, armLY, leanZ };
+  return { legRX, legRY, leanZ, armRX, armRY, armLX, armLY };
 }
 
-function poseCharge(rig, params) {
+function poseSpinBack(rig, params) {
+  // Spinning backfist — flashiest light. Huge wind-up twist one way, whip all
+  // the way through a big horizontal arc, off-arm leads then whips opposite.
+  // Maximize the arc — use leanZ budget to its fullest.
   const t = clamp(params.attackProgress ?? 0, 0, 1);
-  const ph = phaseSplit(t, ...HVY);
-  let armRX, armRY, armLX, armLY, leanZ, footShift;
+  const ph = phaseSplit(t, 0.42, 0.74);
+  let armRX, armRY, leanZ, armLX, armLY, footShift;
   if (ph.p === 0) {
-    armRX = lerp(0.20, -0.30, ph.e);
-    armRY = lerp(-0.30, 0.30, ph.e);
-    armLX = lerp(-0.20, -0.30, ph.e);   // off-arm tucks for shoulder ram
-    armLY = lerp(-0.30, 0.30, ph.e);
-    leanZ = lerp(0, 0.50, ph.e);        // body lunges forward
-    footShift = lerp(0, -0.10, ph.e);
+    // Wind up: DEEP opposite twist, off-arm leads the rotation direction
+    armRX = lerp(0.10, -0.70, ph.e);    // strike arm coils HARD behind body
+    armRY = lerp(-0.20, 0.65, ph.e);    // rises as it coils
+    armLX = lerp(-0.20, 0.55, ph.e);    // off-arm leads the spin direction strongly
+    armLY = lerp(-0.30, 0.35, ph.e);
+    leanZ = lerp(0, -0.90, ph.e);       // maximum wind — near budget limit
+    footShift = lerp(0, -0.18, ph.e);   // weight loads rear foot hard
   } else if (ph.p === 1) {
-    armRX = lerp(-0.30, 0.85, ph.e);
-    armRY = lerp(0.30, -0.10, ph.e);    // shoulder/elbow rams forward
-    armLX = lerp(-0.30, 0.40, ph.e);
-    armLY = lerp(0.30, -0.05, ph.e);
-    leanZ = lerp(0.50, 0.70, ph.e);
-    footShift = lerp(-0.10, 0.28, ph.e);// step deep
+    // Whip: arc SWEEPS from behind all the way to full extension, body rotates max
+    armRX = lerp(-0.70, 0.84, ph.e);    // full horizontal backfist arc (budget-safe)
+    armRY = lerp(0.65, 0.10, ph.e);     // sweeps from high to level
+    armLX = lerp(0.55, -0.58, ph.e);    // off-arm whips ALL THE WAY back the other way
+    armLY = lerp(0.35, 0.15, ph.e);
+    leanZ = lerp(-0.90, 0.80, ph.e);    // massive arc — budget-safe with overshoot
+    footShift = lerp(-0.18, 0.28, ph.e); // weight shifts completely across
   } else {
-    armRX = lerp(0.85, 0.20, ph.e);
-    armRY = lerp(-0.10, -0.30, ph.e);
-    armLX = lerp(0.40, -0.20, ph.e);
-    armLY = lerp(-0.05, -0.30, ph.e);
-    leanZ = lerp(0.70, 0, ph.e);
+    // Settle: still carrying rotation, gradually slows
+    armRX = lerp(0.90, 0.15, ph.e);
+    armRY = lerp(0.10, -0.25, ph.e);
+    armLX = lerp(-0.60, -0.20, ph.e);
+    armLY = lerp(0.15, -0.28, ph.e);
+    leanZ = lerp(0.90, 0.12, ph.e);     // follow-through settle with overshoot
     footShift = lerp(0.28, 0, ph.e);
   }
   return { armRX, armRY, armLX, armLY, leanZ, footShift };
 }
 
-function poseCounterStance(rig, params) {
-  // Static stance through duration — slight settle on entry. No strike arc.
+function poseBlowAway(rig, params) {
+  // heavyNeutral — double-palm push. Both arms chamber back, then drive BOTH
+  // palms forward stacked with a big step-in, strong forward lean, slow committed recover.
   const t = clamp(params.attackProgress ?? 0, 0, 1);
-  const settle = Math.min(1, t / 0.20);
-  // Lead palm raised in bong-sao guard; rear hand cocked at hip ready to counter.
-  const armRX = lerp(0.20, 0.55, settle);
-  const armRY = lerp(0.15, 0.40, settle);
-  const armLX = lerp(-0.20, -0.35, settle);
-  const armLY = lerp(-0.30, 0.10, settle);
-  const leanZ = lerp(0, -0.30, settle);
-  return { armRX, armRY, armLX, armLY, leanZ };
+  const ph = phaseSplit(t, ...HVY);
+  let armRX, armRY, armLX, armLY, leanZ, footShift;
+  if (ph.p === 0) {
+    // Long chamber: both arms pulled BACK and UP, torso winds back, weight loads rear
+    armRX = lerp(0.10, -0.48, ph.e);   // right arm coils back to shoulder height
+    armRY = lerp(-0.20, 0.55, ph.e);   // rises into chamber
+    armLX = lerp(-0.10, -0.48, ph.e);  // left mirrors right (symmetric two-hand chamber)
+    armLY = lerp(-0.20, 0.55, ph.e);
+    leanZ = lerp(0, -0.50, ph.e);      // big torso wind-back for a heavy
+    footShift = lerp(0, -0.20, ph.e);  // weight loads rear foot hard
+  } else if (ph.p === 1) {
+    // Strike: BOTH palms shoot forward stacked, massive step-in, lean commits
+    armRX = lerp(-0.48, 0.86, ph.e);   // right palm drives full extension (budget)
+    armRY = lerp(0.55, 0.05, ph.e);    // drops to horizontal push height
+    armLX = lerp(-0.48, 0.75, ph.e);   // left slightly less extended (stacked)
+    armLY = lerp(0.55, 0.05, ph.e);
+    leanZ = lerp(-0.50, 0.60, ph.e);   // big lean into the shove
+    footShift = lerp(-0.20, 0.32, ph.e); // large step-in — covers distance
+  } else {
+    // Slow recover — committed heavy settle
+    armRX = lerp(0.90, 0.15, ph.e);
+    armRY = lerp(0.05, -0.25, ph.e);
+    armLX = lerp(0.78, -0.15, ph.e);
+    armLY = lerp(0.05, -0.25, ph.e);
+    leanZ = lerp(0.60, 0.05, ph.e);    // holds forward lean a bit (committed weight)
+    footShift = lerp(0.32, 0.05, ph.e);
+  }
+  return { armRX, armRY, armLX, armLY, leanZ, footShift };
+}
+
+function poseUppercut(rig, params) {
+  // heavyUp launcher — drop into deep low coil (striking hand dips below hip),
+  // then ROCKET the fist up overhead on an arc, explode off rear foot.
+  const t = clamp(params.attackProgress ?? 0, 0, 1);
+  const ph = phaseSplit(t, ...LAUN);
+  let armRX, armRY, armLX, armLY, leanZ, footShift;
+  if (ph.p === 0) {
+    // Deep crouch-coil: fist drops ALL the way below hip level, body dips
+    armRX = lerp(0.10, 0.08, ph.e);    // arm moves inward as it drops
+    armRY = lerp(-0.20, -0.82, ph.e);  // fist BELOW hip — deepest coil (budget: |0.82|<0.95)
+    armLX = lerp(-0.20, -0.30, ph.e);  // guard stays up to protect
+    armLY = lerp(-0.25, 0.20, ph.e);   // guard rises as right drops
+    leanZ = lerp(0, -0.55, ph.e);      // body dips into the coil
+    footShift = lerp(0, -0.15, ph.e);  // rear foot loads
+  } else if (ph.p === 1) {
+    // ROCKET: fist arcs upward explosively — shoulder, elbow, fist all extend overhead
+    armRX = lerp(0.08, 0.30, ph.e);    // arm drives upward and slightly forward
+    armRY = lerp(-0.82, 0.76, ph.e);   // full vertical arc — floor to overhead (budget)
+    armLX = lerp(-0.30, -0.42, ph.e);  // left arm sweeps down as counterweight
+    armLY = lerp(0.20, -0.28, ph.e);   // drops hard to counterbalance the rocket
+    leanZ = lerp(-0.55, 0.20, ph.e);   // body extends upward with the punch
+    footShift = lerp(-0.15, 0.22, ph.e); // explode off rear foot
+  } else {
+    // Settle: arm comes back down, body returns from extended stretch
+    armRX = lerp(0.38, 0.15, ph.e);
+    armRY = lerp(0.90, -0.22, ph.e);   // comes back down from overhead
+    armLX = lerp(-0.42, -0.18, ph.e);
+    armLY = lerp(-0.28, -0.22, ph.e);
+    leanZ = lerp(0.20, 0.05, ph.e);
+    footShift = lerp(0.22, 0, ph.e);
+  }
+  return { armRX, armRY, armLX, armLY, leanZ, footShift };
+}
+
+function poseAxe(rig, params) {
+  // heavyDown overhead slam — both hands raise HIGH overhead (chamber up),
+  // then SLAM straight down past body centerline, body folds forward hard.
+  const t = clamp(params.attackProgress ?? 0, 0, 1);
+  const ph = phaseSplit(t, ...HVY);
+  let armRX, armRY, armLX, armLY, leanZ, footShift;
+  if (ph.p === 0) {
+    // Raise up: both arms stretch overhead — as high as possible, lean back
+    armRX = lerp(0.10, 0.18, ph.e);    // arms converge toward center as they rise
+    armRY = lerp(-0.20, 0.90, ph.e);   // reaches maximum overhead height
+    armLX = lerp(-0.10, -0.18, ph.e);
+    armLY = lerp(-0.20, 0.90, ph.e);
+    leanZ = lerp(0, -0.30, ph.e);      // slight lean back to load the overhead
+    footShift = lerp(0, -0.10, ph.e);  // weight shifts back slightly
+  } else if (ph.p === 1) {
+    // SLAM: both arms drive straight down hard, body folds forward violently
+    armRX = lerp(0.18, 0.28, ph.e);    // slight outward flare as arms pass body
+    armRY = lerp(0.90, -0.55, ph.e);   // slams DOWN past hip level
+    armLX = lerp(-0.18, -0.25, ph.e);
+    armLY = lerp(0.90, -0.55, ph.e);
+    leanZ = lerp(-0.30, 0.65, ph.e);   // body folds HARD forward over the slam
+    footShift = lerp(-0.10, 0.15, ph.e); // body hunches forward
+  } else {
+    // Heavy settle: arms hang low, body straightens slowly
+    armRX = lerp(0.28, 0.15, ph.e);
+    armRY = lerp(-0.55, -0.30, ph.e);  // arms stay low in settle
+    armLX = lerp(-0.25, -0.15, ph.e);
+    armLY = lerp(-0.55, -0.30, ph.e);
+    leanZ = lerp(0.65, 0.08, ph.e);    // gradually straightens (heavy settle)
+    footShift = lerp(0.15, 0, ph.e);
+  }
+  return { armRX, armRY, armLX, armLY, leanZ, footShift };
+}
+
+function poseCharge(rig, params) {
+  // heavyForward lunge — wind striking arm back + load rear foot hard,
+  // then long lunging extension with big forward step. Covers distance.
+  const t = clamp(params.attackProgress ?? 0, 0, 1);
+  const ph = phaseSplit(t, ...HVY);
+  let armRX, armRY, armLX, armLY, leanZ, footShift;
+  if (ph.p === 0) {
+    // Load: striking arm retracts DEEP behind body, lead arm guards, weight loads rear
+    armRX = lerp(0.10, -0.60, ph.e);   // arm coils WAY back for lunge
+    armRY = lerp(-0.20, 0.42, ph.e);   // rises as it chambers
+    armLX = lerp(-0.20, 0.18, ph.e);   // lead guard pushes slightly forward
+    armLY = lerp(-0.20, 0.28, ph.e);
+    leanZ = lerp(0, -0.30, ph.e);      // body loads back before the lunge
+    footShift = lerp(0, -0.20, ph.e);  // rear foot loads HARD for the drive
+  } else if (ph.p === 1) {
+    // Lunge: body rockets forward, arm extends with full forward lean
+    armRX = lerp(-0.60, 0.82, ph.e);   // full extension — covers distance (budget)
+    armRY = lerp(0.42, -0.05, ph.e);   // drives forward-level
+    armLX = lerp(0.18, 0.30, ph.e);    // lead arm partially extends to guide direction
+    armLY = lerp(0.28, 0.10, ph.e);
+    leanZ = lerp(-0.30, 0.75, ph.e);   // massive forward lean — commits full body
+    footShift = lerp(-0.20, 0.38, ph.e); // long lunge step — biggest footShift
+  } else {
+    // Slow settle: over-extended, gradually pulls back
+    armRX = lerp(0.90, 0.15, ph.e);
+    armRY = lerp(-0.05, -0.25, ph.e);
+    armLX = lerp(0.30, -0.15, ph.e);
+    armLY = lerp(0.10, -0.22, ph.e);
+    leanZ = lerp(0.75, 0.10, ph.e);    // holds lean a bit (still weighted forward)
+    footShift = lerp(0.38, 0.08, ph.e);
+  }
+  return { armRX, armRY, armLX, armLY, leanZ, footShift };
+}
+
+function poseCounterStance(rig, params) {
+  // heavyBack — defensive read. Bladed stance, lead hand forward as a guard/parry,
+  // weight back, subtle settle-bob. Should look like "bracing to counter," not a strike.
+  const t = clamp(params.attackProgress ?? 0, 0, 1);
+  // Quick settle into stance (first 15% of duration), then hold + subtle bob
+  const settle = Math.min(1, t / 0.15);
+  // Subtle breathing bob through hold — reads as alert, not frozen
+  const holdPhase = Math.max(0, t - 0.15) / 0.85;
+  const bob = Math.sin(holdPhase * Math.PI * 2.5) * 0.04 * settle;
+  // Bladed stance: lead arm extends as a parry/ward, rear arm cocks back at hip
+  // Lead arm (left arm in facing-right convention = armLX) pushes out as guard
+  const armRX = lerp(0.12, -0.42, settle) + bob * 0.08; // rear arm cocked at hip
+  const armRY = lerp(-0.20, 0.22, settle) + bob;         // slightly raised (ready)
+  const armLX = lerp(-0.20, 0.45, settle) - bob * 0.05; // lead guard pushes forward
+  const armLY = lerp(-0.25, 0.35, settle) + bob;         // guard at head level (parry)
+  // Bladed stance leans weight back
+  const leanZ = lerp(0, -0.38, settle) + bob * 0.06;
+  // Slight foot shift back (weight back for counter)
+  const footShift = lerp(0, -0.12, settle);
+  return { armRX, armRY, armLX, armLY, leanZ, footShift };
 }
 
 function poseFlyingKnee(rig, params) {
@@ -557,18 +632,32 @@ function poseDive(rig, params) {
 }
 
 function poseSlideKick(rig, params) {
+  // Sliding low kick — body horizontal (slide). Foot spears out long and low
+  // on active frames then retracts. Snappier + longer extension than before.
   const t = clamp(params.attackProgress ?? 0, 0, 1);
-  // Body already in horizontal slide pose; foot snap-extends mid.
-  const arc = Math.sin(Math.PI * clamp((t - 0.10) / 0.80, 0, 1));
-  const legRX = 0.20 + arc * 0.90;
-  const legRY = -0.45 + arc * 0.10;
-  const leanZ = -Math.PI / 3 + arc * 0.15;
+  // Snappier: arc peaks faster (window 0.08→0.72 instead of 0.10→0.90)
+  // and uses ease-out cubic for explosive extension, ease-in for retract.
+  const rawArc = clamp((t - 0.08) / 0.64, 0, 1);
+  // Ease-out extend (t < 0.5) + ease-in retract (t > 0.5): smooth peak
+  const arcBlend = rawArc < 0.5
+    ? 1 - Math.pow(1 - rawArc * 2, 3) // ease-out into peak
+    : Math.pow(2 - rawArc * 2, 2) * 0.5 + 0.5; // ease-in from peak (actually we want descend)
+  // Actually: just sin arc — but shifted so the peak hits earlier and the
+  // retract is slower (foot lingers at extension then pulls back).
+  const arc = Math.sin(Math.PI * clamp((t - 0.08) / 0.72, 0, 1));
+  // legRX is the forward reach from hip (facing-sign applied by rig).
+  // Budget: sqrt(legRX²+legRY²) < 1.0. legRY≈-0.42 so legRX must stay <0.91.
+  // legRX at peak: 0.20 + 0.70 = 0.90; combined: sqrt(0.90²+0.42²) ≈ 0.994 ✓
+  const legRX = 0.20 + arc * 0.70;    // spear extends forward (budget-safe)
+  const legRY = -0.42 + arc * 0.08;   // stays low, slight rise at peak
+  // leanZ budget ±1.0 — clamp -PI/3 ≈ -1.047 → use -0.95
+  const leanZ = -0.95 + arc * 0.18;   // horizontal body tilt (budget-safe)
   return {
     legRX, legRY,
-    legLX: -0.20, legLY: -0.10,
+    legLX: -0.20, legLY: -0.08,  // trail leg tucks back
     leanZ,
-    armRX: -0.30, armRY: 0.10,
-    armLX: -0.20, armLY: 0.10,
+    armRX: -0.35, armRY: 0.12,   // arms trail back (aerodynamic slide posture)
+    armLX: -0.25, armLY: 0.08,
   };
 }
 
@@ -1068,26 +1157,41 @@ export class StickmanRig {
 
     let footLX, footLY, footRX, footRY;
     if (!params.grounded) {
-      // Three phases driven by vy:
-      //   takeoff vy > 3      : legs trail under hip (extending push)
-      //   apex    vy in [-1,3]: knees tucked up
-      //   fall    vy < -1     : legs reach forward to brace landing
-      let liftN, footFwd;
-      if (vy > 3) {
-        const t = clamp((vy - 3) / 4, 0, 1);
-        liftN = lerp(0.40, 0.05, t);
+      // Four phases driven by vy for a more expressive airborne pose:
+      //   launch  vy > 5      : strong push-off stretch — legs trail behind, extended
+      //   rise    vy in [1,5] : transitioning into tuck
+      //   apex    vy in [-2,1]: DEEP tuck — knees pulled up to chest, forward curl
+      //   fall    vy < -2     : legs reach FORWARD and DOWN to brace landing
+      // The tuck at apex is now much more dramatic (knees genuinely up),
+      // and the reaching fall has both legs spread forward for a weighty catch.
+      let liftN, footFwd, spreadX;
+      if (vy > 5) {
+        // Launch stretch: legs push down and trail behind (extending the push)
+        const tl = clamp((vy - 5) / 5, 0, 1);
+        liftN = lerp(0.50, 0.12, tl);   // feet near ground level (push-off extension)
+        footFwd = lerp(0, -0.08, tl);   // feet slightly behind body (trail)
+        spreadX = lerp(0.16, 0.12, tl); // normal stance width
+      } else if (vy >= 1) {
+        // Rising: legs pull up, transitioning into tuck
+        const tl = clamp((5 - vy) / 4, 0, 1);
+        liftN = lerp(0.50, 0.68, tl);   // feet rising toward chest
         footFwd = 0;
-      } else if (vy >= -1) {
-        const t = clamp((vy + 1) / 4, 0, 1);
-        liftN = lerp(0.40, 0.55, t);
-        footFwd = 0;
+        spreadX = 0.16;
+      } else if (vy >= -2) {
+        // APEX TUCK: knees pulled up close to chest — most expressive phase
+        const tl = clamp((1 - vy) / 3, 0, 1);
+        liftN = lerp(0.68, 0.72, tl);   // deep tuck — feet near hip height
+        footFwd = lerp(0, 0.04, tl);    // feet slightly forward (fetal curl)
+        spreadX = lerp(0.16, 0.18, tl); // feet spread slightly at apex
       } else {
-        const t = clamp((-vy - 1) / 6, 0, 1);
-        liftN = lerp(0.55, 0.18, t);
-        footFwd = lerp(0, 0.10, t);
+        // FALL reach: legs extend forward and down to catch the landing
+        const tl = clamp((-vy - 2) / 7, 0, 1);
+        liftN = lerp(0.72, 0.08, tl);   // feet drop from tuck toward ground
+        footFwd = lerp(0.04, 0.22, tl); // feet reach FORWARD to brace
+        spreadX = lerp(0.18, 0.22, tl); // feet spread wider (stable landing base)
       }
-      footLX = hipX - 0.16 + this.facing * footFwd;
-      footRX = hipX + 0.16 + this.facing * footFwd;
+      footLX = hipX - spreadX + this.facing * footFwd;
+      footRX = hipX + spreadX + this.facing * footFwd;
       footLY = baseFootY + liftN;
       footRY = baseFootY + liftN;
     } else if ((this._realSpeed ?? 0) < 0.5) {
@@ -1135,11 +1239,24 @@ export class StickmanRig {
       if (this._plantRX < hipX - maxDrag) this._plantRX = hipX - maxDrag;
       if (this._plantRX > hipX + maxDrag) this._plantRX = hipX + maxDrag;
 
-      // Asymmetric arcs:
-      //   yArc — knee drives up fast, peaks at t≈0.37, drops to plant.
-      //   xArc — ease-in: foot trails behind early then snaps forward to plant.
-      const yArc = (t) => Math.sin(Math.pow(t, 0.7) * Math.PI);
-      const xArc = (t) => t * t * (1.6 - 0.6 * t);
+      // Asymmetric arcs — reworked for a confident, weighted stride:
+      //   yArc — contact phase: foot lifts FAST (quick toe-off), peaks early at
+      //          t≈0.28 (passing phase), then drops steadily for a clean heel-strike.
+      //          The fast lift + sharp peak reads as a purposeful knee drive rather
+      //          than a flat shuffle. Math: pow(t,0.5) shifts peak earlier than
+      //          the previous pow(t,0.7); the full sin arc closes cleanly.
+      //   xArc — forward travel: foot stays behind on initial lift (heel peels off),
+      //          then accelerates forward in the second half for a confident plant.
+      //          Old cubic was t²(1.6-0.6t) — still an ease-in. New version adds a
+      //          slight shoulder to better simulate the foot hanging behind then
+      //          snapping forward (pendulum swing feel).
+      const yArc = (t) => Math.sin(Math.pow(t, 0.50) * Math.PI);
+      const xArc = (t) => {
+        // Ease-in-out with bias toward late: foot hangs back ~40% of swing,
+        // then swoops forward into plant. Cleaner weight-shift reading.
+        const c = t * t * (3 - 2 * t); // smoothstep base
+        return c * c * (1 + (1 - c) * 0.6); // add late-swing acceleration
+      };
 
       const tL = swingT(0);
       if (tL === null) {
@@ -1308,20 +1425,31 @@ export class StickmanRig {
         handRY = gripY;
       }
     } else if (!params.grounded) {
-      // Airborne arms — phase by vy.
+      // Airborne arms — phase by vy, matching the new jump pose phases.
+      // Launch: arms drive DOWN (counter to legs pushing up) — reads as spring-off.
+      // Apex tuck: arms wrap IN toward body (fetal curl with the knees-up tuck).
+      // Fall: arms spread OUT and slightly down — balance/catch posture.
       let armUpAir, armFwdAir;
-      if (vy > 3) {
-        const t = clamp((vy - 3) / 4, 0, 1);
-        armUpAir = lerp(0.20, 0.55, t);
-        armFwdAir = 0.20;
-      } else if (vy >= -1) {
-        const t = clamp((vy + 1) / 4, 0, 1);
-        armUpAir = lerp(0.10, 0.20, t);
-        armFwdAir = 0.35;
+      if (vy > 5) {
+        // Launch stretch: arms drive down (opposite of leg push-off)
+        const t = clamp((vy - 5) / 5, 0, 1);
+        armUpAir = lerp(0.30, 0.55, t);   // rises during strong launch
+        armFwdAir = lerp(0.25, 0.18, t);
+      } else if (vy >= 1) {
+        // Rising: arms lift to help with upward momentum
+        const t = clamp((5 - vy) / 4, 0, 1);
+        armUpAir = lerp(0.55, 0.18, t);
+        armFwdAir = lerp(0.18, 0.30, t);
+      } else if (vy >= -2) {
+        // Apex tuck: arms pull slightly in + up (curl with the body)
+        const t = clamp((1 - vy) / 3, 0, 1);
+        armUpAir = lerp(0.18, 0.22, t);
+        armFwdAir = lerp(0.30, 0.38, t);  // slightly forward at apex
       } else {
-        const t = clamp((-vy - 1) / 6, 0, 1);
-        armUpAir = lerp(0.20, -0.10, t);
-        armFwdAir = lerp(0.35, 0.45, t);
+        // Fall reach: arms spread OUT and forward for balance/catch
+        const t = clamp((-vy - 2) / 7, 0, 1);
+        armUpAir = lerp(0.22, -0.08, t);  // drops as reaching for ground
+        armFwdAir = lerp(0.38, 0.52, t);  // reaches more forward to brace
       }
       handRX = sRX + this.facing * armFwdAir;
       handRY = sRY + armUpAir;
@@ -1366,19 +1494,24 @@ export class StickmanRig {
       handLX = sLX + Math.cos(aimAng) * aimDist * 0.7;
       handLY = sLY + Math.sin(aimAng) * aimDist * 0.7;
     } else if (!params.grounded) {
+      // Left arm mirrors right arm airborne pose (same vy phases)
       let armUpAir, armFwdAir;
-      if (vy > 3) {
-        const t = clamp((vy - 3) / 4, 0, 1);
-        armUpAir = lerp(0.20, 0.55, t);
-        armFwdAir = 0.20;
-      } else if (vy >= -1) {
-        const t = clamp((vy + 1) / 4, 0, 1);
-        armUpAir = lerp(0.10, 0.20, t);
-        armFwdAir = 0.35;
+      if (vy > 5) {
+        const t = clamp((vy - 5) / 5, 0, 1);
+        armUpAir = lerp(0.30, 0.55, t);
+        armFwdAir = lerp(0.25, 0.18, t);
+      } else if (vy >= 1) {
+        const t = clamp((5 - vy) / 4, 0, 1);
+        armUpAir = lerp(0.55, 0.18, t);
+        armFwdAir = lerp(0.18, 0.30, t);
+      } else if (vy >= -2) {
+        const t = clamp((1 - vy) / 3, 0, 1);
+        armUpAir = lerp(0.18, 0.22, t);
+        armFwdAir = lerp(0.30, 0.38, t);
       } else {
-        const t = clamp((-vy - 1) / 6, 0, 1);
-        armUpAir = lerp(0.20, -0.10, t);
-        armFwdAir = lerp(0.35, 0.45, t);
+        const t = clamp((-vy - 2) / 7, 0, 1);
+        armUpAir = lerp(0.22, -0.08, t);
+        armFwdAir = lerp(0.38, 0.52, t);
       }
       handLX = sLX + this.facing * armFwdAir;
       handLY = sLY + armUpAir;
