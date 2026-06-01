@@ -46,6 +46,8 @@ const ANIM_DEFAULTS = {
   WALK_ARM_SWING: 1.2,    // arm counter-swing amplitude scale (bumped from 1.0)
   // Jump/land tunables
   TAKEOFF_CROUCH: 0.10,   // hip-dip depth on jump takeoff (legs pre-compress before stretch)
+  // Uppercut self-launch — attacker pops off the ground at the strike frame.
+  UPPERCUT_SELF_LAUNCH: 9.5,
 };
 const ANIM = (typeof window !== 'undefined')
   ? (window.__anim = Object.assign({}, ANIM_DEFAULTS, window.__anim || {}))
@@ -126,6 +128,9 @@ const LITE = [0.30, 0.65];
 const HVY  = [0.50, 0.72];
 // Launcher split — 55% windup / 20% strike / 25% recover
 const LAUN = [0.55, 0.75];
+// Charged heavy split — charge already did the anticipation; brief settle
+// then EXPLODE into the strike. 18% hold-the-load / 37% explosive strike / 45% recover.
+const HVY_CHARGED = [0.18, 0.55];
 
 function poseJab(rig, params) {
   // Fast straight — short snappy chamber, explosive centerline extension,
@@ -304,21 +309,53 @@ function poseSpinBack(rig, params) {
 }
 
 // Held cock-back pose while charging a ground heavy (no active move yet).
-// Loads the haymaker: rear fist drawn back + up behind the shoulder, torso
-// coiled away, lead hand guarding, legs braced wide and PLANTED. Builds with
-// chargeProgress; a faint tremble at full load sells the tension.
+// Direction-aware: matches the pre-load of whichever heavy will fire on release.
+//   chargeDirY > 0.4  → uppercut load (fist drops low, legs coil)
+//   chargeDirY < -0.4 → axe load (both hands raise overhead)
+//   else              → haymaker/forward load (fist cocks back + up)
+// Builds with chargeProgress; a faint tremble at full load sells the tension.
+// Legs stay planted-braced wide in all variants.
 function poseChargeWindup(rig, params) {
   const c = clamp(params.chargeProgress ?? 0, 0, 1);
   const tremble = c > 0.6 ? Math.sin((rig.t ?? 0) * 30) * (c - 0.6) * 0.07 : 0;
-  return {
-    armRX: 0.10 - 0.56 * c,          // rear fist cocks back behind the hip
-    armRY: -0.10 + 0.42 * c,         // and up behind the shoulder
-    armLX: -0.16,                    // lead guard at the chin
-    armLY: 0.10 + 0.12 * c,
-    leanZ: (-0.48 * c) + tremble,    // torso coils away, trembling at full load
-    legLX: -0.28, legLY: 0.0,        // braced wide stance, feet planted
-    legRX: 0.30,  legRY: 0.0,
-  };
+  const dirY = params.chargeDirY ?? 0;
+  // Planted wide brace — same in all variants.
+  const legLX = -0.28, legLY = 0.0, legRX = 0.30, legRY = 0.0;
+
+  if (dirY > 0.4) {
+    // UPPERCUT load: fist drops below hip (deep crouch-coil), guard up.
+    // Matches poseUppercut phase-0 end state so t=0 of that pose starts here.
+    return {
+      armRX: 0.10 - 0.02 * c,         // arm pulls slightly inward
+      armRY: -0.20 - 0.62 * c,        // fist drops well below hip (-0.82 at full)
+      armLX: -0.20 - 0.10 * c,        // guard stays up to protect
+      armLY: -0.25 + 0.45 * c,        // guard rises as right drops
+      leanZ: -0.55 * c + tremble,     // body dips into the coil
+      legLX, legLY, legRX, legRY,
+    };
+  } else if (dirY < -0.4) {
+    // AXE load: both hands raise overhead, slight back-lean.
+    // Matches poseAxe phase-0 end state.
+    return {
+      armRX: 0.10 + 0.08 * c,         // arms converge toward center as they rise
+      armRY: -0.20 + 1.10 * c,        // reaches overhead (0.90 at full)
+      armLX: -0.10 - 0.08 * c,
+      armLY: -0.20 + 1.10 * c,        // both hands overhead
+      leanZ: -0.30 * c + tremble,     // slight lean back to load the overhead
+      legLX, legLY, legRX, legRY,
+    };
+  } else {
+    // HAYMAKER/FORWARD load: rear fist cocks back + up, torso coils away.
+    // Matches poseBlowAway / poseCharge phase-0 end state.
+    return {
+      armRX: 0.10 - 0.64 * c,         // rear fist cocks back behind the hip (-0.54 at full)
+      armRY: -0.10 + 0.44 * c,        // and up behind the shoulder (0.34 at full)
+      armLX: -0.16,                   // lead guard at the chin
+      armLY: -0.10 + 0.36 * c,        // guard rises (0.26 at full)
+      leanZ: -0.58 * c + tremble,     // torso coils away, trembling at full load
+      legLX, legLY, legRX, legRY,
+    };
+  }
 }
 
 function poseBlowAway(rig, params) {
@@ -327,134 +364,149 @@ function poseBlowAway(rig, params) {
   // braced wide and planted the whole time (explicit leg targets → the
   // footShift slide is skipped); power comes from torso whip + weight
   // transfer, not a step.
+  // Phase-0 STARTS already loaded (matching charge windup end state) so
+  // there is no snap on release. HVY_CHARGED split: brief settle-into-load
+  // then explosive strike, then recover.
   const t = clamp(params.attackProgress ?? 0, 0, 1);
-  const ph = phaseSplit(t, ...HVY);
+  const ph = phaseSplit(t, ...HVY_CHARGED);
   // Planted wide brace throughout — feet do not translate.
   const legLX = -0.30, legLY = 0.0, legRX = 0.32, legRY = 0.0;
   let armRX, armRY, armLX, armLY, leanZ;
   if (ph.p === 0) {
-    // Wind back + up behind the hip, torso coils away, lead guard up.
-    armRX = lerp(0.10, -0.54, ph.e);
-    armRY = lerp(-0.10, 0.34, ph.e);   // cocked up-behind the shoulder
-    armLX = lerp(-0.16, -0.10, ph.e);  // lead guard near chin
-    armLY = lerp(-0.10, 0.26, ph.e);
-    leanZ = lerp(0, -0.58, ph.e);      // huge wind-back
+    // Phase 0: ALREADY loaded — settle briefly into the deep cock.
+    // Starts at charge end state, sinks slightly deeper into the load.
+    armRX = lerp(-0.54, -0.62, ph.e);  // already cocked back, settle deeper
+    armRY = lerp(0.34, 0.40, ph.e);    // fist rises higher behind the shoulder
+    armLX = lerp(-0.10, -0.08, ph.e);  // lead guard stays near chin
+    armLY = lerp(0.26, 0.28, ph.e);
+    leanZ = lerp(-0.58, -0.64, ph.e);  // torso fully coiled
   } else if (ph.p === 1) {
     // Explosive looping overhand: sweeps from behind, up, over, slams forward.
-    armRX = lerp(-0.54, 0.80, ph.e);   // big horizontal sweep
-    armRY = lerp(0.34, -0.08, ph.e);   // arcs over the top down to contact
-    armLX = lerp(-0.10, -0.30, ph.e);  // guard pulls tight to the body
-    armLY = lerp(0.26, 0.05, ph.e);
-    leanZ = lerp(-0.58, 0.66, ph.e);   // torso whips through the swing
+    armRX = lerp(-0.62, 0.82, ph.e);   // big explosive sweep from loaded state
+    armRY = lerp(0.40, -0.08, ph.e);   // arcs over the top down to contact
+    armLX = lerp(-0.08, -0.32, ph.e);  // guard pulls tight to the body
+    armLY = lerp(0.28, 0.05, ph.e);
+    leanZ = lerp(-0.64, 0.70, ph.e);   // torso whips through the full swing
   } else {
     // Heavy follow-through past contact, slow grounded settle.
-    armRX = lerp(0.80, 0.12, ph.e);
+    armRX = lerp(0.82, 0.12, ph.e);
     armRY = lerp(-0.08, -0.25, ph.e);
-    armLX = lerp(-0.30, -0.15, ph.e);
+    armLX = lerp(-0.32, -0.15, ph.e);
     armLY = lerp(0.05, -0.25, ph.e);
-    leanZ = lerp(0.66, 0.05, ph.e);
+    leanZ = lerp(0.70, 0.05, ph.e);
   }
   return { armRX, armRY, armLX, armLY, leanZ, legLX, legLY, legRX, legRY };
 }
 
 function poseUppercut(rig, params) {
-  // heavyUp launcher — drop into deep low coil (striking hand dips below hip),
-  // then ROCKET the fist up overhead on an arc, explode off rear foot.
+  // heavyUp launcher — charge already dipped into the deep low coil; this
+  // pose STARTS loaded (fist already below hip) then ROCKETS overhead.
+  // HVY_CHARGED: brief hold-the-load settle, then explosive vertical arc.
   const t = clamp(params.attackProgress ?? 0, 0, 1);
-  const ph = phaseSplit(t, ...LAUN);
+  const ph = phaseSplit(t, ...HVY_CHARGED);
   let armRX, armRY, armLX, armLY, leanZ, footShift;
   if (ph.p === 0) {
-    // Deep crouch-coil: fist drops ALL the way below hip level, body dips
-    armRX = lerp(0.10, 0.08, ph.e);    // arm moves inward as it drops
-    armRY = lerp(-0.20, -0.82, ph.e);  // fist BELOW hip — deepest coil (budget: |0.82|<0.95)
-    armLX = lerp(-0.20, -0.30, ph.e);  // guard stays up to protect
-    armLY = lerp(-0.25, 0.20, ph.e);   // guard rises as right drops
-    leanZ = lerp(0, -0.55, ph.e);      // body dips into the coil
-    footShift = lerp(0, -0.15, ph.e);  // rear foot loads
+    // Phase 0: ALREADY in deep coil (matching charge end state).
+    // Settle very slightly deeper to confirm the load.
+    armRX = lerp(0.08, 0.06, ph.e);    // arm slightly inward — already loaded
+    armRY = lerp(-0.82, -0.86, ph.e);  // fist at deepest point below hip
+    armLX = lerp(-0.30, -0.32, ph.e);  // guard stays up
+    armLY = lerp(0.20, 0.22, ph.e);    // guard risen
+    leanZ = lerp(-0.55, -0.58, ph.e);  // body fully coiled
+    footShift = lerp(-0.15, -0.18, ph.e); // rear foot at max load
   } else if (ph.p === 1) {
-    // ROCKET: fist arcs upward explosively — shoulder, elbow, fist all extend overhead
-    armRX = lerp(0.08, 0.30, ph.e);    // arm drives upward and slightly forward
-    armRY = lerp(-0.82, 0.76, ph.e);   // full vertical arc — floor to overhead (budget)
-    armLX = lerp(-0.30, -0.42, ph.e);  // left arm sweeps down as counterweight
-    armLY = lerp(0.20, -0.28, ph.e);   // drops hard to counterbalance the rocket
-    leanZ = lerp(-0.55, 0.20, ph.e);   // body extends upward with the punch
-    footShift = lerp(-0.15, 0.22, ph.e); // explode off rear foot
+    // ROCKET: fist explodes vertically from deep coil straight overhead.
+    // Budget note: overshoot e can reach ~1.16; target armRY=0.72 so
+    // overshoot peak stays under hypot budget. Still reads as a full launch.
+    armRX = lerp(0.06, 0.22, ph.e);    // arm drives up and slightly forward (reduced to keep budget)
+    armRY = lerp(-0.86, 0.72, ph.e);   // vertical ROCKET — floor to overhead, budget-safe
+    armLX = lerp(-0.32, -0.45, ph.e);  // left arm sweeps down as counterweight
+    armLY = lerp(0.22, -0.30, ph.e);   // drops hard to counterbalance the rocket
+    leanZ = lerp(-0.58, 0.22, ph.e);   // body uncurls with the launch
+    footShift = lerp(-0.18, 0.24, ph.e); // explode off rear foot
   } else {
-    // Settle: arm comes back down, body returns from extended stretch
-    armRX = lerp(0.38, 0.15, ph.e);
-    armRY = lerp(0.90, -0.22, ph.e);   // comes back down from overhead
-    armLX = lerp(-0.42, -0.18, ph.e);
-    armLY = lerp(-0.28, -0.22, ph.e);
-    leanZ = lerp(0.20, 0.05, ph.e);
-    footShift = lerp(0.22, 0, ph.e);
+    // Settle: arm comes back down from overhead, body returns
+    armRX = lerp(0.30, 0.15, ph.e);
+    armRY = lerp(0.85, -0.22, ph.e);   // comes back down from overhead
+    armLX = lerp(-0.45, -0.18, ph.e);
+    armLY = lerp(-0.32, -0.22, ph.e);
+    leanZ = lerp(0.22, 0.05, ph.e);
+    footShift = lerp(0.24, 0, ph.e);
   }
   return { armRX, armRY, armLX, armLY, leanZ, footShift };
 }
 
 function poseAxe(rig, params) {
-  // heavyDown overhead slam — both hands raise HIGH overhead (chamber up),
-  // then SLAM straight down past body centerline, body folds forward hard.
+  // heavyDown overhead slam — charge already raised both hands overhead;
+  // this pose STARTS loaded (hands already high) then SLAMS straight down.
+  // HVY_CHARGED: brief hold-the-overhead, then violent downward SLAM.
   const t = clamp(params.attackProgress ?? 0, 0, 1);
-  const ph = phaseSplit(t, ...HVY);
+  const ph = phaseSplit(t, ...HVY_CHARGED);
   let armRX, armRY, armLX, armLY, leanZ, footShift;
   if (ph.p === 0) {
-    // Raise up: both arms stretch overhead — as high as possible, lean back
-    armRX = lerp(0.10, 0.18, ph.e);    // arms converge toward center as they rise
-    armRY = lerp(-0.20, 0.90, ph.e);   // reaches maximum overhead height
-    armLX = lerp(-0.10, -0.18, ph.e);
-    armLY = lerp(-0.20, 0.90, ph.e);
-    leanZ = lerp(0, -0.30, ph.e);      // slight lean back to load the overhead
-    footShift = lerp(0, -0.10, ph.e);  // weight shifts back slightly
+    // Phase 0: ALREADY overhead (matching charge end state).
+    // Settle slightly higher/tighter to confirm the load.
+    armRX = lerp(0.18, 0.16, ph.e);    // arms already overhead, slight tighten
+    armRY = lerp(0.90, 0.92, ph.e);    // push a touch higher at max
+    armLX = lerp(-0.18, -0.16, ph.e);
+    armLY = lerp(0.90, 0.92, ph.e);
+    leanZ = lerp(-0.30, -0.33, ph.e);  // lean back fully loaded
+    footShift = lerp(-0.10, -0.12, ph.e);
   } else if (ph.p === 1) {
-    // SLAM: both arms drive straight down hard, body folds forward violently
-    armRX = lerp(0.18, 0.28, ph.e);    // slight outward flare as arms pass body
-    armRY = lerp(0.90, -0.55, ph.e);   // slams DOWN past hip level
-    armLX = lerp(-0.18, -0.25, ph.e);
-    armLY = lerp(0.90, -0.55, ph.e);
-    leanZ = lerp(-0.30, 0.65, ph.e);   // body folds HARD forward over the slam
-    footShift = lerp(-0.10, 0.15, ph.e); // body hunches forward
+    // SLAM: both arms drive straight down HARD, body folds forward violently.
+    // Bigger travel now that we start from full overhead.
+    armRX = lerp(0.16, 0.30, ph.e);    // slight outward flare as arms pass body
+    armRY = lerp(0.92, -0.55, ph.e);   // slams DOWN past hip level (full ~1.47 total)
+    armLX = lerp(-0.16, -0.28, ph.e);
+    armLY = lerp(0.92, -0.55, ph.e);
+    leanZ = lerp(-0.33, 0.70, ph.e);   // body folds HARD forward over the slam
+    footShift = lerp(-0.12, 0.16, ph.e);
   } else {
     // Heavy settle: arms hang low, body straightens slowly
-    armRX = lerp(0.28, 0.15, ph.e);
-    armRY = lerp(-0.55, -0.30, ph.e);  // arms stay low in settle
-    armLX = lerp(-0.25, -0.15, ph.e);
+    armRX = lerp(0.30, 0.15, ph.e);
+    armRY = lerp(-0.55, -0.30, ph.e);
+    armLX = lerp(-0.28, -0.15, ph.e);
     armLY = lerp(-0.55, -0.30, ph.e);
-    leanZ = lerp(0.65, 0.08, ph.e);    // gradually straightens (heavy settle)
-    footShift = lerp(0.15, 0, ph.e);
+    leanZ = lerp(0.70, 0.08, ph.e);    // gradually straightens
+    footShift = lerp(0.16, 0, ph.e);
   }
   return { armRX, armRY, armLX, armLY, leanZ, footShift };
 }
 
 function poseCharge(rig, params) {
-  // heavyForward lunge — wind striking arm back + load rear foot hard,
-  // then long lunging extension with big forward step. Covers distance.
+  // heavyForward lunge — charge already loaded the arm way back; pose STARTS
+  // loaded (arm already coiled behind) then LUNGES with bigger extension.
+  // HVY_CHARGED: brief settle-into-load, then explosive forward lunge.
+  // This move DOES cover distance — footShift is intentionally large here.
   const t = clamp(params.attackProgress ?? 0, 0, 1);
-  const ph = phaseSplit(t, ...HVY);
+  const ph = phaseSplit(t, ...HVY_CHARGED);
   let armRX, armRY, armLX, armLY, leanZ, footShift;
   if (ph.p === 0) {
-    // Load: striking arm retracts DEEP behind body, lead arm guards, weight loads rear
-    armRX = lerp(0.10, -0.60, ph.e);   // arm coils WAY back for lunge
-    armRY = lerp(-0.20, 0.42, ph.e);   // rises as it chambers
-    armLX = lerp(-0.20, 0.18, ph.e);   // lead guard pushes slightly forward
-    armLY = lerp(-0.20, 0.28, ph.e);
-    leanZ = lerp(0, -0.30, ph.e);      // body loads back before the lunge
-    footShift = lerp(0, -0.20, ph.e);  // rear foot loads HARD for the drive
+    // Phase 0: ALREADY loaded (matching charge end state).
+    // Settle deeper into the cock — arm goes even further back.
+    armRX = lerp(-0.54, -0.66, ph.e);  // already coiled, sink deeper
+    armRY = lerp(0.34, 0.46, ph.e);    // rises higher behind shoulder
+    armLX = lerp(-0.10, 0.20, ph.e);   // lead guard pushes forward (ready)
+    armLY = lerp(0.26, 0.30, ph.e);
+    leanZ = lerp(-0.58, -0.64, ph.e);  // torso fully coiled away
+    footShift = lerp(-0.20, -0.24, ph.e); // rear foot at max load
   } else if (ph.p === 1) {
-    // Lunge: body rockets forward, arm extends with full forward lean
-    armRX = lerp(-0.60, 0.82, ph.e);   // full extension — covers distance (budget)
-    armRY = lerp(0.42, -0.05, ph.e);   // drives forward-level
-    armLX = lerp(0.18, 0.30, ph.e);    // lead arm partially extends to guide direction
-    armLY = lerp(0.28, 0.10, ph.e);
-    leanZ = lerp(-0.30, 0.75, ph.e);   // massive forward lean — commits full body
-    footShift = lerp(-0.20, 0.38, ph.e); // long lunge step — biggest footShift
+    // LUNGE: body rockets forward from loaded state — bigger, faster arc.
+    // Budget: overshoot e ~1.16; armRX target 0.78 so peak stays under 1.0.
+    armRX = lerp(-0.66, 0.78, ph.e);   // massive extension from loaded state (budget-safe)
+    armRY = lerp(0.46, -0.05, ph.e);   // drives forward-level
+    armLX = lerp(0.20, 0.32, ph.e);    // lead arm partially extends to guide
+    armLY = lerp(0.30, 0.08, ph.e);
+    leanZ = lerp(-0.64, 0.80, ph.e);   // massive full-body commit (bigger than before)
+    footShift = lerp(-0.24, 0.44, ph.e); // long lunge step — biggest footShift
   } else {
     // Slow settle: over-extended, gradually pulls back
-    armRX = lerp(0.90, 0.15, ph.e);
+    armRX = lerp(0.82, 0.15, ph.e);
     armRY = lerp(-0.05, -0.25, ph.e);
-    armLX = lerp(0.30, -0.15, ph.e);
-    armLY = lerp(0.10, -0.22, ph.e);
-    leanZ = lerp(0.75, 0.10, ph.e);    // holds lean a bit (still weighted forward)
-    footShift = lerp(0.38, 0.08, ph.e);
+    armLX = lerp(0.32, -0.15, ph.e);
+    armLY = lerp(0.08, -0.22, ph.e);
+    leanZ = lerp(0.80, 0.10, ph.e);
+    footShift = lerp(0.44, 0.08, ph.e);
   }
   return { armRX, armRY, armLX, armLY, leanZ, footShift };
 }
@@ -462,22 +514,25 @@ function poseCharge(rig, params) {
 function poseCounterStance(rig, params) {
   // heavyBack — defensive read. Bladed stance, lead hand forward as a guard/parry,
   // weight back, subtle settle-bob. Should look like "bracing to counter," not a strike.
+  // Phase-0 STARTS from the cocked haymaker load (charge end state) and
+  // eases INTO the bladed guard — so there's no snap on release.
   const t = clamp(params.attackProgress ?? 0, 0, 1);
-  // Quick settle into stance (first 15% of duration), then hold + subtle bob
+  // Quick settle into stance (first 15% of duration), then hold + subtle bob.
+  // STARTS from haymaker load pose values, transitions into the bladed guard.
   const settle = Math.min(1, t / 0.15);
   // Subtle breathing bob through hold — reads as alert, not frozen
   const holdPhase = Math.max(0, t - 0.15) / 0.85;
   const bob = Math.sin(holdPhase * Math.PI * 2.5) * 0.04 * settle;
-  // Bladed stance: lead arm extends as a parry/ward, rear arm cocks back at hip
-  // Lead arm (left arm in facing-right convention = armLX) pushes out as guard
-  const armRX = lerp(0.12, -0.42, settle) + bob * 0.08; // rear arm cocked at hip
-  const armRY = lerp(-0.20, 0.22, settle) + bob;         // slightly raised (ready)
-  const armLX = lerp(-0.20, 0.45, settle) - bob * 0.05; // lead guard pushes forward
-  const armLY = lerp(-0.25, 0.35, settle) + bob;         // guard at head level (parry)
-  // Bladed stance leans weight back
-  const leanZ = lerp(0, -0.38, settle) + bob * 0.06;
+  // FROM: haymaker charge end state (armRX=-0.54, armRY=0.34, leanZ=-0.58)
+  // TO:   bladed guard (rear arm cocked at hip, lead guard forward, lean back)
+  const armRX = lerp(-0.54, -0.42, settle) + bob * 0.08; // ease from charge cock into guard
+  const armRY = lerp(0.34, 0.22, settle)  + bob;          // ease from high-behind into ready
+  const armLX = lerp(-0.16, 0.45, settle) - bob * 0.05;  // lead guard pushes forward
+  const armLY = lerp(0.26, 0.35, settle)  + bob;          // guard rises to head level (parry)
+  // Bladed stance leans weight back (charge was also leaning back, so small delta)
+  const leanZ = lerp(-0.58, -0.38, settle) + bob * 0.06;
   // Slight foot shift back (weight back for counter)
-  const footShift = lerp(0, -0.12, settle);
+  const footShift = lerp(-0.20, -0.12, settle);
   return { armRX, armRY, armLX, armLY, leanZ, footShift };
 }
 

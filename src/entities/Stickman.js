@@ -1188,6 +1188,7 @@ export class Stickman {
     this.parryRecoverUntil = 0;
     this._attackBuffer = 0;
     this.attackCooldown = 0;
+    this._pendingSelfLaunch = false;
   }
 
   _fireMove(id) {
@@ -1203,6 +1204,10 @@ export class Stickman {
     this.kicking = (id === 'knee'
                     || id === 'airHeavyN' || id === 'airHeavyD' || id === 'slideKick');
     this._attackStep = (id === 'jab') ? 0 : (id === 'cross') ? 1 : 2;
+
+    // heavyUp self-launch: pop the attacker off the ground at the strike frame
+    // so they rise with the victim and can follow up with aerial moves.
+    this._pendingSelfLaunch = (id === 'heavyUp');
 
     // Per-move startup impulses.
     if (id === 'heavyForward') {
@@ -1280,6 +1285,16 @@ export class Stickman {
     if (m.radius <= 0 || m.dmg === 0) return;
 
     const phase = 1 - this.attackTimer / m.dur;
+
+    // heavyUp self-launch: pop attacker off the ground at the strike frame
+    // so they rise with the launched victim and can aerial-follow-up.
+    if (this._pendingSelfLaunch && id === 'heavyUp' && phase >= m.activeStart) {
+      this._pendingSelfLaunch = false;
+      const SELF_LAUNCH_VY = (window.__anim?.UPPERCUT_SELF_LAUNCH ?? 9.5);
+      this.body.velocity.y = Math.max(this.body.velocity.y, SELF_LAUNCH_VY);
+      this.grounded = false;
+    }
+
     if (phase < m.activeStart || phase > m.activeEnd) return;
 
     const tNow = performance.now();
