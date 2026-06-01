@@ -60,7 +60,7 @@ export class Sword extends Weapon {
           if (dx * dx + dy * dy < 0.95 * 0.95) {
             p.takeDamage(30, {
               attacker: this.holder, weapon: 'sword',
-              kb: { x: this.holder.facing * 14, y: 7 }, stun: 0.3,
+              kb: { x: this.holder.facing * 9, y: 5 }, stun: 0.3,
             });
             this.hits.add(p.id);
             this.game.fx.particles.blood(p.position.x, p.position.y + 0.5, 0, this.holder.facing, 0.5);
@@ -113,7 +113,7 @@ export class Bat extends Weapon {
           if (dx * dx + dy * dy < 1.0 * 1.0) {
             p.takeDamage(24, {
               attacker: this.holder, weapon: 'bat',
-              kb: { x: this.holder.facing * 22, y: 12 }, stun: 0.4,
+              kb: { x: this.holder.facing * 14, y: 8 }, stun: 0.4,
             });
             this.hits.add(p.id);
             audio.bonk();
@@ -179,7 +179,7 @@ export class Longsword extends Weapon {
           if (dx * dx + dy * dy < 1.25 * 1.25) {
             p.takeDamage(42, {
               attacker: this.holder, weapon: 'longsword',
-              kb: { x: this.holder.facing * 17, y: 8 }, stun: 0.35,
+              kb: { x: this.holder.facing * 11, y: 6 }, stun: 0.35,
             });
             this.hits.add(p.id);
             this.game.fx.particles.blood(p.position.x, p.position.y + 0.5, 0, this.holder.facing, 0.5);
@@ -243,7 +243,7 @@ export class Mace extends Weapon {
           if (dx * dx + dy * dy < 0.9 * 0.9) {
             p.takeDamage(40, {
               attacker: this.holder, weapon: 'mace',
-              kb: { x: this.holder.facing * 26, y: 14 }, stun: 0.5,
+              kb: { x: this.holder.facing * 17, y: 9 }, stun: 0.5,
             });
             this.hits.add(p.id);
             audio.bonk();
@@ -305,7 +305,7 @@ export class WarHammer extends Weapon {
           if (dx * dx + dy * dy < 1.05 * 1.05) {
             p.takeDamage(60, {
               attacker: this.holder, weapon: 'hammer',
-              kb: { x: this.holder.facing * 32, y: 18 }, stun: 0.7,
+              kb: { x: this.holder.facing * 20, y: 11 }, stun: 0.7,
             });
             this.hits.add(p.id);
             audio.bonk(); audio.bonk();
@@ -373,7 +373,7 @@ export class Halberd extends Weapon {
           if (dx * dx + dy * dy < 1.4 * 1.4) {
             p.takeDamage(38, {
               attacker: this.holder, weapon: 'halberd',
-              kb: { x: this.holder.facing * 15, y: 7 }, stun: 0.3,
+              kb: { x: this.holder.facing * 10, y: 5 }, stun: 0.3,
             });
             this.hits.add(p.id);
             this.game.fx.particles.blood(p.position.x, p.position.y + 0.5, 0, this.holder.facing, 0.5);
@@ -1494,7 +1494,7 @@ export class SniperRifle extends Weapon {
             const overkill = (sm.maxHealth ?? 100) + (sm.maxArmor ?? 0) + 200;
             sm.takeDamage(overkill, {
               attacker: player, weapon: 'sniper-head',
-              kb: { x: ax * 18, y: 10 + Math.abs(ay) * 4 }, stun: 0.6,
+              kb: { x: ax * 12, y: 7 + Math.abs(ay) * 3 }, stun: 0.6,
             });
             this.game.fx.particles.blood?.(hp.x, hp.y, 0, ax >= 0 ? 1 : -1, 1.4);
             this.game.fx.particles.burst(hp.x, hp.y, 0, { count: 32, speed: 14, color: 0xff2244 });
@@ -1505,7 +1505,7 @@ export class SniperRifle extends Weapon {
           } else {
             sm.takeDamage(85, {
               attacker: player, weapon: 'sniper',
-              kb: { x: ax * 14, y: 6 + Math.abs(ay) * 4 }, stun: 0.4,
+              kb: { x: ax * 10, y: 4 + Math.abs(ay) * 3 }, stun: 0.4,
             });
             this.game.fx.particles.blood?.(hp.x, hp.y, 0, ax >= 0 ? 1 : -1, 0.8);
           }
@@ -1965,7 +1965,7 @@ export class HulkHands extends Weapon {
           if (dx * dx + dy * dy < radius * radius) {
             p.takeDamage(45, {
               attacker: this.holder, weapon: 'hulk',
-              kb: { x: this.holder.facing * 38, y: 14 }, stun: 0.45,
+              kb: { x: this.holder.facing * 24, y: 10 }, stun: 0.45,
             });
             this.hits.add(p.id);
             audio.bonk();
@@ -2107,7 +2107,7 @@ export class RubberChicken extends Weapon {
             // huge knockback, low damage — comedy weapon
             p.takeDamage(2, {
               attacker: this.holder, weapon: 'chicken',
-              kb: { x: this.holder.facing * 30, y: 18 }, stun: 0.5,
+              kb: { x: this.holder.facing * 19, y: 11 }, stun: 0.5,
             });
             this.hits.add(p.id);
             this.game.fx.particles.burst(p.position.x, p.position.y, 0, { count: 16, speed: 7, color: 0xffeecc });
@@ -2198,7 +2198,7 @@ export class FishSlap extends Weapon {
           if (dx * dx + dy * dy < 0.9 * 0.9) {
             p.takeDamage(10, {
               attacker: this.holder, weapon: 'fish',
-              kb: { x: this.holder.facing * 16, y: 9 }, stun: 0.35,
+              kb: { x: this.holder.facing * 11, y: 6 }, stun: 0.35,
             });
             this.hits.add(p.id);
             audio.beep(220, 0.08, 'sine', 0.2);
@@ -2466,7 +2466,7 @@ export class Lightsaber extends Weapon {
           if (dx * dx + dy * dy < 1.1 * 1.1) {
             p.takeDamage(48, {
               attacker: this.holder, weapon: 'saber',
-              kb: { x: this.holder.facing * 16, y: 8 }, stun: 0.3,
+              kb: { x: this.holder.facing * 11, y: 6 }, stun: 0.3,
             });
             this.hits.add(p.id);
             this.game.fx.particles.burst(p.position.x, p.position.y + 0.4, 0, { count: 12, speed: 6, color: this.bladeColor });
@@ -2540,7 +2540,7 @@ export class FlameSword extends Weapon {
           if (dx * dx + dy * dy < 1.1 * 1.1) {
             p.takeDamage(40, {
               attacker: this.holder, weapon: 'flame',
-              kb: { x: this.holder.facing * 18, y: 9 }, stun: 0.35,
+              kb: { x: this.holder.facing * 12, y: 6 }, stun: 0.35,
             });
             // Burn DoT — apply via repeated small ticks
             p._burnUntil = performance.now() + 2500;
