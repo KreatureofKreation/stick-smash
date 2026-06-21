@@ -283,10 +283,8 @@ export class Stickman {
     this.superPunchUntil = 0;
     this.timeSlowUntil = 0;
     this.gumGumUntil = 0;
-    this._burnUntil = 0;
-    this._burnTickAt = 0;
-    this._burnSrc = null;
     this._frozenUntil = 0;
+    this._freezeImmuneUntil = 0;  // anti-permafreeze cooldown
 
     // Misc visuals
     this._handAnchorWorld = new THREE.Vector3();
@@ -923,7 +921,7 @@ export class Stickman {
   _tickShield(dt) {
     const canBlock = this.state === STATE.ACTIVE && this.hitstun <= 0 && !this.grabbing
       && this.attackTimer <= 0 && !this.climbing && (this.weapon?.swingTimer ?? 0) <= 0
-      && !this.charging;
+      && !this.charging && performance.now() >= this._frozenUntil;
     const want = !!this.input.special && canBlock && !this._shieldBroken && this._shieldMeter > 0;
     if (want) {
       if (!this._blocking) { this._blocking = true; this._blockRaisedAt = performance.now(); audio.block?.(); }
@@ -1944,15 +1942,27 @@ export class Stickman {
       return;
     }
 
-    // Burn DoT — applied by Flamethrower cone or FirePatch ground fire.
+    // Burn DoT — the ONE fire system (flamethrower, fire sword, fire patches all
+    // route here via applyBurn). Pure damage: NO knockback, NO stun — so burning
+    // never pins or lifts the victim (the old bug). Flames render the effect.
     if (this._burnDoT && this.alive) {
       this._burnDoT.remaining -= dt;
+      // NO kb/stun key at all — passing kb:{0,0} would call applyKnockback and
+      // zero the victim's velocity every tick, pinning them mid-air (the old
+      // "stuck + slowly lifted" bug). Burn is pure damage; victim keeps control.
       this.takeDamage(this._burnDoT.dmgPerSec * dt, {
-        attacker: this._burnDoT.attacker,
-        weapon: 'fire',
-        kb: { x: 0, y: 0 },
-        stun: 0,
+        attacker: this._burnDoT.attacker, weapon: 'fire',
       });
+      this._burnFxAccum = (this._burnFxAccum || 0) + dt;
+      if (this._burnFxAccum > 0.05 && this.game?.fx) {
+        this._burnFxAccum = 0;
+        this.game.fx.particles.spark.spawn({
+          x: this.position.x + (Math.random() - 0.5) * 0.4,
+          y: this.position.y + Math.random() * 0.8, z: 0,
+          vx: rand(-0.5, 0.5), vy: rand(2, 4), life: 0.4, size: 0.18,
+          color: rand() < 0.5 ? 0xff5500 : 0xffaa33, gravity: -2, drag: 0.7, shrink: 1,
+        });
+      }
       if (this._burnDoT.remaining <= 0) this._burnDoT = null;
     }
 
@@ -1960,21 +1970,6 @@ export class Stickman {
     if (this.hitstun > 0) { this.hitstun -= dt; }
     if (this.climbCooldown > 0) this.climbCooldown -= dt;
     this.flashAmount = damp(this.flashAmount, 0, 0.001, dt);
-
-    // Burn DoT
-    const tNow = performance.now();
-    if (tNow < this._burnUntil) {
-      if (tNow - this._burnTickAt > 350) {
-        this._burnTickAt = tNow;
-        this.takeDamage(5, { attacker: this._burnSrc, weapon: 'flame' });
-        if (this.game?.fx) this.game.fx.particles.spark.spawn({
-          x: this.position.x + (Math.random() - 0.5) * 0.4,
-          y: this.position.y + Math.random() * 0.6,
-          z: 0, vx: 0, vy: rand(2, 4), life: 0.5, size: 0.18,
-          color: rand() < 0.5 ? 0xff5500 : 0xffaa33, gravity: -2, drag: 0.7, shrink: 1,
-        });
-      }
-    }
 
     this.prevGrounded = this.grounded;
     this._updateGroundCheck();
@@ -1996,6 +1991,14 @@ export class Stickman {
           audio.jump();
         }
       }
+    } else if (this.hitstun <= 0 && frozen) {
+      // Frozen solid (Ice Sword) — locked in place, no actions. Physics can
+      // still shove the ice block around, but no self-movement.
+      this.body.velocity.x *= 0.5;
+      if (this.game?.fx && Math.random() < 0.3) this.game.fx.particles.spark.spawn({
+        x: this.position.x + (Math.random() - 0.5) * 0.5, y: this.position.y + Math.random() * 1.0,
+        z: 0, vx: 0, vy: 0.5, life: 0.5, size: 0.12, color: 0xbfeaff, gravity: 0, drag: 0.9, shrink: 1,
+      });
     } else if (this.hitstun <= 0) {
       this._move(dt);
 

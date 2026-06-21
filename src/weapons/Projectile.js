@@ -15,6 +15,7 @@ export class Projectile {
     this.kb = opts.kb ?? { x: 0, y: 0 };
     this.owner = opts.owner ?? null;
     this.onHit = opts.onHit ?? null;
+    this.noPush = opts.noPush ?? false;   // ignite-only (no damage/kb/push)
     this.explosive = opts.explosive ?? false;
     this.explodeOnContact = opts.explodeOnContact ?? false;
     this.tracerColor = opts.tracerColor ?? 0xffcc33;
@@ -57,6 +58,10 @@ export class Projectile {
     this.body.position.set(opts.x, opts.y, opts.z ?? 0);
     this.body.velocity.set(opts.vx, opts.vy, 0);
     this.body.userData = { kind: 'projectile', proj: this };
+    // noPush: detect collisions (onHit still fires) but apply NO physical
+    // response — so a stream of flames ignites without shoving/lifting the
+    // victim (fixes the "stuck + slowly lifted" fire bug).
+    if (opts.noPush) this.body.collisionResponse = false;
     game.physics.add(this.body);
     game.registerProjectile(this);
     this.gravityScale = opts.gravityScale ?? (this.gravity ? 1 : 0);
@@ -127,7 +132,7 @@ export class Projectile {
       if (sm && sm !== this.owner && sm.alive && sm._shieldBlocks?.(this.body.position.x, this.body.position.y)) {
         this._deflectOff(sm); return;
       }
-      if (sm && sm !== this.owner && sm.alive && sm.invuln <= 0) {
+      if (sm && sm !== this.owner && sm.alive && sm.invuln <= 0 && !this.noPush) {
         // Head detection from projectile-vs-player body positions. The
         // cannon-shim doesn't supply a usable contact-point delta, so we
         // approximate: if the projectile's body Y is above the player's
@@ -322,6 +327,14 @@ export class Projectile {
       if (!pbody) continue;
       // Block shield deflects before any damage.
       if (player._shieldBlocks?.(p.x, p.y)) { this._deflectOff(player); break; }
+      // noPush (flames): ignite only — fire onHit, no damage/kb, then die.
+      if (this.noPush) {
+        const px = pbody.position.x, py = pbody.position.y;
+        if (segmentVsCapsule(this._sweepFrom, sweepTo, { x: px, y: py - 0.30 }, { x: px, y: py + 0.55 }, 0.34)) {
+          this.onHit?.(this, pbody); this._hitPlayers.add(player); this._pendingDestroy = true; break;
+        }
+        continue;
+      }
       if (player.invuln > 0) continue;
       const px = pbody.position.x;
       const py = pbody.position.y;
