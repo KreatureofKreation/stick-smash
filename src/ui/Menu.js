@@ -701,30 +701,28 @@ export class Menu {
       this._lobby();
       return;
     }
-    // Real lobby update: store the latest data and re-render.
-    if (this.game._lobbyRoster !== undefined || this._currentScreen === 'lobby') {
-      this.game._lobbyRoster = roster;
-      if (isHost !== undefined) this.game._lobbyIsHost = isHost;
-      if (code !== undefined) this.game._lobbyCode = code;
-      if (levelId !== undefined) { this.game.levelId = levelId; this.level = levelId; }
-      if (this._currentScreen === 'lobby') {
-        // Re-render the player list in place to avoid full DOM rebuild.
-        const container = this.root.querySelector('#lobby-players');
-        if (container) {
-          const playerRows = roster.map(p => {
-            const char = p.character || {};
-            const hex = '#' + ((char.primary || 0x888888).toString(16).padStart(6, '0'));
-            const readyIcon = p.ready ? '<span style="color:#66e2a3;font-weight:700">READY</span>' : '<span style="opacity:0.5">&#9633;</span>';
-            const hostBadge = p.isHost ? ' <span style="font-size:11px;opacity:0.6">(HOST)</span>' : '';
-            return `<div class="player-row" style="gap:10px;">
-              <div class="swatch" style="--c:${hex}"></div>
-              <strong style="color:${hex}">${(p.name || 'P').slice(0, 10)}</strong>${hostBadge}
-              <span style="margin-left:auto">${readyIcon}</span>
-            </div>`;
-          }).join('');
-          container.innerHTML = playerRows || '<p style="opacity:0.5">Waiting for players...</p>';
-        }
-      }
+    // Always store the latest roster data so other code can read it.
+    this.game._lobbyRoster = roster;
+    if (isHost !== undefined) this.game._lobbyIsHost = isHost;
+    if (code !== undefined) this.game._lobbyCode = code;
+    if (levelId !== undefined) { this.game.levelId = levelId; this.level = levelId; }
+    // Only re-render the DOM when the lobby screen is actually showing.
+    if (this._currentScreen !== 'lobby') return;
+    // Re-render the player list in place to avoid full DOM rebuild.
+    const container = this.root.querySelector('#lobby-players');
+    if (container) {
+      const playerRows = roster.map(p => {
+        const char = p.character || {};
+        const hex = '#' + ((char.primary || 0x888888).toString(16).padStart(6, '0'));
+        const readyIcon = p.ready ? '<span style="color:#66e2a3;font-weight:700">READY</span>' : '<span style="opacity:0.5">&#9633;</span>';
+        const hostBadge = p.isHost ? ' <span style="font-size:11px;opacity:0.6">(HOST)</span>' : '';
+        return `<div class="player-row" style="gap:10px;">
+          <div class="swatch" style="--c:${hex}"></div>
+          <strong style="color:${hex}">${(p.name || 'P').slice(0, 10)}</strong>${hostBadge}
+          <span style="margin-left:auto">${readyIcon}</span>
+        </div>`;
+      }).join('');
+      container.innerHTML = playerRows || '<p style="opacity:0.5">Waiting for players...</p>';
     }
   }
 

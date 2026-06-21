@@ -229,7 +229,6 @@ export class Game {
         });
       } catch (_) {}
     }
-    this._startCountdown();
   }
 
   // === Match start variants ===

@@ -7,7 +7,8 @@
 // and becomes the HOST. First arrival hosts; everyone after joins them.
 //
 // Drop-in: host spawns each new peer into the LIVE match the moment the
-// peer says hello. No lobby, no "press Start", no room codes typed.
+// peer says hello. This is the DEFAULT path (Quick Play). A room-code lobby
+// with ready-up (Create/Join Room) is ALSO available when opts.lobby=true.
 //
 // Room-code lobby (NEW): pass opts.lobby=true + opts.code to enter a
 // pre-match lobby instead of immediately starting. Host broadcasts
@@ -146,6 +147,15 @@ export class Net {
     if (this._intentionalDisconnect) return;
     if (this._migrating) return;
     this._migrating = true;
+    // If the host dropped while we were still in the lobby (match never started),
+    // just return to the main menu — don't auto-reconnect into a new host lobby.
+    if (this._lobby) {
+      this._migrating = false;
+      this._lobby = false;
+      try { this.game.lobbyActive = false; } catch (_) {}
+      try { this.game.menu.show('main'); } catch (_) {}
+      return;
+    }
     // Tear down match — we're either reconnecting or becoming the new host.
     try { this.game.endMatch(); } catch (_) {}
     // Random jitter so multiple displaced clients don't all race to claim
@@ -338,6 +348,8 @@ export class Net {
     const slot = this.connections.get(conn.peer);
     if (!slot) return;
     if (data.t === 'hello') {
+      // Defensive guard: if slot is already onboarded (playerId set), ignore duplicate hellos.
+      if (slot.playerId != null) return;
       slot.name = (data.name || 'P').slice(0, 10);
       slot.character = rosterById(data.character || 'bolt');
       if (this._lobby && !this.game.running) {
