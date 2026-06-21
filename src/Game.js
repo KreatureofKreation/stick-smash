@@ -1025,6 +1025,7 @@ export class Game {
         gd: p.grounded ? 1 : 0,
         sl: p.sliding ? 1 : 0,
         cr: p.crouching ? 1 : 0,
+        bk: p._blocking ? 1 : 0, sdx: p._shieldDirX, sdy: p._shieldDirY,
       } : null),
       // Only ship damaged tiles (hp < maxHp) instead of every tile.
       // Cuts payload from ~hundreds of entries to whatever is broken.
@@ -1102,6 +1103,8 @@ export class Game {
       p.sliding = !!sp.sl;
       p.crouching = !!sp.cr;
       p.grounded = sp.gd != null ? !!sp.gd : Math.abs(sp.vy) < 0.5;
+      p._blocking = !!sp.bk;
+      if (sp.sdx != null) { p._shieldDirX = sp.sdx; p._shieldDirY = sp.sdy; }
     }
     // BUG 2: destroy ghost players when host roster shrinks.
     for (let i = snap.players.length; i < this.players.length; i++) {

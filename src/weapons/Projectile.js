@@ -89,6 +89,31 @@ export class Projectile {
     this._hitPlayers = new Set();
   }
 
+  // Block-shield deflection: bounce the projectile back at whoever fired it and
+  // hand ownership to the blocker so the original shooter can now be hit.
+  _deflectOff(blocker) {
+    const v = this.body.velocity;
+    let vx = -v.x, vy = -v.y;
+    const shooter = this.owner;
+    if (shooter?.body) {
+      const dx = shooter.body.position.x - this.body.position.x;
+      const dy = shooter.body.position.y - this.body.position.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const sp = Math.max(14, Math.hypot(v.x, v.y));
+      vx = (dx / d) * sp; vy = (dy / d) * sp;
+    }
+    this.body.velocity.set(vx, vy, 0);
+    this.owner = blocker;
+    this._hitPlayers?.clear();
+    this._sweepFrom = { x: this.body.position.x, y: this.body.position.y };
+    if (blocker._shieldMeter != null) blocker._shieldMeter = Math.max(0, blocker._shieldMeter - 0.18);
+    if (this.game?.fx) {
+      this.game.fx.particles.burst(this.body.position.x, this.body.position.y, 0, { count: 8, speed: 8, color: 0x99e0ff });
+      this.game.fx.camera?.punch?.(0.12);
+    }
+    try { audio.block?.(); } catch (_) {}
+  }
+
   _impact(other, contact) {
     if (this.dead || this._pendingExplode || this._pendingDestroy || this.stuck || this._pendingStick) return;
     let hitPlayer = null;
@@ -98,6 +123,10 @@ export class Projectile {
       // skip the cannon-es path's damage application — otherwise we'd
       // double-apply on a fast projectile that both swept-hit and contact-hit.
       if (this._hitPlayers?.has(sm)) return;
+      // Block shield deflects the projectile back at the shooter.
+      if (sm && sm !== this.owner && sm.alive && sm._shieldBlocks?.(this.body.position.x, this.body.position.y)) {
+        this._deflectOff(sm); return;
+      }
       if (sm && sm !== this.owner && sm.alive && sm.invuln <= 0) {
         // Head detection from projectile-vs-player body positions. The
         // cannon-shim doesn't supply a usable contact-point delta, so we
@@ -288,10 +317,12 @@ export class Projectile {
     const sweepTo = { x: p.x, y: p.y };
     for (const player of this.game.players) {
       if (!player || !player.alive || player === this.owner) continue;
-      if (player.invuln > 0) continue;
       if (this._hitPlayers.has(player)) continue;
       const pbody = player.body;
       if (!pbody) continue;
+      // Block shield deflects before any damage.
+      if (player._shieldBlocks?.(p.x, p.y)) { this._deflectOff(player); break; }
+      if (player.invuln > 0) continue;
       const px = pbody.position.x;
       const py = pbody.position.y;
       // Head capsule: top of player body (y+0.45 to y+0.65), r=0.18.
