@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import * as CANNON from 'cannon-es';
 import { COL_GROUPS } from '../physics/PhysicsWorld.js';
 import { audio } from '../audio/Audio.js';
@@ -177,6 +178,11 @@ export class Tile {
       for (const c of cs.constraints) this.level.physics.removeConstraint(c);
       cs.constraints.length = 0;
       for (const seg of cs.segs) seg.destroy();
+      // Merged chain visuals.
+      for (const cm of (cs.chainMeshes ?? [])) {
+        if (cm.parent) cm.parent.remove(cm);
+        cm.geometry?.dispose(); cm.material?.dispose();
+      }
       // Both end anchors (bodies + eye-bolt meshes).
       for (const ab of (cs.anchorBodies ?? [cs.anchorBody])) if (ab) this.level.physics.remove(ab);
       for (const am of (cs.anchorMeshes ?? [cs.anchorMesh])) if (am?.parent) am.parent.remove(am);
@@ -895,15 +901,14 @@ export class Level {
   // link is destroyed, every constraint on the chain dissolves AND the tile
   // is converted to a dynamic body so it falls.
   // Suspend a single rigid platform by a chain at EACH END from a crossbar at
-  // spec.y. The tile body is built DYNAMIC + fixedRotation + heavy/damped (see
-  // Tile.build, `suspend` path) so the two rigid chains hold it taut and level
-  // with almost no give — chains don't stretch. Each chain anchors straight
-  // above its end so the rest position equals the designed spot (no inward
-  // collapse). Severing any chain seg drops the slab (ChainSeg.onBreak).
+  // spec.y. The platform is held by a RIGID direct tether (anchor → platform
+  // end), NOT through the chain links — so it can't stretch or sag: a chain of
+  // soft joints bearing the slab + a standing player is what made the old links
+  // pull apart. Each chain is instead ONE taut, static visual: many small
+  // interlocking links merged into a single mesh, never separating, plus one
+  // thin hit-box so shooting anywhere on the chain severs it and drops the slab.
   _suspendTile(tile, spec) {
     if (!tile.body) return;
-    const segCount = Math.max(3, spec.segs ?? 5);
-    const segR = 0.09;
     const tx = tile.body.position.x, ty = tile.body.position.y;
     const top = ty + tile.h / 2;
     const anchorY = spec.y;
@@ -916,12 +921,11 @@ export class Level {
     const constraints = [];
     const anchorBodies = [];
     const anchorMeshes = [];
+    const chainMeshes = [];
 
     for (const ex of ends) {
-      const colX = tx + ex;                  // chain hangs straight down to here
-      const attachLocal = new CANNON.Vec3(ex, tile.h / 2, 0); // tile-local end pivot
-      const dist = Math.max(0.5, anchorY - top);
-      const segLen = dist / segCount;
+      const colX = tx + ex;                  // chain runs straight up from here
+      const dist = Math.max(0.4, anchorY - top);
 
       const anchorBody = new CANNON.Body({
         mass: 0, type: CANNON.Body.STATIC,
@@ -933,7 +937,7 @@ export class Level {
 
       // Small eye-bolt block at the crossbar.
       const anchorMesh = new THREE.Mesh(
-        new THREE.BoxGeometry(0.34, 0.18, 0.3),
+        new THREE.BoxGeometry(0.3, 0.16, 0.28),
         new THREE.MeshLambertMaterial({ color: 0x20222a }),
       );
       anchorMesh.position.set(colX, anchorY, 0);
@@ -941,79 +945,70 @@ export class Level {
       this.scene.add(anchorMesh);
       anchorMeshes.push(anchorMesh);
 
-      let prevBody = anchorBody;
-      let prevPivot = new CANNON.Vec3(0, 0, 0);
-      const chainSegs = [];
-
-      for (let i = 0; i < segCount; i++) {
-        const segBody = new CANNON.Body({
-          mass: 0.6,
-          material: this.physics.materials.prop,
-          linearDamping: 0.4, angularDamping: 0.7,
-          collisionFilterGroup: COL_GROUPS.CHAIN,
-          collisionFilterMask: COL_GROUPS.PROJECTILE | COL_GROUPS.HAZARD,
-        });
-        segBody.addShape(new CANNON.Sphere(segR));
-        segBody.position.set(colX, anchorY - (i + 0.5) * segLen, 0);
-        this.physics.add(segBody);
-
-        const segMesh = this._makeChainLink(segLen, i);
-        segMesh.position.copy(segBody.position);
-        this.scene.add(segMesh);
-
-        const seg = new ChainSeg(this, segBody, segMesh, spec.hp ?? 22);
-        this._chainSegs.add(seg);
-        seg.onBreak = () => this._dropSuspendedTile(tile);
-        chainSegs.push(seg);
-        segs.push(seg);
-
-        const c = new CANNON.PointToPointConstraint(
-          prevBody, prevPivot,
-          segBody, new CANNON.Vec3(0, segLen / 2, 0),
-        );
-        this.physics.world.addConstraint(c);
-        seg.constraints.push(c);
-        if (chainSegs.length > 1) chainSegs[chainSegs.length - 2].constraints.push(c);
-        constraints.push(c);
-
-        prevBody = segBody;
-        prevPivot = new CANNON.Vec3(0, -segLen / 2, 0);
-      }
-
-      // Last seg → this end of the platform.
-      const cTile = new CANNON.PointToPointConstraint(
-        prevBody, prevPivot,
-        tile.body, attachLocal,
+      // RIGID load-bearing tether: pin the platform end straight below the
+      // anchor at the fixed chain length. The platform is fixedRotation so its
+      // local axes == world; the local pivot is just the world offset from the
+      // tile centre to the anchor. One per end → the slab is fully fixed (taut,
+      // level, zero stretch) yet still drops when a chain is cut below.
+      const tether = new CANNON.PointToPointConstraint(
+        anchorBody, new CANNON.Vec3(0, 0, 0),
+        tile.body, new CANNON.Vec3(ex, anchorY - ty, 0),
       );
-      this.physics.world.addConstraint(cTile);
-      chainSegs[chainSegs.length - 1].constraints.push(cTile);
-      constraints.push(cTile);
+      this.physics.world.addConstraint(tether);
+      constraints.push(tether);
+
+      // Visual chain: one merged mesh of many small interlocking links along the
+      // taut line. Static (the slab barely moves) → never comes apart.
+      const geo = this._buildChainGeo(dist);
+      const mat = new THREE.MeshLambertMaterial({ color: 0x8a909e, emissive: 0x14161c, emissiveIntensity: 0.45 });
+      const chainMesh = new THREE.Mesh(geo, mat);
+      chainMesh.position.set(colX, top, 0);   // geo built from y=0 (platform top) upward
+      chainMesh.updateMatrix(); chainMesh.matrixAutoUpdate = false;
+      this.scene.add(chainMesh);
+      chainMeshes.push(chainMesh);
+
+      // One thin static hit-box spanning the chain — shoot anywhere on it to
+      // cut. Invisible (the merged mesh is the visual); ChainSeg drives the
+      // damage/break. Breaking → drop the slab + snap both chains.
+      const hitBody = new CANNON.Body({
+        mass: 0, type: CANNON.Body.STATIC,
+        collisionFilterGroup: COL_GROUPS.CHAIN,
+        collisionFilterMask: COL_GROUPS.PROJECTILE | COL_GROUPS.HAZARD,
+      });
+      hitBody.addShape(new CANNON.Box(new CANNON.Vec3(0.16, dist / 2, 0.16)));
+      hitBody.position.set(colX, top + dist / 2, 0);
+      this.physics.add(hitBody);
+
+      const seg = new ChainSeg(this, hitBody, null, spec.hp ?? 22);
+      this._chainSegs.add(seg);
+      seg.onBreak = () => this._dropSuspendedTile(tile);
+      segs.push(seg);
     }
 
     tile._chainSuspension = {
       anchorBody: anchorBodies[0], anchorMesh: anchorMeshes[0],
-      anchorBodies, anchorMeshes, segs, constraints,
+      anchorBodies, anchorMeshes, chainMeshes, segs, constraints,
     };
   }
 
-  // One chain LINK mesh — an oval torus, alternating 90° per index so
-  // consecutive links interlock and read as a real chain (not bead-on-a-string).
-  // Sized to the segment length so links nearly touch. Position is synced to the
-  // seg body each frame in update(); orientation is baked here (segs barely
-  // rotate on a stiff chain).
-  _makeChainLink(segLen, i) {
-    const ring = Math.max(0.07, segLen * 0.42);
-    const tube = Math.max(0.028, segLen * 0.14);
-    const geo = new THREE.TorusGeometry(ring, tube, 6, 12);
-    // Per-link material — ChainSeg.destroy() disposes each seg's material, so a
-    // shared one would be freed by the first link cut and blank the rest.
-    const mat = new THREE.MeshLambertMaterial({ color: 0x8a909e, emissive: 0x14161c, emissiveIntensity: 0.5 });
-    const m = new THREE.Mesh(geo, mat);
-    // Torus ring sits in the XY plane (facing the front-on camera) = a link seen
-    // flat. Twist alternate links 90° about the vertical so the next one turns
-    // edge-on and the two interlock — reads as a real chain, not stacked rings.
-    m.rotation.y = (i % 2) * (Math.PI / 2);
-    return m;
+  // Build ONE geometry of small interlocking chain links stacked from y=0 up to
+  // y=dist. Alternate links rotate 90° so they interlock and read as a real
+  // chain (not stacked rings). Merged into a single buffer → one draw call, and
+  // being static it never stretches or pulls apart under load.
+  _buildChainGeo(dist) {
+    const ring = 0.12, tube = 0.045, step = 0.2;
+    const n = Math.max(2, Math.round(dist / step));
+    const s = dist / n;
+    const parts = [];
+    for (let i = 0; i < n; i++) {
+      const g = new THREE.TorusGeometry(ring, tube, 6, 9);
+      if (i % 2) g.rotateY(Math.PI / 2);
+      g.translate(0, (i + 0.5) * s, 0);
+      parts.push(g);
+    }
+    const merged = BufferGeometryUtils.mergeGeometries(parts, false);
+    parts.forEach(p => p.dispose());
+    return merged;
   }
 
   // Convert a chain-suspended OR parent-stacked static tile into a falling
@@ -1028,10 +1023,19 @@ export class Level {
     // anchor tether + any remaining chain constraints (the broken seg already
     // removed its own). Without this the tether keeps it pinned to the anchor.
     if (tile._chainSuspension) {
-      for (const c of tile._chainSuspension.constraints) {
+      const cs = tile._chainSuspension;
+      for (const c of cs.constraints) {
         try { this.physics.world.removeConstraint(c); } catch (_) {}
       }
-      tile._chainSuspension.constraints.length = 0;
+      cs.constraints.length = 0;
+      // Snap the chains visually — remove the merged link meshes and kill the
+      // remaining hit-segs (the one that was shot already destroyed itself).
+      for (const cm of (cs.chainMeshes ?? [])) {
+        if (cm.parent) cm.parent.remove(cm);
+        cm.geometry?.dispose(); cm.material?.dispose();
+      }
+      if (cs.chainMeshes) cs.chainMeshes.length = 0;
+      for (const seg of [...(cs.segs ?? [])]) if (!seg.dead) seg.destroy();
     }
     const body = tile.body;
     const mass = tile.tileMass ?? Math.max(4, tile.w * tile.h * 6);
