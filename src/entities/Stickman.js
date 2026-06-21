@@ -63,6 +63,19 @@ const GROUND_CHAIN = ['jab','cross','hook','knee','spinBack'];
 // with the melee weapon list used by _tryClashOnIncoming.
 const PARRY_DEFLECT_WEAPONS = new Set(['fist','sword','bat','longsword','mace','hammer','halberd','saber']);
 
+// Block shield (Phase 2). Hold Special to raise a directional deflector that
+// absorbs frontal damage/knockback and bounces projectiles back at the shooter.
+// A meter drains while raised so it can't be turtled; a short window after
+// raising parries (stuns the attacker).
+const SHIELD_MAX = 1.0;           // meter (≈ seconds of full uptime)
+const SHIELD_DRAIN = 1 / 1.15;    // empties in ~1.15s of holding
+const SHIELD_HIT_COST = 0.22;     // extra drain per absorbed hit
+const SHIELD_RECHARGE = 1 / 2.2;  // refills in ~2.2s when lowered
+const SHIELD_UNBREAK = 0.45;      // must recharge to here after a full break
+const SHIELD_PARRY_MS = 180;      // parry window after raising
+const SHIELD_ARC_DOT = 0.0;       // block cone: front hemisphere of the shield dir
+const BLOCK_MOVE_SCALE = 0.35;    // movement slowed while blocking
+
 export class Stickman {
   constructor(world, scene, opts) {
     this.world = world;
@@ -157,6 +170,14 @@ export class Stickman {
     };
     this._prev = { jump: false, attack: false, grab: false, special: false, throw: false };
     this._attackPressedAt = 0;   // ms — last press timestamp for hold detection
+
+    // Block shield state (Phase 2).
+    this._blocking = false;
+    this._shieldMeter = SHIELD_MAX;
+    this._shieldBroken = false;
+    this._blockRaisedAt = 0;
+    this._shieldDirX = 1; this._shieldDirY = 0;
+    this._shieldMesh = this._makeShieldMesh();
 
     // State
     this.state = STATE.ACTIVE;
@@ -399,6 +420,27 @@ export class Stickman {
   takeDamage(amount, opts = {}) {
     if (this.state === STATE.DEAD) return false;
     if (this.invuln > 0) return false;
+    // Block shield — absorb a frontal hit entirely. Parry (within the raise
+    // window) also stuns the attacker. Environmental DoT (lava/flame) ignores
+    // the shield.
+    if (this._blocking && opts.weapon !== 'lava' && opts.weapon !== 'flame') {
+      const ax = opts.attacker?.position?.x ?? (this.position.x - (opts.kb?.x ?? this._shieldDirX));
+      const ay = (opts.attacker?.position?.y ?? this.position.y) + 0.35;
+      if (this._shieldBlocks(ax, ay)) {
+        const parry = performance.now() - this._blockRaisedAt < SHIELD_PARRY_MS;
+        this._shieldMeter = Math.max(0, this._shieldMeter - SHIELD_HIT_COST);
+        if (this._shieldMeter <= 0) { this._shieldBroken = true; this._blocking = false; }
+        if (this.game?.fx) this.game.fx.particles.burst(
+          this.position.x + this._shieldDirX * 0.5, this.position.y + 0.4, 0,
+          { count: parry ? 14 : 7, speed: parry ? 11 : 6, color: parry ? 0xffffff : 0x88ddff });
+        audio.block?.();
+        if (parry && opts.attacker?.applyKnockback) {
+          const dir = Math.sign((opts.attacker.position.x - this.position.x) || 1);
+          opts.attacker.applyKnockback(dir * 7, 4, 0.5);
+        }
+        return false;
+      }
+    }
     // Melee clash — if a punch / melee swing connects while this defender is
     // also mid-swing of a melee/fist and facing the attacker, both attacks
     // parry. No damage, both knocked back, both staggered briefly.
@@ -857,6 +899,71 @@ export class Stickman {
     this.body.velocity.set(0, 0, 0);
     this.body.angularVelocity.set(0, 0, 0);
     audio.click();
+  }
+
+  _makeShieldMesh() {
+    const disc = new THREE.Mesh(
+      new THREE.CircleGeometry(0.6, 22),
+      new THREE.MeshBasicMaterial({ color: 0x5bc8ff, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false }),
+    );
+    const rim = new THREE.Mesh(
+      new THREE.RingGeometry(0.55, 0.66, 26),
+      new THREE.MeshBasicMaterial({ color: 0xb0ecff, transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false }),
+    );
+    disc.add(rim);
+    disc.visible = false;
+    disc.renderOrder = 6;
+    this.scene.add(disc);
+    return disc;
+  }
+
+  // Hold Special → raise the directional shield. Drains a meter; breaks at 0
+  // (brief vulnerable window until it recharges past SHIELD_UNBREAK). Called
+  // every frame so the meter recharges even while stunned/acting.
+  _tickShield(dt) {
+    const canBlock = this.state === STATE.ACTIVE && this.hitstun <= 0 && !this.grabbing
+      && this.attackTimer <= 0 && !this.climbing && (this.weapon?.swingTimer ?? 0) <= 0
+      && !this.charging;
+    const want = !!this.input.special && canBlock && !this._shieldBroken && this._shieldMeter > 0;
+    if (want) {
+      if (!this._blocking) { this._blocking = true; this._blockRaisedAt = performance.now(); audio.block?.(); }
+      let dx = this.input.aimActive ? this.aimDir.x : this.facing;
+      let dy = this.input.aimActive ? this.aimDir.y : 0;
+      const d = Math.hypot(dx, dy) || 1; this._shieldDirX = dx / d; this._shieldDirY = dy / d;
+      this._shieldMeter -= SHIELD_DRAIN * dt;
+      if (this._shieldMeter <= 0) {
+        this._shieldMeter = 0; this._blocking = false; this._shieldBroken = true;
+        if (this.game?.fx) this.game.fx.particles.burst(this.position.x, this.position.y + 0.4, 0, { count: 10, speed: 6, color: 0x5bc8ff });
+        audio.break?.();
+      }
+    } else {
+      this._blocking = false;
+      this._shieldMeter = Math.min(SHIELD_MAX, this._shieldMeter + SHIELD_RECHARGE * dt);
+      if (this._shieldBroken && this._shieldMeter >= SHIELD_UNBREAK) this._shieldBroken = false;
+    }
+  }
+
+  // Is a source at (x,y) inside the raised shield's front hemisphere?
+  _shieldBlocks(fromX, fromY) {
+    if (!this._blocking) return false;
+    const dx = fromX - this.position.x, dy = fromY - (this.position.y + 0.35);
+    const d = Math.hypot(dx, dy) || 1;
+    return (dx / d) * this._shieldDirX + (dy / d) * this._shieldDirY > SHIELD_ARC_DOT;
+  }
+
+  _updateShieldVisual() {
+    const m = this._shieldMesh;
+    if (!m) return;
+    m.visible = this._blocking && this.state !== STATE.DEAD;
+    if (!m.visible) return;
+    m.position.set(
+      this.position.x + this._shieldDirX * 0.62,
+      this.position.y + 0.35 + this._shieldDirY * 0.3,
+      0.18,
+    );
+    const lowPulse = this._shieldMeter < 0.3 ? 0.5 + 0.5 * Math.abs(Math.sin(performance.now() * 0.02)) : 1;
+    m.scale.setScalar(0.88 + 0.12 * lowPulse);
+    m.material.opacity = 0.22 + 0.12 * lowPulse;
   }
 
   _throwWeapon() {
@@ -1871,6 +1978,7 @@ export class Stickman {
 
     this.prevGrounded = this.grounded;
     this._updateGroundCheck();
+    this._tickShield(dt);
 
     // Climbing logic — body stays DYNAMIC so floor/ceiling collisions work.
     if (this.climbing) {
@@ -1891,6 +1999,12 @@ export class Stickman {
     } else if (this.hitstun <= 0) {
       this._move(dt);
 
+      if (this._blocking) {
+        // While blocking: no attacks/grabs, slowed shuffle. The shield itself
+        // is resolved in takeDamage / projectile deflection.
+        this.body.velocity.x *= BLOCK_MOVE_SCALE;
+        this.grabReachTimer = 0;
+      } else {
       // Grab vs release. Pressing grab opens a 160ms reach window — the arm
       // stays extended and we keep checking for targets so a sloppy timing
       // still connects (Stick-Fight-style "stuffed grab").
@@ -1940,6 +2054,7 @@ export class Stickman {
 
       // Throw held weapon as a projectile.
       if (now.throwPressed && this.weapon) this._throwWeapon();
+      } // end !blocking
     }
     // Throw windup countdown — when 0, fire the queued throw.
     if (this._throwWindupT > 0) {
@@ -2128,7 +2243,9 @@ export class Stickman {
     params.worldOriginX = rigInLocal ? this.body.position.x : 0;
     params.worldOriginY = rigInLocal ? this.body.position.y : 0;
     params.struggle = (this.state === STATE.GRABBED) ? (this._grabEscape ?? 0) : 0;
+    params.blocking = this._blocking;
     this.rig.update(rigPos, params);
+    this._updateShieldVisual();
 
     if (rigInLocal) {
       // Group carries body's transform; limbs are in local space.
@@ -2194,6 +2311,7 @@ export class Stickman {
     this.world.remove(this.body);
     this.scene.remove(this.rig.group);
     if (this.nameSprite) this.scene.remove(this.nameSprite);
+    if (this._shieldMesh) { this.scene.remove(this._shieldMesh); this._shieldMesh.geometry?.dispose(); this._shieldMesh.material?.dispose(); this._shieldMesh = null; }
     if (this.weapon) this.weapon.destroy();
   }
 }
