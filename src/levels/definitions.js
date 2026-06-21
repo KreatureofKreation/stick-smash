@@ -37,6 +37,20 @@ const col = (x, y0, y1, opts = {}) => {
 const tough = (y, x0, x1, opts = {}) =>
   row(y, x0, x1, { hp: 200, color: 0x2a2c34, material: 'metal', ...opts });
 
+// Single RIGID platform spanning x0..x1, hung by a chain at EACH END from a
+// crossbar at y=anchorY. One body (not a row of blocks) → it stays a solid
+// rectangle. Stiff: it barely gives, swings only slightly, and drops when a
+// chain is shot. opts.segs / opts.chainHp tune the chains; rest = tile opts.
+const chainPlat = (y, x0, x1, anchorY, opts = {}) => {
+  const { segs = 5, chainHp = 22, h = 0.6, ...rest } = opts;
+  return {
+    x: (x0 + x1) / 2, y, shape: 'box', w: (x1 - x0) + 1, h,
+    material: 'metal', color: 0x6a6878, hp: 60,
+    suspend: { y: anchorY, segs, hp: chainHp },
+    ...rest,
+  };
+};
+
 // Wooden crate — dynamic physics tile.
 const crate = (x, y, size = 1.0, opts = {}) => ({
   x, y: y + 0.4,
@@ -467,21 +481,12 @@ export const LEVELS = [
       ...row(0,  10, 16, { material: 'stone', hp: 70, color: 0x4a3a3a }),
       ...tough(-2, -16, -10, { color: 0x1a1010 }),
       ...tough(-2, 10, 16, { color: 0x1a1010 }),
-      // Lower chain platforms — suspended from the y=12 crossbar.
-      // Shooting the chain (CHAIN segs) drops them.
-      ...row(3, -7, -4, {
-        material: 'metal', hp: 60, color: 0x6a6878,
-        chainAnchor: { x: -5.5, y: 12, segs: 5, hp: 22 },
-      }),
-      ...row(3,  4,  7, {
-        material: 'metal', hp: 60, color: 0x6a6878,
-        chainAnchor: { x: 5.5, y: 12, segs: 5, hp: 22 },
-      }),
+      // Lower chain platforms — single rigid slabs hung by a chain at each end
+      // from the y=12 crossbar. Shooting a chain drops the slab.
+      chainPlat(3, -7, -4, 12),
+      chainPlat(3,  4,  7, 12),
       // Center mid platform (also chain-suspended).
-      ...row(6, -2, 2, {
-        material: 'metal', hp: 60, color: 0x6a6878,
-        chainAnchor: { x: 0, y: 12, segs: 4, hp: 22 },
-      }),
+      chainPlat(6, -2, 2, 12, { segs: 4 }),
       // Upper side platforms.
       ...row(9, -8, -5, { material: 'metal', hp: 60, color: 0x6a6878 }),
       ...row(9,  5,  8, { material: 'metal', hp: 60, color: 0x6a6878 }),
@@ -549,11 +554,9 @@ export const LEVELS = [
       // Glass walkway tier 1 (y=3).
       ...row(3, -8, -3, { material: 'ice', hp: 14, color: 0x80c0e0 }),
       ...row(3,  3,  8, { material: 'ice', hp: 14, color: 0x80c0e0 }),
-      // Mid bridge (y=6) — chain-suspended from the antenna mast above.
-      ...row(6, -2, 2,  {
-        material: 'ice', hp: 14, color: 0x90d0f0,
-        chainAnchor: { x: 0, y: 14, segs: 6, hp: 22 },
-      }),
+      // Mid bridge (y=6) — single rigid slab hung by a chain at each end from
+      // the antenna mast above.
+      chainPlat(6, -2, 2, 14, { material: 'ice', hp: 14, color: 0x90d0f0, segs: 6 }),
       // Glass walkway tier 2 (y=9).
       ...row(9, -7, -3, { material: 'ice', hp: 12, color: 0xa0e0ff }),
       ...row(9,  3,  7, { material: 'ice', hp: 12, color: 0xa0e0ff }),
@@ -1018,7 +1021,7 @@ export const LEVELS = [
       // want the prize can shoot the chains to drop the chandelier on
       // anyone underneath.
       { x: 0, y: 9, shape: 'box', w: 3, h: 0.5, material: 'metal', hp: 90, color: 0xa88040,
-        chainAnchor: { x: 0, y: 14, segs: 5, hp: 24 } },
+        suspend: { y: 14, segs: 5, hp: 24 } },
       // Vault ribs (now y=11 — was 9, room for chandelier at y=9 below).
       { x: -3, y: 11, shape: 'box', w: 2, h: 0.4, material: 'stone', hp: 60, color: 0x808898 },
       { x:  3, y: 11, shape: 'box', w: 2, h: 0.4, material: 'stone', hp: 60, color: 0x808898 },
@@ -1099,9 +1102,9 @@ export const LEVELS = [
       ...row(4, -1, 1, { material: 'metal', hp: 45, dynamic: true, tileMass: 10, color: 0x6a707e }),
       // Mid-air bridges — chain-suspended (shootable).
       { x: -7, y: 5, shape: 'box', w: 3, h: 0.4, material: 'metal', hp: 70, color: 0x707888,
-        chainAnchor: { x: -7, y: 11, segs: 5, hp: 22 } },
+        suspend: { y: 11, segs: 5, hp: 22 } },
       { x:  7, y: 5, shape: 'box', w: 3, h: 0.4, material: 'metal', hp: 70, color: 0x707888,
-        chainAnchor: { x: 7, y: 11, segs: 5, hp: 22 } },
+        suspend: { y: 11, segs: 5, hp: 22 } },
       // Top prize platform.
       { x: 0, y: 9, shape: 'box', w: 6, h: 0.5, material: 'metal', hp: 100, color: 0x6a7080 },
     ],
@@ -1396,10 +1399,7 @@ export const LEVELS = [
       // Upper chain wood right y=17. Chain anchored to invisible static point
       // at (9, 24); 5 segments hang the platform. Cutting any seg → platform
       // converts dynamic and falls (drop credit anyone standing on it).
-      ...row(17, 7, 11, {
-        material: 'wood', hp: 18, color: 0x6a4020,
-        chainAnchor: { x: 9, y: 24, segs: 5, hp: 30 },
-      }),
+      chainPlat(17, 7, 11, 24, { material: 'wood', hp: 18, color: 0x6a4020, segs: 5, chainHp: 30 }),
       // Top sanctum y=20 (durable prize platform).
       ...row(20, -5, 5, { material: 'stone', hp: 80, color: 0x6a7a68 }),
       // ---- Crystal spire centerpiece (segmented). Each main shard is split
