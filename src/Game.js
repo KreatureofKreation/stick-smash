@@ -971,7 +971,7 @@ export class Game {
     // the moment P1 runs out of lives.
     if (this.localPlayers.length === 1) {
       const local = this.localPlayer;
-      if (local.lives <= 0 && local.state === STATE.DEAD) {
+      if (local && local.lives <= 0 && local.state === STATE.DEAD) {
         this.running = false;
         audio.death();
         this.net.broadcast?.({ t: 'gameover', text: 'KO!', sub: `${local.name} eliminated.` });
