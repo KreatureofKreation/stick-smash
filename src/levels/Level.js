@@ -902,11 +902,12 @@ export class Level {
   // is converted to a dynamic body so it falls.
   // Suspend a single rigid platform by a chain at EACH END from a crossbar at
   // spec.y. The platform is held by a RIGID direct tether (anchor → platform
-  // end), NOT through the chain links — so it can't stretch or sag: a chain of
-  // soft joints bearing the slab + a standing player is what made the old links
-  // pull apart. Each chain is instead ONE taut, static visual: many small
-  // interlocking links merged into a single mesh, never separating, plus one
-  // thin hit-box so shooting anywhere on the chain severs it and drops the slab.
+  // end), NOT through the chain links — so it can't stretch or sag. The chain
+  // itself is its OWN set of entities: each end is split into `segs` independent
+  // breakable segments (a static hit-box + its own merged-link mesh). Shooting a
+  // segment breaks it RIGHT THERE — that segment + every segment below it burst
+  // into debris (the cut falls away) while the segments above keep dangling from
+  // the crossbar, and the slab drops. CHAIN group → players walk through.
   _suspendTile(tile, spec) {
     if (!tile.body) return;
     const tx = tile.body.position.x, ty = tile.body.position.y;
@@ -916,12 +917,12 @@ export class Level {
     // single centre chain.
     const inset = Math.min(0.5, tile.w * 0.18);
     const ends = tile.w > 1.4 ? [-tile.w / 2 + inset, tile.w / 2 - inset] : [0];
+    const segCount = Math.max(2, spec.segs ?? 5);
 
     const segs = [];
     const constraints = [];
     const anchorBodies = [];
     const anchorMeshes = [];
-    const chainMeshes = [];
 
     for (const ex of ends) {
       const colX = tx + ex;                  // chain runs straight up from here
@@ -957,53 +958,64 @@ export class Level {
       this.physics.world.addConstraint(tether);
       constraints.push(tether);
 
-      // Visual chain: one merged mesh of many small interlocking links along the
-      // taut line. Static (the slab barely moves) → never comes apart.
-      const geo = this._buildChainGeo(dist);
-      const mat = new THREE.MeshLambertMaterial({ color: 0x8a909e, emissive: 0x14161c, emissiveIntensity: 0.45 });
-      const chainMesh = new THREE.Mesh(geo, mat);
-      chainMesh.position.set(colX, top, 0);   // geo built from y=0 (platform top) upward
-      chainMesh.updateMatrix(); chainMesh.matrixAutoUpdate = false;
-      this.scene.add(chainMesh);
-      chainMeshes.push(chainMesh);
+      // Build this chain as `segCount` independent breakable link-segments,
+      // bottom (j=0) → top.
+      const segLen = dist / segCount;
+      const chainList = [];
+      for (let j = 0; j < segCount; j++) {
+        const cy = top + (j + 0.5) * segLen;     // segment centre
 
-      // One thin static hit-box spanning the chain — shoot anywhere on it to
-      // cut. Invisible (the merged mesh is the visual); ChainSeg drives the
-      // damage/break. Breaking → drop the slab + snap both chains.
-      const hitBody = new CANNON.Body({
-        mass: 0, type: CANNON.Body.STATIC,
-        collisionFilterGroup: COL_GROUPS.CHAIN,
-        collisionFilterMask: COL_GROUPS.PROJECTILE | COL_GROUPS.HAZARD,
-      });
-      hitBody.addShape(new CANNON.Box(new CANNON.Vec3(0.16, dist / 2, 0.16)));
-      hitBody.position.set(colX, top + dist / 2, 0);
-      this.physics.add(hitBody);
+        const hitBody = new CANNON.Body({
+          mass: 0, type: CANNON.Body.STATIC,
+          collisionFilterGroup: COL_GROUPS.CHAIN,
+          collisionFilterMask: COL_GROUPS.PROJECTILE | COL_GROUPS.HAZARD,
+        });
+        hitBody.addShape(new CANNON.Box(new CANNON.Vec3(0.16, segLen / 2, 0.16)));
+        hitBody.position.set(colX, cy, 0);
+        this.physics.add(hitBody);
 
-      const seg = new ChainSeg(this, hitBody, null, spec.hp ?? 22);
-      this._chainSegs.add(seg);
-      seg.onBreak = () => this._dropSuspendedTile(tile);
-      segs.push(seg);
+        const geo = this._buildChainGeo(segLen);
+        const mat = new THREE.MeshLambertMaterial({ color: 0x8a909e, emissive: 0x14161c, emissiveIntensity: 0.45 });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(colX, cy, 0);          // static body → sync keeps it here
+        this.scene.add(mesh);
+
+        const seg = new ChainSeg(this, hitBody, mesh, spec.hp ?? 22);
+        seg.yIndex = j;
+        this._chainSegs.add(seg);
+        segs.push(seg);
+        chainList.push(seg);
+
+        // Break HERE: debris at the cut, drop the slab, and sever everything
+        // below this link on the same chain (it falls away). Body is gone by the
+        // time onBreak fires, so the burst uses the captured static centre.
+        const bx = colX, by = cy, idx = j;
+        seg.onBreak = () => {
+          this.fx?.particles?.debris(bx, by, 0, 0x9098a8, 7);
+          this._dropSuspendedTile(tile);
+          for (const s of chainList) if (s.yIndex < idx && !s.dead) s.destroy();
+        };
+      }
     }
 
     tile._chainSuspension = {
       anchorBody: anchorBodies[0], anchorMesh: anchorMeshes[0],
-      anchorBodies, anchorMeshes, chainMeshes, segs, constraints,
+      anchorBodies, anchorMeshes, segs, constraints,
     };
   }
 
-  // Build ONE geometry of small interlocking chain links stacked from y=0 up to
-  // y=dist. Alternate links rotate 90° so they interlock and read as a real
-  // chain (not stacked rings). Merged into a single buffer → one draw call, and
-  // being static it never stretches or pulls apart under load.
-  _buildChainGeo(dist) {
+  // Build one merged geometry of small interlocking links spanning `span`,
+  // CENTRED on y=0 (the static seg body sits at the segment centre). Alternate
+  // links rotate 90° so they interlock and read as a real chain.
+  _buildChainGeo(span) {
     const ring = 0.12, tube = 0.045, step = 0.2;
-    const n = Math.max(2, Math.round(dist / step));
-    const s = dist / n;
+    const n = Math.max(1, Math.round(span / step));
+    const s = span / n;
     const parts = [];
     for (let i = 0; i < n; i++) {
       const g = new THREE.TorusGeometry(ring, tube, 6, 9);
       if (i % 2) g.rotateY(Math.PI / 2);
-      g.translate(0, (i + 0.5) * s, 0);
+      g.translate(0, -span / 2 + (i + 0.5) * s, 0);
       parts.push(g);
     }
     const merged = BufferGeometryUtils.mergeGeometries(parts, false);
@@ -1023,19 +1035,14 @@ export class Level {
     // anchor tether + any remaining chain constraints (the broken seg already
     // removed its own). Without this the tether keeps it pinned to the anchor.
     if (tile._chainSuspension) {
-      const cs = tile._chainSuspension;
-      for (const c of cs.constraints) {
+      // Just sever the load-bearing tethers so the slab falls. The chain links
+      // are their own entities — the seg that was shot (and the segs below it)
+      // break themselves with debris; segs ABOVE the cut stay dangling from the
+      // crossbar. We deliberately don't nuke them here.
+      for (const c of tile._chainSuspension.constraints) {
         try { this.physics.world.removeConstraint(c); } catch (_) {}
       }
-      cs.constraints.length = 0;
-      // Snap the chains visually — remove the merged link meshes and kill the
-      // remaining hit-segs (the one that was shot already destroyed itself).
-      for (const cm of (cs.chainMeshes ?? [])) {
-        if (cm.parent) cm.parent.remove(cm);
-        cm.geometry?.dispose(); cm.material?.dispose();
-      }
-      if (cs.chainMeshes) cs.chainMeshes.length = 0;
-      for (const seg of [...(cs.segs ?? [])]) if (!seg.dead) seg.destroy();
+      tile._chainSuspension.constraints.length = 0;
     }
     const body = tile.body;
     const mass = tile.tileMass ?? Math.max(4, tile.w * tile.h * 6);
