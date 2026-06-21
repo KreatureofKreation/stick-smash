@@ -63,6 +63,7 @@ export class Menu {
     this._stopPadPolling();
     this.root.innerHTML = '';
     document.body.classList.add('menu-open');
+    this._currentScreen = screen;
     if (screen === 'main') return this._main();
     if (screen === 'play') return this._play();
     if (screen === 'local') return this._local();
@@ -70,6 +71,7 @@ export class Menu {
     if (screen === 'settings') return this._settings();
     if (screen === 'pause') return this._pause();
     if (screen === 'over') return this._over(...args);
+    if (screen === 'lobby') return this._lobby();
   }
 
   hide() {
@@ -130,37 +132,103 @@ export class Menu {
 
   _online() {
     const params = new URLSearchParams(location.search);
-    const roomId = params.get('room') || 'public';
-    const isPrivate = !!params.get('room');
+    const urlRoom = params.get('room');
+
+    // If a ?room= URL param is present, skip the chooser and go straight to
+    // the Quick Play / drop-in flow for that room (back-compat for shared links).
+    if (urlRoom) {
+      const el = this._menuShell(`
+        <div class="panel">
+          <h2>PLAY ONLINE</h2>
+          <p style="opacity:0.8">
+            Room: <code>${urlRoom}</code>
+            <br>First arrival hosts. Others drop in. Leave any time.
+          </p>
+          <hr class="sep">
+          <h2>CHARACTER</h2>
+          <div class="char-grid"></div>
+          <hr class="sep">
+          <div class="row">
+            <label>Name <input type="text" maxlength="10" value="${this.playerName}" id="pname" /></label>
+            <label>Bots <input type="number" min="0" max="6" value="${this.bots}" id="bots" /></label>
+            <label>Level <select id="level">${LEVELS.map(l => `<option value="${l.id}" ${l.id === this.level ? 'selected' : ''}>${l.name}</option>`).join('')}</select></label>
+          </div>
+          <p class="hint" style="margin-top:0">Bots / level only apply if you arrive first and host.</p>
+          <div class="btn-row">
+            <button class="btn" data-act="back">← BACK</button>
+            <button class="btn primary" data-act="go">GO</button>
+          </div>
+        </div>
+      `);
+      this._renderRoster(el);
+      el.querySelector('#pname').oninput = (e) => { this.playerName = e.target.value || 'P1'; localStorage.setItem('pn', this.playerName); };
+      el.querySelector('#bots').oninput = (e) => this.bots = +e.target.value;
+      el.querySelector('#level').onchange = (e) => this.level = e.target.value;
+      el.querySelector('[data-act="back"]').onclick = () => { this.game.net.disconnect(); this.show('main'); };
+      el.querySelector('[data-act="go"]').onclick = () => {
+        this.hide();
+        this.game.startOnline({
+          character: this.selectedChar,
+          name: this.playerName,
+          bots: this.bots,
+          levelId: this.level,
+        });
+      };
+      return;
+    }
+
+    // No ?room= param → show the three-way chooser.
     const el = this._menuShell(`
       <div class="panel">
         <h2>PLAY ONLINE</h2>
-        <p style="opacity:0.8">
-          Room: <code>${roomId}</code>${isPrivate ? '' : '  <span style="opacity:0.6">(public — anyone can join)</span>'}
-          <br>First arrival hosts. Others drop in. Leave any time.
-        </p>
         <hr class="sep">
         <h2>CHARACTER</h2>
         <div class="char-grid"></div>
         <hr class="sep">
         <div class="row">
           <label>Name <input type="text" maxlength="10" value="${this.playerName}" id="pname" /></label>
-          <label>Bots <input type="number" min="0" max="6" value="${this.bots}" id="bots" /></label>
-          <label>Level <select id="level">${LEVELS.map(l => `<option value="${l.id}" ${l.id === this.level ? 'selected' : ''}>${l.name}</option>`).join('')}</select></label>
         </div>
-        <p class="hint" style="margin-top:0">Bots / level only apply if you arrive first and host.</p>
-        <div class="btn-row">
+        <hr class="sep">
+        <div class="btn-row" style="flex-direction:column;align-items:center;gap:14px;">
+          <button class="btn primary" data-act="quickplay">QUICK PLAY
+            <span style="display:block;font-size:11px;opacity:0.7;font-weight:400;margin-top:2px">Drop into the public room — no code needed</span>
+          </button>
+          <button class="btn" data-act="create">CREATE ROOM
+            <span style="display:block;font-size:11px;opacity:0.7;font-weight:400;margin-top:2px">Get a code to share with friends</span>
+          </button>
+          <button class="btn" data-act="join">JOIN ROOM
+            <span style="display:block;font-size:11px;opacity:0.7;font-weight:400;margin-top:2px">Enter a code to join a friend's room</span>
+          </button>
+        </div>
+        <div id="join-form" style="display:none;margin-top:18px;text-align:center;">
+          <label style="font-size:14px;">Room code: <input type="text" id="room-code" maxlength="4" placeholder="ABCD"
+            style="text-transform:uppercase;letter-spacing:4px;font-size:20px;width:80px;text-align:center;" /></label>
+          <div class="btn-row" style="justify-content:center;margin-top:12px;">
+            <button class="btn" data-act="cancel-join">CANCEL</button>
+            <button class="btn primary" data-act="do-join">JOIN</button>
+          </div>
+        </div>
+        <div id="create-opts" style="display:none;margin-top:18px;">
+          <div class="row">
+            <label>Bots <input type="number" min="0" max="6" value="${this.bots}" id="bots" /></label>
+            <label>Level <select id="level">${LEVELS.map(l => `<option value="${l.id}" ${l.id === this.level ? 'selected' : ''}>${l.name}</option>`).join('')}</select></label>
+          </div>
+          <div class="btn-row" style="justify-content:center;margin-top:8px;">
+            <button class="btn" data-act="cancel-create">CANCEL</button>
+            <button class="btn primary" data-act="do-create">CREATE &amp; ENTER LOBBY</button>
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:18px;">
           <button class="btn" data-act="back">← BACK</button>
-          <button class="btn primary" data-act="go">GO</button>
         </div>
       </div>
     `);
     this._renderRoster(el);
     el.querySelector('#pname').oninput = (e) => { this.playerName = e.target.value || 'P1'; localStorage.setItem('pn', this.playerName); };
-    el.querySelector('#bots').oninput = (e) => this.bots = +e.target.value;
-    el.querySelector('#level').onchange = (e) => this.level = e.target.value;
     el.querySelector('[data-act="back"]').onclick = () => { this.game.net.disconnect(); this.show('main'); };
-    el.querySelector('[data-act="go"]').onclick = () => {
+
+    // Quick Play — existing drop-in flow, unchanged.
+    el.querySelector('[data-act="quickplay"]').onclick = () => {
       this.hide();
       this.game.startOnline({
         character: this.selectedChar,
@@ -169,6 +237,147 @@ export class Menu {
         levelId: this.level,
       });
     };
+
+    // Create Room — show bots/level opts.
+    const createOpts = el.querySelector('#create-opts');
+    const joinForm = el.querySelector('#join-form');
+    el.querySelector('[data-act="create"]').onclick = () => {
+      createOpts.style.display = '';
+      joinForm.style.display = 'none';
+    };
+    el.querySelector('[data-act="cancel-create"]').onclick = () => {
+      createOpts.style.display = 'none';
+    };
+    if (el.querySelector('#bots')) {
+      el.querySelector('#bots').oninput = (e) => this.bots = +e.target.value;
+    }
+    if (el.querySelector('#level')) {
+      el.querySelector('#level').onchange = (e) => this.level = e.target.value;
+    }
+    el.querySelector('[data-act="do-create"]').onclick = () => {
+      const code = this._genRoomCode();
+      this.game.net.connect('ss-room-' + code, {
+        character: this.selectedChar,
+        name: this.playerName,
+        bots: this.bots,
+        levelId: this.level,
+        lobby: true,
+        code,
+      });
+    };
+
+    // Join Room — show code input.
+    el.querySelector('[data-act="join"]').onclick = () => {
+      joinForm.style.display = '';
+      createOpts.style.display = 'none';
+    };
+    el.querySelector('[data-act="cancel-join"]').onclick = () => {
+      joinForm.style.display = 'none';
+    };
+    const codeInput = el.querySelector('#room-code');
+    // Force uppercase as the user types.
+    codeInput.oninput = () => { codeInput.value = codeInput.value.toUpperCase(); };
+    el.querySelector('[data-act="do-join"]').onclick = () => {
+      const code = (codeInput.value || '').toUpperCase().trim();
+      if (!code) { codeInput.focus(); return; }
+      this.game.net.connect('ss-room-' + code, {
+        character: this.selectedChar,
+        name: this.playerName,
+        lobby: true,
+        code,
+      });
+    };
+  }
+
+  // Generate a 4-char room code using only unambiguous characters.
+  _genRoomCode() {
+    const ALPHA = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 4; i++) {
+      code += ALPHA[Math.floor(Math.random() * ALPHA.length)];
+    }
+    return code;
+  }
+
+  // Lobby screen: big room code, player list, host controls / client ready button.
+  _lobby() {
+    const game = this.game;
+    const isHost = !!game._lobbyIsHost;
+    const code = game._lobbyCode || '????';
+    const roster = game._lobbyRoster || [];
+    const levelId = game.levelId || 'arena';
+    const bots = game._lobbyBots ?? 2;
+
+    const playerRows = roster.map(p => {
+      const char = p.character || {};
+      const hex = '#' + ((char.primary || 0x888888).toString(16).padStart(6, '0'));
+      const readyIcon = p.ready ? '<span style="color:#66e2a3;font-weight:700">READY</span>' : '<span style="opacity:0.5">&#9633;</span>';
+      const hostBadge = p.isHost ? ' <span style="font-size:11px;opacity:0.6">(HOST)</span>' : '';
+      return `<div class="player-row" style="gap:10px;">
+        <div class="swatch" style="--c:${hex}"></div>
+        <strong style="color:${hex}">${(p.name || 'P').slice(0, 10)}</strong>${hostBadge}
+        <span style="margin-left:auto">${readyIcon}</span>
+      </div>`;
+    }).join('');
+
+    const hostControls = isHost ? `
+      <hr class="sep">
+      <div class="row" style="flex-wrap:wrap;gap:12px;">
+        <label>Level
+          <select id="lobby-level">${LEVELS.map(l => `<option value="${l.id}" ${l.id === levelId ? 'selected' : ''}>${l.name}</option>`).join('')}</select>
+        </label>
+        <label>Bots <input type="number" min="0" max="6" value="${bots}" id="lobby-bots" /></label>
+      </div>
+      <div class="btn-row" style="margin-top:14px;">
+        <button class="btn primary" data-act="start">START MATCH</button>
+      </div>
+    ` : `
+      <div class="btn-row" style="margin-top:18px;">
+        <button class="btn primary" data-act="ready" id="ready-btn">READY</button>
+      </div>
+      <p class="hint" style="text-align:center;margin-top:6px">Waiting for host to start...</p>
+    `;
+
+    const el = this._menuShell(`
+      <div class="panel" style="max-width:480px;text-align:center;">
+        <h2>LOBBY</h2>
+        <div style="font-size:48px;letter-spacing:8px;font-weight:900;margin:8px 0 2px;">${code}</div>
+        <p style="opacity:0.6;margin:0 0 16px;font-size:13px;">Share this code to invite friends</p>
+        <hr class="sep">
+        <div id="lobby-players" style="text-align:left;">${playerRows || '<p style="opacity:0.5">Waiting for players...</p>'}</div>
+        ${hostControls}
+        <div class="btn-row" style="margin-top:20px;">
+          <button class="btn" data-act="back">← LEAVE</button>
+        </div>
+      </div>
+    `);
+
+    el.querySelector('[data-act="back"]').onclick = () => {
+      game.net.disconnect();
+      game.lobbyActive = false;
+      this.show('main');
+    };
+
+    if (isHost) {
+      const lvlSel = el.querySelector('#lobby-level');
+      if (lvlSel) lvlSel.onchange = (e) => { this.level = e.target.value; game.net.setLobbyLevel(e.target.value); };
+      const botIn = el.querySelector('#lobby-bots');
+      if (botIn) botIn.oninput = (e) => { game.net.setLobbyBots(+e.target.value); };
+      const startBtn = el.querySelector('[data-act="start"]');
+      if (startBtn) startBtn.onclick = () => game.net.startLobbyMatch();
+    } else {
+      // Client ready toggle.
+      this._lobbyReady = false;
+      const readyBtn = el.querySelector('[data-act="ready"]');
+      if (readyBtn) {
+        readyBtn.onclick = () => {
+          this._lobbyReady = !this._lobbyReady;
+          readyBtn.textContent = this._lobbyReady ? 'UNREADY' : 'READY';
+          readyBtn.classList.toggle('primary', !this._lobbyReady);
+          game.net.sendReady(this._lobbyReady);
+        };
+      }
+    }
   }
 
   _play() {
@@ -481,10 +690,43 @@ export class Menu {
     return out;
   }
 
-  // Stub — Net layer still calls refreshLobby() on peer changes. Drop-in
-  // gameplay has no lobby, but the call is harmless. If we later add an
-  // in-game players list, populate it here.
-  refreshLobby() { /* no-op — drop-in design has no pre-game lobby */ }
+  // Called by Net whenever the lobby roster changes.
+  // With args (roster, isHost, code, levelId) → updates game state + re-renders lobby.
+  // With no args (drop-in legacy call) → no-op unless we're actually in the lobby.
+  refreshLobby(roster, isHost, code, levelId) {
+    if (roster === undefined) {
+      // Drop-in legacy call with no args — only act if lobby is currently shown.
+      if (this._currentScreen !== 'lobby') return;
+      // Refresh using existing game state.
+      this._lobby();
+      return;
+    }
+    // Real lobby update: store the latest data and re-render.
+    if (this.game._lobbyRoster !== undefined || this._currentScreen === 'lobby') {
+      this.game._lobbyRoster = roster;
+      if (isHost !== undefined) this.game._lobbyIsHost = isHost;
+      if (code !== undefined) this.game._lobbyCode = code;
+      if (levelId !== undefined) { this.game.levelId = levelId; this.level = levelId; }
+      if (this._currentScreen === 'lobby') {
+        // Re-render the player list in place to avoid full DOM rebuild.
+        const container = this.root.querySelector('#lobby-players');
+        if (container) {
+          const playerRows = roster.map(p => {
+            const char = p.character || {};
+            const hex = '#' + ((char.primary || 0x888888).toString(16).padStart(6, '0'));
+            const readyIcon = p.ready ? '<span style="color:#66e2a3;font-weight:700">READY</span>' : '<span style="opacity:0.5">&#9633;</span>';
+            const hostBadge = p.isHost ? ' <span style="font-size:11px;opacity:0.6">(HOST)</span>' : '';
+            return `<div class="player-row" style="gap:10px;">
+              <div class="swatch" style="--c:${hex}"></div>
+              <strong style="color:${hex}">${(p.name || 'P').slice(0, 10)}</strong>${hostBadge}
+              <span style="margin-left:auto">${readyIcon}</span>
+            </div>`;
+          }).join('');
+          container.innerHTML = playerRows || '<p style="opacity:0.5">Waiting for players...</p>';
+        }
+      }
+    }
+  }
 
   // ── Settings: weapon / item toggles ─────────────────────────────────────
   // The user can disable any spawn-table entry. State lives in localStorage

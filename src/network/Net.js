@@ -9,6 +9,11 @@
 // Drop-in: host spawns each new peer into the LIVE match the moment the
 // peer says hello. No lobby, no "press Start", no room codes typed.
 //
+// Room-code lobby (NEW): pass opts.lobby=true + opts.code to enter a
+// pre-match lobby instead of immediately starting. Host broadcasts
+// roster state; clients ready-up; host clicks START. Drop-in stays
+// default and is completely unchanged when lobby:false (the default).
+//
 // Drop-out / host migration: if a client loses their conn (host left,
 // flaky network, etc.), they automatically reconnect, which kicks off the
 // same auto-detect flow — somebody will become the new host. Random
@@ -24,13 +29,20 @@ export class Net {
     this.peer = null;
     this.role = null;
     this.roomId = null;
-    this.connections = new Map(); // peerId -> { conn, name, character, lastInput, playerId }
+    this.connections = new Map(); // peerId -> { conn, name, character, lastInput, playerId, ready }
     this.peers = [];
     this.localPlayerId = null;
     this._connectOpts = null;
     this._migrating = false;
     this._intentionalDisconnect = false;
     this._joinResolveTimer = null;
+    // Lobby state (host-side)
+    this._lobby = false;
+    this._code = null;
+    this._hostName = null;
+    this._hostChar = null;
+    this._lobbyLevel = 'arena';
+    this._lobbyBots = 2;
   }
 
   _newPeer(id) {
@@ -56,6 +68,10 @@ export class Net {
   // The user clicks PLAY ONLINE → menu gathers (character, name, bots,
   // levelId), then calls this. We try to JOIN the shared room first; if
   // the host slot is empty we claim it and host instead.
+  //
+  // opts.lobby=true → room-code lobby mode (Create/Join Room).
+  // opts.code      → the 4-char room code (lobby mode only).
+  // No lobby (default) → drop-in, starts match immediately on host.
   async connect(roomId, opts) {
     if (this.peer) try { this.peer.destroy(); } catch (_) {}
     this.role = null;
@@ -63,6 +79,14 @@ export class Net {
     this._connectOpts = opts;
     this._intentionalDisconnect = false;
     this._migrating = false;
+
+    // Store lobby settings so _becomeHost can read them.
+    this._lobby = !!opts?.lobby;
+    this._code = opts?.code ?? null;
+    this._hostName = opts?.name ?? null;
+    this._hostChar = opts?.character ?? null;
+    this._lobbyLevel = opts?.levelId ?? 'arena';
+    this._lobbyBots = opts?.bots ?? 2;
 
     // Anonymous peer first — try connecting AS A CLIENT to the well-known
     // host ID. If nobody owns that ID (peer-unavailable), promote ourselves.
@@ -111,7 +135,8 @@ export class Net {
   _asClient(conn, opts) {
     this.role = 'client';
     this.conn = conn;
-    try { conn.send({ t: 'hello', name: opts.name, character: opts.character }); } catch (_) {}
+    // Send hello with lobby flag so host knows we're in lobby mode.
+    try { conn.send({ t: 'hello', name: opts.name, character: opts.character, lobby: !!opts?.lobby }); } catch (_) {}
     conn.on('data', (data) => this._handleClientMessage(data));
     conn.on('close', () => this._onClientLost());
     conn.on('error', (e) => console.warn('conn err', e));
@@ -134,8 +159,19 @@ export class Net {
 
   _handleClientMessage(data) {
     if (!data || !data.t) return;
-    if (data.t === 'start') {
+    if (data.t === 'lobby') {
+      // Host is broadcasting lobby state. Enter/update lobby screen.
+      this.game.enterLobby({
+        isHost: false,
+        code: data.code,
+        levelId: data.levelId,
+        bots: data.bots,
+        players: data.players,
+      });
+    } else if (data.t === 'start') {
       this.localPlayerId = data.playerId;
+      // Clear lobby state on match start.
+      this._lobby = false;
       this.game.startAsClient({ levelId: data.level });
       if (data.snap) this.game.applySnapshot(data.snap);
     } else if (data.t === 'snap') {
@@ -147,6 +183,12 @@ export class Net {
     }
   }
 
+  // Client sends ready state to host.
+  sendReady(ready) {
+    if (this.role !== 'client' || !this.conn?.open) return;
+    try { this.conn.send({ t: 'ready', ready: !!ready }); } catch (_) {}
+  }
+
   // ── Host path ──────────────────────────────────────────────────────────
   _becomeHost(roomId, opts) {
     if (this.peer) try { this.peer.destroy(); } catch (_) {}
@@ -156,14 +198,26 @@ export class Net {
     let opened = false;
     this.peer.on('open', () => {
       opened = true;
-      // Match starts immediately. No lobby. Late joiners will be spawned
-      // mid-match as they come in.
-      this.game.startHosted({
-        character: opts.character,
-        name: opts.name,
-        bots: opts.bots ?? 2,
-        levelId: opts.levelId ?? 'arena',
-      });
+      if (this._lobby) {
+        // Lobby mode: show the lobby screen instead of starting immediately.
+        // The host's own roster entry is always ready (they're the host).
+        this.game.enterLobby({
+          isHost: true,
+          code: this._code,
+          levelId: this._lobbyLevel,
+          bots: this._lobbyBots,
+          players: this._buildRoster(),
+        });
+      } else {
+        // Drop-in: match starts immediately. Late joiners will be spawned
+        // mid-match as they come in.
+        this.game.startHosted({
+          character: opts.character,
+          name: opts.name,
+          bots: opts.bots ?? 2,
+          levelId: opts.levelId ?? 'arena',
+        });
+      }
     });
     this.peer.on('error', (err) => {
       if (err.type === 'unavailable-id') {
@@ -193,7 +247,7 @@ export class Net {
     conn.on('open', () => {
       const slot = {
         conn, name: 'P', character: rosterById('bolt'),
-        lastInput: null, playerId: null,
+        lastInput: null, playerId: null, ready: false,
       };
       this.connections.set(conn.peer, slot);
       conn.on('data', (data) => this._handleHostMessage(conn, data));
@@ -213,7 +267,70 @@ export class Net {
     this.peers = [...this.connections.values()].map(c => ({
       id: c.conn.peer, name: c.name, character: c.character,
     }));
-    this.game.menu?.refreshLobby?.();
+    if (this._lobby) {
+      this._broadcastLobby();
+    } else {
+      this.game.menu?.refreshLobby?.();
+    }
+  }
+
+  // Build the full lobby roster array (host + all connected clients).
+  _buildRoster() {
+    const hostChar = this._hostChar
+      ? rosterById(this._hostChar)
+      : rosterById('bolt');
+    const roster = [
+      {
+        id: 'host',
+        name: this._hostName || 'Host',
+        character: hostChar,
+        ready: true,
+        isHost: true,
+      },
+    ];
+    for (const c of this.connections.values()) {
+      roster.push({
+        id: c.conn.peer,
+        name: c.name,
+        character: c.character,
+        ready: !!c.ready,
+      });
+    }
+    return roster;
+  }
+
+  // Broadcast current lobby state to all clients and update host UI.
+  _broadcastLobby() {
+    const roster = this._buildRoster();
+    const msg = {
+      t: 'lobby',
+      code: this._code,
+      levelId: this._lobbyLevel,
+      bots: this._lobbyBots,
+      players: roster,
+    };
+    this.broadcast(msg);
+    // Update the host's own lobby UI.
+    this.game.menu?.refreshLobby?.(roster, true, this._code, this._lobbyLevel);
+  }
+
+  // Host: update the selected level and re-broadcast.
+  setLobbyLevel(id) {
+    this._lobbyLevel = id;
+    if (this._lobby) this._broadcastLobby();
+  }
+
+  // Host: update the bot count and re-broadcast.
+  setLobbyBots(n) {
+    this._lobbyBots = n;
+    if (this._lobby) this._broadcastLobby();
+  }
+
+  // Host: start the match for all lobby participants.
+  startLobbyMatch() {
+    if (!this._lobby) return;
+    this._lobby = false;
+    this.game.startHostedMatch(this._lobbyLevel, this._lobbyBots);
   }
 
   _handleHostMessage(conn, data) {
@@ -223,10 +340,14 @@ export class Net {
     if (data.t === 'hello') {
       slot.name = (data.name || 'P').slice(0, 10);
       slot.character = rosterById(data.character || 'bolt');
-      // Drop-in: the match is already running on the host. Spawn the
-      // joiner immediately and ship them a fresh snapshot so they enter
-      // the world without waiting for a lobby.
-      if (this.game.running && slot.playerId == null) {
+      if (this._lobby && !this.game.running) {
+        // Lobby mode: record the joiner in the roster, don't spawn yet.
+        slot.ready = false;
+        this._broadcastLobby();
+      } else if (this.game.running && slot.playerId == null) {
+        // Drop-in: the match is already running on the host. Spawn the
+        // joiner immediately and ship them a fresh snapshot so they enter
+        // the world without waiting for a lobby.
         const sm = this.game.addNetPlayer(slot.name, slot.character);
         slot.playerId = sm.id;
         try {
@@ -237,8 +358,14 @@ export class Net {
             snap: this.game._snapshot(),
           });
         } catch (_) {}
+        this._refreshPeers();
+      } else {
+        this._refreshPeers();
       }
-      this._refreshPeers();
+    } else if (data.t === 'ready') {
+      // Client toggled ready status in the lobby.
+      slot.ready = !!data.ready;
+      if (this._lobby) this._broadcastLobby();
     } else if (data.t === 'input') {
       slot.lastInput = data.in;
     } else if (data.t === 'ping') {
@@ -266,6 +393,8 @@ export class Net {
     this.connections.clear();
     this.peers = [];
     this.localPlayerId = null;
+    this._lobby = false;
+    this._code = null;
     clearTimeout(this._joinResolveTimer);
   }
 }

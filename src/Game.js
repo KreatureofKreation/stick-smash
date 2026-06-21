@@ -87,6 +87,7 @@ export class Game {
     this.killFeed = [];
     this.paused = false;
     this.running = false;
+    this.lobbyActive = false;
 
     // Restore the player's weapon-toggle preferences before any spawn pool
     // pick happens. Stored as a JSON array of disabled item ids.
@@ -184,6 +185,51 @@ export class Game {
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+  }
+
+  // === Lobby ===
+
+  // Called by Net when the lobby state is established (host or client).
+  // Stores lobby data on the game and shows the lobby menu screen.
+  enterLobby({ isHost, code, levelId, bots, players }) {
+    this.lobbyActive = true;
+    this.running = false;
+    this._lobbyRoster = players || [];
+    this._lobbyIsHost = !!isHost;
+    this._lobbyCode = code;
+    this.levelId = levelId || 'arena';
+    this._lobbyBots = bots ?? 2;
+    this.menu.show('lobby');
+  }
+
+  // Called by the host's START MATCH button (via net.startLobbyMatch()).
+  // Runs _startMatch as host, then onboards all waiting lobby clients.
+  startHostedMatch(levelId, bots) {
+    this.lobbyActive = false;
+    const character = this.net._hostChar ?? this.menu.selectedChar;
+    const name = this.net._hostName ?? this.menu.playerName;
+    this._startMatch({
+      character,
+      name,
+      bots: bots ?? 0,
+      levelId: levelId ?? 'arena',
+      isOnline: true,
+    });
+    this.running = true;
+    // Onboard each waiting client with a start message + snapshot.
+    for (const slot of this.net.connections.values()) {
+      const sm = this.addNetPlayer(slot.name, slot.character);
+      slot.playerId = sm.id;
+      try {
+        slot.conn.send({
+          t: 'start',
+          level: levelId,
+          playerId: sm.id,
+          snap: this._snapshot(),
+        });
+      } catch (_) {}
+    }
+    this._startCountdown();
   }
 
   // === Match start variants ===
@@ -380,6 +426,7 @@ export class Game {
 
   endMatch() {
     this.running = false;
+    this.lobbyActive = false;
     this._cleanup();
     this.net.disconnect();
   }
