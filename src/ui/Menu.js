@@ -9,6 +9,12 @@ export class Menu {
   constructor(game) {
     this.game = game;
     this.root = document.getElementById('ui-root');
+    // Soft hover blip on any menu button (delegated — covers every screen,
+    // incl. dynamically-built ones). audio.hover() self-throttles.
+    this.root.addEventListener('pointerover', (e) => {
+      const b = e.target.closest?.('button');
+      if (b && !b.disabled) audio.hover?.();
+    });
     this.selectedChar = ROSTER[0].id;
     this.bots = 3;
     this.level = 'arena';

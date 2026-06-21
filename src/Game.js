@@ -400,10 +400,10 @@ export class Game {
     const lockMs = 3 * 700 + 200;
     const until = performance.now() + lockMs;
     for (const p of this.players) if (p) p._frozenUntil = until;
-    this.hud.showCenter('3', '', 700);
-    this._countdownTimers.push(setTimeout(() => { audio.beep?.(660, 0.08, 'square', 0.15); this.hud.showCenter('2', '', 700); }, 700));
-    this._countdownTimers.push(setTimeout(() => { audio.beep?.(660, 0.08, 'square', 0.15); this.hud.showCenter('1', '', 700); }, 1400));
-    this._countdownTimers.push(setTimeout(() => { audio.beep?.(990, 0.12, 'square', 0.2); this.hud.showCenter('FIGHT', 'last one standing wins', 1200); }, 2100));
+    audio.countdown?.(); this.hud.showCenter('3', '', 700);
+    this._countdownTimers.push(setTimeout(() => { audio.countdown?.(); this.hud.showCenter('2', '', 700); }, 700));
+    this._countdownTimers.push(setTimeout(() => { audio.countdown?.(); this.hud.showCenter('1', '', 700); }, 1400));
+    this._countdownTimers.push(setTimeout(() => { audio.go?.(); this.hud.showCenter('FIGHT', 'last one standing wins', 1200); }, 2100));
   }
 
   _cleanup() {
