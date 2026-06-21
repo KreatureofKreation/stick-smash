@@ -192,6 +192,7 @@ export class Game {
   // Called by Net when the lobby state is established (host or client).
   // Stores lobby data on the game and shows the lobby menu screen.
   enterLobby({ isHost, code, levelId, bots, players }) {
+    const alreadyInLobby = this.lobbyActive && this.menu._currentScreen === 'lobby';
     this.lobbyActive = true;
     this.running = false;
     this._lobbyRoster = players || [];
@@ -199,7 +200,13 @@ export class Game {
     this._lobbyCode = code;
     this.levelId = levelId || 'arena';
     this._lobbyBots = bots ?? 2;
-    this.menu.show('lobby');
+    if (alreadyInLobby) {
+      // Partial refresh: update player list without rebuilding the DOM so
+      // the client's ready button state (_lobbyReady) is preserved.
+      this.menu.refreshLobby(this._lobbyRoster, !!isHost, code, levelId || 'arena');
+    } else {
+      this.menu.show('lobby');
+    }
   }
 
   // Called by the host's START MATCH button (via net.startLobbyMatch()).
@@ -432,7 +439,7 @@ export class Game {
   }
 
   restart() {
-    if (this.net.role) this.net.disconnect();
+    this.net?.disconnect();
     if (!this.localPlayer) return this.menu.show('main');
     // Round-end map rotation: pick a different level for variety.
     const otherIds = LEVELS.map(l => l.id).filter(id => id !== this.levelId);
@@ -967,6 +974,7 @@ export class Game {
       if (local.lives <= 0 && local.state === STATE.DEAD) {
         this.running = false;
         audio.death();
+        this.net.broadcast?.({ t: 'gameover', text: 'KO!', sub: `${local.name} eliminated.` });
         setTimeout(() => this.menu.show('over', 'KO!', `${local.name} eliminated.`), 1200);
         return;
       }
@@ -978,6 +986,7 @@ export class Game {
     if (stillIn.length === 0) {
       this.running = false;
       audio.death();
+      this.net.broadcast?.({ t: 'gameover', text: 'DRAW', sub: 'Everyone went down.' });
       setTimeout(() => this.menu.show('over', 'DRAW', 'Everyone went down.'), 1200);
       return;
     }
@@ -989,11 +998,13 @@ export class Game {
       const localWon = this.localPlayers.includes(winner);
       if (localWon) audio.win(); else audio.death();
       const sub = `${winner.name} wins!`;
+      this.net.broadcast?.({ t: 'gameover', text: 'VICTORY', sub });
       setTimeout(() => this.menu.show('over', 'VICTORY', sub), 800);
     }
   }
 
   _snapshot() {
+    if (!this.level) return { players: [], tiles: [] };
     const data = {
       players: this.players.map(p => p ? {
         id: p.id, name: p.name, character: p.character,
@@ -1092,8 +1103,16 @@ export class Game {
       p.crouching = !!sp.cr;
       p.grounded = sp.gd != null ? !!sp.gd : Math.abs(sp.vy) < 0.5;
     }
+    // BUG 2: destroy ghost players when host roster shrinks.
+    for (let i = snap.players.length; i < this.players.length; i++) {
+      if (this.players[i]) {
+        if (this.players[i] === this.localPlayer) this.localPlayer = null;
+        this.players[i].destroy?.();
+        this.players[i] = null;
+      }
+    }
     // Tile HP updates -> destroy locally
-    for (const [gx, gy, hp] of snap.tiles) {
+    for (const [gx, gy, hp] of snap.tiles ?? []) {
       const t = this.level.tiles.get(`${gx},${gy}`);
       if (t && hp <= 0) t.destroy();
       else if (t) t.hp = hp;
@@ -1109,7 +1128,7 @@ export class Game {
       }
     }
     if (snap.wedges && this.level?.planets) {
-      for (const [planetId, kind, idx, hp] of snap.wedges) {
+      for (const [planetId, kind, idx, hp] of snap.wedges ?? []) {
         const planet = this.level.planets.find(pp => pp.id === planetId);
         if (!planet) continue;
         const w = planet.wedges.find(ww => ww && ww.kind === kind && ww.idx === idx);

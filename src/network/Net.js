@@ -186,6 +186,9 @@ export class Net {
       if (data.snap) this.game.applySnapshot(data.snap);
     } else if (data.t === 'snap') {
       this.game.applySnapshot(data.snap);
+    } else if (data.t === 'gameover') {
+      this.game.running = false;
+      setTimeout(() => this.game.menu?.show('over', data.text, data.sub), 800);
     } else if (data.t === 'event') {
       this.game.handleNetEvent(data.ev);
     } else if (data.t === 'pong') {
@@ -201,6 +204,7 @@ export class Net {
 
   // ── Host path ──────────────────────────────────────────────────────────
   _becomeHost(roomId, opts) {
+    opts = opts || {};
     if (this.peer) try { this.peer.destroy(); } catch (_) {}
     this.role = 'host';
     this.roomId = roomId;
