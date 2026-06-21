@@ -160,11 +160,6 @@ export class HUD {
         { name: 'time',    icon: '⏱', until: local.timeSlowUntil,  col: '#ff4d6d' },
         { name: 'super',   icon: '👊', until: local.superPunchUntil, col: '#ffcc33' },
         { name: 'speed',   icon: '⚡', until: local.speedBoostUntil, col: '#66e2a3' },
-        { name: 'gum',     icon: '🟣', until: local.gumGumUntil,    col: '#c870ff' },
-        { name: 'push',    icon: '🌀', until: local.forcePushUntil, col: '#77aaff' },
-        { name: 'pull',    icon: '🧲', until: local.forcePullUntil, col: '#4dccff' },
-        { name: 'lightng', icon: '⚡', until: local.forceLightningUntil, col: '#c870ff' },
-        { name: 'choke',   icon: '👐', until: local.forceChokeUntil, col: '#ff4d6d' },
       ];
       let html = '';
       for (const b of buffs) {

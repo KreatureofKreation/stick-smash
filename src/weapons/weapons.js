@@ -3163,13 +3163,11 @@ export const SPAWN_TABLE = [
   // melee
   { cls: Sword,         w: 12,  id: 'sword',        label: 'Katana',        cat: 'melee' },
   { cls: Bat,           w: 10,  id: 'bat',          label: 'Bat',           cat: 'melee' },
-  { cls: Longsword,     w: 10,  id: 'longsword',    label: 'Longsword',     cat: 'melee' },
   { cls: Mace,          w: 9,   id: 'mace',         label: 'Mace',          cat: 'melee' },
   { cls: WarHammer,     w: 6,   id: 'warhammer',    label: 'War Hammer',    cat: 'melee' },
   { cls: Halberd,       w: 8,   id: 'halberd',      label: 'Halberd',       cat: 'melee' },
   { cls: HulkHands,     w: 4,   id: 'hulkhands',    label: 'Hulk Hands',    cat: 'melee' },
   // ranged
-  { cls: Pistol,        w: 14,  id: 'pistol',       label: 'Pistol',        cat: 'ranged' },
   { cls: Shotgun,       w: 9,   id: 'shotgun',      label: 'Shotgun',       cat: 'ranged' },
   { cls: Minigun,       w: 5,   id: 'minigun',      label: 'Minigun',       cat: 'ranged' },
   { cls: Grenade,       w: 8,   id: 'grenade',      label: 'Grenade',       cat: 'ranged' },
@@ -3179,10 +3177,9 @@ export const SPAWN_TABLE = [
   { cls: StickyBomb,    w: 4,   id: 'sticky',       label: 'Sticky Bomb',   cat: 'ranged' },
   { cls: SMG,           w: 10,  id: 'smg',          label: 'SMG',           cat: 'ranged' },
   { cls: AssaultRifle,  w: 9,   id: 'assaultrifle', label: 'Assault Rifle', cat: 'ranged' },
-  { cls: Revolver,      w: 7,   id: 'revolver',     label: 'Revolver',      cat: 'ranged' },
+  { cls: Revolver,      w: 14,  id: 'revolver',     label: 'Revolver',      cat: 'ranged' },
   { cls: Crossbow,      w: 6,   id: 'crossbow',     label: 'Crossbow',      cat: 'ranged' },
   { cls: Flamethrower,  w: 5,   id: 'flamethrower', label: 'Flamethrower',  cat: 'ranged' },
-  { cls: DualPistols,   w: 8,   id: 'dualpistols',  label: 'Dual Pistols',  cat: 'ranged' },
   // joke
   { cls: RubberChicken, w: 2,   id: 'chicken',      label: 'Rubber Chicken',cat: 'joke' },
   { cls: Boomerang,     w: 5,   id: 'boomerang',    label: 'Boomerang',     cat: 'joke' },
@@ -3199,18 +3196,12 @@ export const SPAWN_TABLE = [
   { cls: ArmorPlate,    w: 6,   id: 'armor',        label: 'Armor',         cat: 'pickup' },
   { cls: SpeedBoost,    w: 6,   id: 'speed',        label: 'Speed Boost',   cat: 'pickup' },
   { cls: Shield,        w: 5,   id: 'shield',       label: 'Shield',        cat: 'pickup' },
-  // powers
+  // powers — Force powers + Gum-Gum culled (freed the Special button for the
+  // block/parry shield). Super Punch already off-spawn (Hulk Hands fills that
+  // role). Cut classes stay exported (harmless) but no longer spawn.
   { cls: FlightPower,       w: 5, id: 'flight',     label: 'Flight',        cat: 'power' },
   { cls: InvisibilityPower, w: 5, id: 'invis',      label: 'Invisibility',  cat: 'power' },
   { cls: TimeSlowPower,     w: 4, id: 'timeslow',   label: 'Time Slow',     cat: 'power' },
-  // Super Punch removed from spawns — Hulk Hands fills the "big knockback
-  // melee" role with proper visual identity. The class stays exported in
-  // case other systems still buff Stickman.superPunchUntil directly.
-  { cls: GumGumFruit,       w: 4, id: 'gumgum',     label: 'Gum-Gum',       cat: 'power' },
-  { cls: ForcePushPower,    w: 5, id: 'forcepush', label: 'Force Push',    cat: 'power' },
-  { cls: ForcePullPower,    w: 5, id: 'forcepull', label: 'Force Pull',    cat: 'power' },
-  { cls: ForceLightningPower,w: 4,id: 'forcelight',label: 'Force Lightning', cat: 'power' },
-  { cls: ForceChokePower,   w: 4, id: 'forcechoke',label: 'Force Choke',   cat: 'power' },
 ];
 
 // Module-level enabled set. `null` means "all enabled" — the default. The
@@ -3226,7 +3217,7 @@ export function pickRandomSpawn() {
   const pool = SPAWN_TABLE.filter(e => !_disabledIds.has(e.id));
   // Fallback: if the user disabled literally every spawn, return Pistol so
   // the match still gets weapons (better than spawning nothing forever).
-  if (!pool.length) return Pistol;
+  if (!pool.length) return Revolver;
   const total = pool.reduce((s, e) => s + e.w, 0);
   let r = Math.random() * total;
   for (const e of pool) { r -= e.w; if (r <= 0) return e.cls; }

@@ -262,11 +262,6 @@ export class Stickman {
     this.superPunchUntil = 0;
     this.timeSlowUntil = 0;
     this.gumGumUntil = 0;
-    this.forcePushUntil = 0;
-    this.forcePullUntil = 0;
-    this.forceLightningUntil = 0;
-    this.forceChokeUntil = 0;
-    this._forceCooldown = 0;
     this._burnUntil = 0;
     this._burnTickAt = 0;
     this._burnSrc = null;
@@ -862,119 +857,6 @@ export class Stickman {
     this.body.velocity.set(0, 0, 0);
     this.body.angularVelocity.set(0, 0, 0);
     audio.click();
-  }
-
-  _forcePush() {
-    const radius = 6.5;
-    const game = this.game;
-    if (game?.fx) {
-      game.fx.particles.burst(this.position.x + this.facing * 0.6, this.position.y + 0.4, 0, { count: 36, speed: 14, color: 0x88aaff });
-      game.fx.camera.punch(0.3);
-    }
-    audio.sweep(900, 80, 0.3, 'sawtooth', 0.35);
-    for (const p of game.players) {
-      if (!p || p === this || !p.alive || p.invuln > 0) continue;
-      const dx = p.position.x - this.position.x;
-      const dy = p.position.y - this.position.y;
-      const d = Math.hypot(dx, dy);
-      if (d >= radius) continue;
-      // Only push targets in front (don't blast 360°).
-      if ((dx > 0 ? 1 : -1) !== this.facing) continue;
-      const f = 1 - d / radius;
-      const nx = dx / Math.max(0.1, d), ny = dy / Math.max(0.1, d);
-      p.takeDamage(8 * f, {
-        attacker: this, weapon: 'forcePush',
-        kb: { x: nx * 28 * f, y: ny * 8 * f + 6 }, stun: 0.4 * f,
-      });
-    }
-  }
-  _forcePull() {
-    const radius = 8;
-    const game = this.game;
-    if (game?.fx) game.fx.particles.burst(this.position.x, this.position.y + 0.4, 0, { count: 24, speed: 10, color: 0x4dccff });
-    audio.sweep(120, 1000, 0.3, 'sine', 0.3);
-    for (const p of game.players) {
-      if (!p || p === this || !p.alive || p.invuln > 0) continue;
-      const dx = this.position.x - p.position.x;
-      const dy = (this.position.y + 0.5) - p.position.y;
-      const d = Math.hypot(dx, dy);
-      if (d >= radius) continue;
-      if (d < 1) continue; // already touching
-      const nx = dx / Math.max(0.1, d), ny = dy / Math.max(0.1, d);
-      p.body.velocity.x = nx * 18;
-      p.body.velocity.y = ny * 14 + 4;
-      p.takeDamage(2, { attacker: this, weapon: 'forcePull' });
-    }
-  }
-  _forceLightning() {
-    const game = this.game;
-    const start = { x: this.position.x + this.facing * 0.6, y: this.position.y + 0.55 };
-    let prev = start;
-    const hit = new Set();
-    audio.sweep(2200, 200, 0.18, 'square', 0.3);
-    audio.noise(0.12, 0.25, 6000);
-    for (let i = 0; i < 3; i++) {
-      let best = null, bestD2 = 12 * 12;
-      for (const p of game.players) {
-        if (!p || p === this || !p.alive || p.invuln > 0) continue;
-        if (hit.has(p.id)) continue;
-        const dx = p.position.x - prev.x, dy = p.position.y - prev.y;
-        const d2 = dx * dx + dy * dy;
-        if (d2 < bestD2) { bestD2 = d2; best = p; }
-      }
-      if (!best) break;
-      hit.add(best.id);
-      const segs = 10;
-      for (let s = 0; s < segs; s++) {
-        const t = s / (segs - 1);
-        const x = prev.x + (best.position.x - prev.x) * t + (Math.random() - 0.5) * 0.25;
-        const y = prev.y + (best.position.y + 0.45 - prev.y) * t + (Math.random() - 0.5) * 0.25;
-        game.fx.particles.spark.spawn({ x, y, z: 0, vx: 0, vy: 0, life: 0.15, size: 0.13, color: 0xeeccff, gravity: 0, drag: 0.9, shrink: 1 });
-      }
-      best.takeDamage(18 - i * 4, {
-        attacker: this, weapon: 'lightning',
-        kb: { x: (best.position.x - prev.x) * 0.8, y: 3 }, stun: 0.25,
-      });
-      prev = { x: best.position.x, y: best.position.y };
-    }
-    game.fx.camera.punch(0.18);
-  }
-  _forceChoke() {
-    const game = this.game;
-    // Find closest enemy in front of facing.
-    let best = null, bestD2 = 7 * 7;
-    for (const p of game.players) {
-      if (!p || p === this || !p.alive || p.invuln > 0) continue;
-      const dx = p.position.x - this.position.x;
-      const dy = p.position.y - this.position.y;
-      if ((dx > 0 ? 1 : -1) !== this.facing) continue;
-      const d2 = dx * dx + dy * dy;
-      if (d2 < bestD2) { bestD2 = d2; best = p; }
-    }
-    if (!best) return;
-    audio.sweep(80, 30, 0.6, 'sawtooth', 0.25);
-    // Lift target.
-    best.body.velocity.x = 0;
-    best.body.velocity.y = 12;
-    best.takeDamage(20, {
-      attacker: this, weapon: 'choke',
-      kb: { x: 0, y: 12 }, stun: 0.7,
-    });
-    // Shake them mid-air.
-    const target = best;
-    const tickStart = performance.now();
-    const shakeFn = () => {
-      const elapsed = performance.now() - tickStart;
-      if (elapsed > 700 || !target.alive) return;
-      target.body.velocity.x = (Math.random() - 0.5) * 6;
-      target.body.velocity.y = 6;
-      requestAnimationFrame(shakeFn);
-    };
-    shakeFn();
-    if (game.fx) {
-      game.fx.particles.burst(target.position.x, target.position.y + 0.4, 0, { count: 18, speed: 6, color: 0xff4d6d });
-      game.fx.camera.punch(0.2);
-    }
   }
 
   _throwWeapon() {
@@ -2049,23 +1931,12 @@ export class Stickman {
       if (this.weapon?.heldTick) this.weapon.heldTick(dt, this);
       if (now.attackReleased && this.weapon?.releaseFire) this.weapon.releaseFire(this);
 
-      // Special / weapon alt fire / force powers.
-      if (now.specialPressed) {
-        const tNow = performance.now();
-        let didFire = false;
-        if (this._forceCooldown <= 0) {
-          if (tNow < this.forcePushUntil) { this._forcePush(); this._forceCooldown = 0.7; didFire = true; }
-          else if (tNow < this.forcePullUntil) { this._forcePull(); this._forceCooldown = 0.7; didFire = true; }
-          else if (tNow < this.forceLightningUntil) { this._forceLightning(); this._forceCooldown = 0.4; didFire = true; }
-          else if (tNow < this.forceChokeUntil) { this._forceChoke(); this._forceCooldown = 1.0; didFire = true; }
-          else if (this.weapon?.altFire) { this.weapon.altFire(this); didFire = true; }
-        } else if (this.weapon?.altFire && performance.now() >= this.forcePushUntil && performance.now() >= this.forcePullUntil) {
-          this.weapon.altFire(this);
-          didFire = true;
-        }
-        if (didFire && this === this.game?.localPlayer) vibrate(40);
+      // Special button → weapon alt-fire for now. Phase 2 (block/parry shield)
+      // replaces this handler entirely. Force powers were culled.
+      if (now.specialPressed && this.weapon?.altFire) {
+        this.weapon.altFire(this);
+        if (this === this.game?.localPlayer) vibrate(40);
       }
-      if (this._forceCooldown > 0) this._forceCooldown -= dt;
 
       // Throw held weapon as a projectile.
       if (now.throwPressed && this.weapon) this._throwWeapon();
