@@ -264,6 +264,7 @@ export class Game {
 
   _startMatch({ character, name, bots, levelId, isOnline, asClient, localPlayerId, localMP = false, extras = null }) {
     this._cleanup();
+    this.lobbyActive = false;   // any match start exits the lobby state
     this.levelId = levelId;
     this.level = new Level(this.scene, this.physics, this.fx, getLevel(levelId), this);
     this.camera._level = this.level;
