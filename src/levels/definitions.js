@@ -1222,19 +1222,20 @@ export const LEVELS = [
       killBound: { x: 24, y: 30 },
       tiles: [
         ...castleFrame(),
-        // Tier 1 (y=4) — symmetric short bridges.
-        ...row(4, -8, -5, { material: 'bouncy', hp: 30, color: TIER[1] }),
-        ...row(4,  5,  8, { material: 'bouncy', hp: 30, color: TIER[1] }),
+        // Tier 1 (y=4) — symmetric short bridges. HP raised so the castle
+        // structure holds up under combat instead of crumbling early.
+        ...row(4, -8, -5, { material: 'bouncy', hp: 120, color: TIER[1] }),
+        ...row(4,  5,  8, { material: 'bouncy', hp: 120, color: TIER[1] }),
         // Tier 2 (y=8) — wider center bridge.
-        ...row(8, -6,  6, { material: 'bouncy', hp: 30, color: TIER[2] }),
+        ...row(8, -6,  6, { material: 'bouncy', hp: 120, color: TIER[2] }),
         // Tier 3 (y=12) — symmetric short bridges + center trampoline pad.
-        ...row(12, -8, -5, { material: 'bouncy', hp: 30, color: TIER[3] }),
-        ...row(12,  5,  8, { material: 'bouncy', hp: 30, color: TIER[3] }),
-        { x: 0, y: 12, shape: 'box', w: 1.6, h: 0.6, material: 'bouncy', hp: 25, color: TRAMP },
+        ...row(12, -8, -5, { material: 'bouncy', hp: 120, color: TIER[3] }),
+        ...row(12,  5,  8, { material: 'bouncy', hp: 120, color: TIER[3] }),
+        { x: 0, y: 12, shape: 'box', w: 1.6, h: 0.6, material: 'bouncy', hp: 100, color: TRAMP },
         // Tier 4 (y=16) — narrow top bridge.
-        ...row(16, -3, 3, { material: 'bouncy', hp: 25, color: 0xffffff }),
+        ...row(16, -3, 3, { material: 'bouncy', hp: 100, color: 0xffffff }),
         // Bell prize sphere atop center.
-        { x: 0, y: 18.2, shape: 'sphere', radius: 0.7, material: 'bouncy', hp: 30, color: 0xffffff },
+        { x: 0, y: 18.2, shape: 'sphere', radius: 0.7, material: 'bouncy', hp: 120, color: 0xffffff },
       ],
       hazards: [],
       spawns: [
@@ -1252,42 +1253,6 @@ export const LEVELS = [
       background: castleBg(),
     }];
   })(),
-
-  // ---------------------------------------------------------------------
-  // PLANET TEST — single planet for tuning curved-gravity feel.
-  // Once movement + gravity feel right here, scale up to multi-planet.
-  // ---------------------------------------------------------------------
-  {
-    id: 'planettest_single',
-    name: 'Planet Test (Single)',
-    bgColor: 0x000008,
-    gravity: 0,
-    curvedGravity: true,
-    cameraClamp: { x: [-30, 30], y: [-25, 25], zoom: [12, 30] },
-    killBound: { x: 30, y: 25 },
-    planets: [
-      { id: 'p1', cx: 0, cy: 0, radius: 5.0, mantleRadius: 3.5, coreRadius: 1.6, mass: 40, pullStrength: 18 },
-    ],
-    tiles: [],
-    hazards: [],
-    spawns: [
-      { x: 0, y: 6.5 },     // top
-      { x: -6.5, y: 0 },    // left
-      { x: 6.5, y: 0 },     // right
-      { x: 0, y: -6.5 },    // bottom
-    ],
-    weaponSpawns: [
-      { x: 0, y: 6.5 }, { x: -6.5, y: 0 }, { x: 6.5, y: 0 }, { x: 0, y: -6.5 },
-    ],
-    background: [
-      bgGlow(-12, 14, 0.18, 0.18, 0xffffff, -16),
-      bgGlow(8, 12, 0.18, 0.18, 0xffffff, -16),
-      bgGlow(-8, -12, 0.18, 0.18, 0xeeeeff, -16),
-      bgGlow(14, -8, 0.18, 0.18, 0xffffff, -16),
-      bgGlow(-14, 4, 0.15, 0.15, 0xddddff, -16),
-      bgGlow(11, -14, 0.15, 0.15, 0xffffff, -16),
-    ],
-  },
 
   // ---------------------------------------------------------------------
   // CRATE ZONE — pure crate physics. No static floor inside the kill
