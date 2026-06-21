@@ -60,14 +60,19 @@ export class Tile {
     const w = this.w ?? 1;
     const h = this.h ?? 1;
     const d = this.d ?? 1;
-    const dyn = !!this.dynamic;
+    // Chain-suspended platforms must be DYNAMIC from creation — the Rapier-backed
+    // shim won't promote a static body to dynamic after the fact, so they have to
+    // start dynamic to actually hang/swing from their chain. fixedRotation keeps
+    // the platform level (standable); firm damping settles the swing.
+    const hung = !!this.chainAnchor;
+    const dyn = !!this.dynamic || hung;
 
     const body = new CANNON.Body({
-      mass: dyn ? (this.tileMass ?? 8) : 0,
+      mass: dyn ? (this.tileMass ?? (hung ? Math.max(2.5, w * h * 2.0) : 8)) : 0,
       material: phyMat,
-      linearDamping: dyn ? 0.2 : 0.01,
-      angularDamping: dyn ? 0.5 : 0.01,
-      fixedRotation: dyn ? false : true,
+      linearDamping: hung ? 0.5 : (dyn ? 0.2 : 0.01),
+      angularDamping: hung ? 0.6 : (dyn ? 0.5 : 0.01),
+      fixedRotation: (dyn && !hung) ? false : true,
       collisionFilterGroup: COL_GROUPS.WORLD,
       collisionFilterMask: -1,
     });
@@ -888,8 +893,14 @@ export class Level {
     if (!tile.body) return;
     const segCount = Math.max(3, spec.segs ?? 4);
     const segR = 0.10;
-    const ax = spec.x, ay = spec.y;
     const tx = tile.body.position.x, ty = tile.body.position.y;
+    // Anchor the chain straight ABOVE the tile (not at the authored spec.x). The
+    // tile is dynamic now and hangs as a pendulum from this anchor — putting the
+    // anchor directly overhead makes the pendulum's rest position equal the
+    // tile's DESIGNED spot, so a row of platforms sharing one authored anchor
+    // doesn't swing inward and collapse on load. spec.y still sets how high the
+    // chain rises. The tile swings on a side hit and settles back to its spot.
+    const ax = tx, ay = spec.y;
     const dx = tx - ax, dy = ty - ay;
     const dist = Math.hypot(dx, dy) || 0.0001;
     const segLen = dist / segCount;
@@ -919,9 +930,12 @@ export class Level {
 
     for (let i = 0; i < segCount; i++) {
       const segBody = new CANNON.Body({
-        mass: 0.20,
+        // Heavier links than the old 0.20 so the constraint solver stays stable
+        // when a dynamic platform now hangs off the bottom of the chain (better
+        // mass ratio = less stretch/jitter under load).
+        mass: 0.6,
         material: this.physics.materials.prop,
-        linearDamping: 0.1, angularDamping: 0.4,
+        linearDamping: 0.2, angularDamping: 0.5,
         collisionFilterGroup: COL_GROUPS.CHAIN,
         collisionFilterMask: COL_GROUPS.PROJECTILE | COL_GROUPS.HAZARD,
       });
@@ -968,6 +982,12 @@ export class Level {
     constraints.push(cTile);
 
     tile._chainSuspension = { anchorBody, anchorMesh, segs, constraints };
+    // The tile body is built DYNAMIC + fixedRotation (see Tile.build, chainAnchor
+    // path) so this rigid chain actually suspends it: it hangs taut at its
+    // designed spot, swings on a hit, and falls when a seg is severed
+    // (ChainSeg.onBreak → _dropSuspendedTile). Nothing more to do here —
+    // converting a static body to dynamic after creation does NOT take in the
+    // Rapier-backed physics, which is why the suspension is set at build time.
   }
 
   // Convert a chain-suspended OR parent-stacked static tile into a falling
@@ -978,6 +998,15 @@ export class Level {
   _dropSuspendedTile(tile) {
     if (!tile || tile._dropped || !tile.body) return;
     tile._dropped = true;
+    // Sever the suspension so the platform actually falls — remove the stiff
+    // anchor tether + any remaining chain constraints (the broken seg already
+    // removed its own). Without this the tether keeps it pinned to the anchor.
+    if (tile._chainSuspension) {
+      for (const c of tile._chainSuspension.constraints) {
+        try { this.physics.world.removeConstraint(c); } catch (_) {}
+      }
+      tile._chainSuspension.constraints.length = 0;
+    }
     const body = tile.body;
     const mass = tile.tileMass ?? Math.max(4, tile.w * tile.h * 6);
     body.mass = mass;
