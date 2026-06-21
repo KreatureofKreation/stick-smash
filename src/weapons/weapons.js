@@ -3192,6 +3192,193 @@ export const PICKUP_CLASSES = [
 // Spawn table — every entry tagged with a stable `id` (used for the
 // player-facing toggle UI's localStorage keys), a `label` (display text),
 // and a `cat` (group bucket for the weapon-toggle settings panel).
+// =============================================================================
+// New weapons (overhaul Phase 5).
+// =============================================================================
+
+// SPIKE THROWER — fires a spike that impales + PINS the target in place
+// (no bleed). noPush so the pin isn't fought by knockback.
+export class SpikeThrower extends Weapon {
+  constructor(game) {
+    super(game);
+    this.name = 'Spike Thrower'; this.icon = '🔱';
+    this.fireDelay = 0.7; this.aimWeapon = true; this.poseRight = 'aim'; this.poseLeft = null;
+    this.ammo = 5; this.length = 0.7; this.barrelOffset = 0.6;
+    this.recoilImpulse = 4; this.throwImpulse = 4; this.hitKnockback = 1.0;
+  }
+  _buildMesh() {
+    const grp = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.1), new THREE.MeshLambertMaterial({ color: 0x3a3a44 }));
+    body.position.x = 0.2;
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.04, 0.04), new THREE.MeshLambertMaterial({ color: 0x6a6a72 }));
+    rail.position.set(0.32, 0.08, 0);
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.2, 0.08), new THREE.MeshLambertMaterial({ color: 0x222226 }));
+    grip.position.set(0.05, -0.16, 0); grip.rotation.z = -0.2;
+    grp.add(body, rail, grip); this.mesh = grp;
+  }
+  fire(player) {
+    const aim = this.effectiveAimDir ?? player.aimDir;
+    const sp = 42; const mz = this._muzzlePos(player);
+    const spike = new THREE.Group();
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 6), new THREE.MeshLambertMaterial({ color: 0x9a9aa4 }));
+    shaft.rotation.z = Math.PI / 2;
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.16, 6), new THREE.MeshLambertMaterial({ color: 0xcfcfd8 }));
+    tip.rotation.z = -Math.PI / 2; tip.position.x = 0.3;
+    spike.add(shaft, tip); spike.rotation.z = Math.atan2(aim.y, aim.x);
+    const proj = new Projectile(this.game, {
+      x: mz.x, y: mz.y, vx: aim.x * sp, vy: aim.y * sp,
+      damage: 0, owner: player, gravity: true, gravityScale: 0.4, life: 2, radius: 0.09,
+      mesh: spike, noPush: true, tracerColor: 0xcfcfd8,
+    });
+    proj.onHit = (pr, other) => {
+      if (other.userData?.kind !== 'player') return;
+      const sm = other.userData.stickman;
+      if (!sm || sm === player) return;
+      sm.takeDamage(14, { attacker: player, weapon: 'spike' });   // no kb → stays put
+      sm._pinnedUntil = performance.now() + 1200;
+      this.game.fx.particles.burst(sm.position.x, sm.position.y + 0.3, 0, { count: 12, speed: 5, color: 0xcfcfd8 });
+    };
+    audio.shoot();
+    if (window.__forceFeatures?.recoil !== 0 && this.recoilImpulse > 0) player.applyImpulse(-aim.x * this.recoilImpulse, -aim.y * this.recoilImpulse);
+    this.game.fx.camera.punch(0.15);
+  }
+}
+
+// SHRINK RAY — beam that shrinks the target for a few seconds (smaller, easier
+// to launch). Wears off.
+export class ShrinkRay extends Weapon {
+  constructor(game) {
+    super(game);
+    this.name = 'Shrink Ray'; this.icon = '🔬';
+    this.fireDelay = 0.8; this.aimWeapon = true; this.poseRight = 'aim'; this.poseLeft = null;
+    this.ammo = 4; this.length = 0.6; this.barrelOffset = 0.6; this.throwImpulse = 3;
+  }
+  _buildMesh() {
+    const grp = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.16, 0.12), new THREE.MeshLambertMaterial({ color: 0x6a3a8a }));
+    body.position.x = 0.18;
+    const dish = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.18, 12, 1, true), new THREE.MeshLambertMaterial({ color: 0xc060ff, emissive: 0x6a1a8a, side: THREE.DoubleSide }));
+    dish.rotation.z = -Math.PI / 2; dish.position.x = 0.42;
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.18, 0.08), new THREE.MeshLambertMaterial({ color: 0x2a1838 }));
+    grip.position.set(0.05, -0.15, 0);
+    grp.add(body, dish, grip); this.mesh = grp;
+  }
+  fire(player) {
+    const aim = this.effectiveAimDir ?? player.aimDir;
+    const sp = 48; const mz = this._muzzlePos(player);
+    const orb = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), new THREE.MeshLambertMaterial({ color: 0xc060ff, emissive: 0x9020dd, emissiveIntensity: 1 }));
+    const proj = new Projectile(this.game, {
+      x: mz.x, y: mz.y, vx: aim.x * sp, vy: aim.y * sp,
+      damage: 0, owner: player, gravity: false, life: 1.2, radius: 0.13,
+      mesh: orb, noPush: true, tracerColor: 0xc060ff,
+    });
+    proj.onHit = (pr, other) => {
+      if (other.userData?.kind !== 'player') return;
+      const sm = other.userData.stickman;
+      if (!sm || sm === player) return;
+      sm._shrinkUntil = performance.now() + 5000;
+      sm.takeDamage(6, { attacker: player, weapon: 'shrink' });
+      this.game.fx.particles.burst(sm.position.x, sm.position.y + 0.3, 0, { count: 16, speed: 6, color: 0xc060ff });
+    };
+    audio.shoot(); audio.beep(1400, 0.1, 'sine', 0.2); this.game.fx.camera.punch(0.1);
+  }
+}
+
+// METEOR STORM (super) — calls a barrage of meteors down across the arena.
+// Spawned all at once from staggered heights so they rain in over ~2s.
+export class MeteorStorm extends Weapon {
+  constructor(game) {
+    super(game);
+    this.name = 'Meteor Storm'; this.icon = '☄'; this.ammo = 1; this.fireDelay = 0.5; this.throwImpulse = 3;
+  }
+  _buildMesh() {
+    const grp = new THREE.Group();
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.16), new THREE.MeshLambertMaterial({ color: 0x6a3a2a, emissive: 0xff4400, emissiveIntensity: 0.4 }));
+    const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.5, 6), new THREE.MeshLambertMaterial({ color: 0x33221a }));
+    staff.position.y = -0.2;
+    grp.add(rock, staff); this.mesh = grp;
+  }
+  fire(player) {
+    audio.explode(); this.game.fx.camera.punch(0.5);
+    const cx = player.position.x, cy = player.position.y;
+    for (let i = 0; i < 18; i++) {
+      const x = cx + rand(-13, 13);
+      const y = cy + rand(11, 24);   // staggered height → staggered landing
+      const m = new THREE.Mesh(new THREE.DodecahedronGeometry(0.3), new THREE.MeshLambertMaterial({ color: 0x5a2a1a, emissive: 0xff5500, emissiveIntensity: 0.8 }));
+      new Projectile(this.game, {
+        x, y, vx: rand(-2, 2), vy: rand(-14, -10),
+        damage: 24, owner: player, gravity: true, gravityScale: 1.4, life: 4, radius: 0.3,
+        mesh: m, explosive: true, explodeOnContact: true, explodeRadius: 2.4, explodeDamage: 30, tracerColor: 0xff6600,
+      });
+    }
+    player.weapon = null; this.destroy();
+  }
+}
+
+// VACUUM GUN — hold to suck players (+loose stuff) toward the muzzle; release to
+// blast them back out. Captured count boosts the blast.
+export class VacuumGun extends Weapon {
+  constructor(game) {
+    super(game);
+    this.name = 'Vacuum Gun'; this.icon = '🌀';
+    this.aimWeapon = true; this.poseRight = 'aim'; this.poseLeft = null;
+    this.ammo = Infinity; this.length = 0.75; this.barrelOffset = 0.62;
+    this._held = false; this._captured = 0; this.throwImpulse = 3; this.hitKnockback = 1.0;
+  }
+  _buildMesh() {
+    const grp = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.18, 0.14), new THREE.MeshLambertMaterial({ color: 0x33445a }));
+    body.position.x = 0.16;
+    const funnel = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.08, 0.26, 14, 1, true), new THREE.MeshLambertMaterial({ color: 0x5a7aa0, side: THREE.DoubleSide, emissive: 0x14304a }));
+    funnel.rotation.z = -Math.PI / 2; funnel.position.x = 0.5;
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.2, 0.08), new THREE.MeshLambertMaterial({ color: 0x202830 }));
+    grip.position.set(0.04, -0.16, 0);
+    grp.add(body, funnel, grip); this.mesh = grp;
+  }
+  tryFire(player) { this._held = true; }
+  releaseFire(player) { if (this._held) { this._held = false; this._blast(player); } }
+  heldTick(dt, player) { if (this._held) this._suck(dt, player); }
+  _suck(dt, player) {
+    const aim = this.effectiveAimDir ?? player.aimDir;
+    const mz = this._muzzlePos(player);
+    for (const p of this.game.players) {
+      if (!p || p === player || !p.alive) continue;
+      const dx = p.position.x - mz.x, dy = p.position.y - mz.y; const d = Math.hypot(dx, dy) || 1;
+      if (d > 7 || d < 0.6) { if (d < 0.6) this._captured++; continue; }
+      const dot = (dx / d) * aim.x + (dy / d) * aim.y;
+      if (dot < 0.3) continue;                 // only what's in front of the funnel
+      // Drag the target IN by nudging position toward the muzzle — a velocity
+      // push would just be overwritten by their own _move each frame. Capped so
+      // it can't tunnel through walls.
+      const step = Math.min(0.26, 20 * (1 - d / 7) * dt);
+      p.body.wakeUp?.();
+      p.body.position.x += -(dx / d) * step;
+      p.body.position.y += (-(dy / d) + 0.15) * step;
+      p.body.velocity.x += -(dx / d) * 4 * dt;   // a little velocity for feel
+      if (d < 1.4) this._captured++;
+    }
+    if (Math.random() < dt * 25 && this.game.fx) this.game.fx.particles.spark.spawn({
+      x: mz.x + aim.x * rand(1, 4), y: mz.y + aim.y * rand(1, 4), z: 0,
+      vx: -aim.x * 9, vy: -aim.y * 9, life: 0.25, size: 0.1, color: 0x99ccff, gravity: 0, drag: 0.8, shrink: 1,
+    });
+  }
+  _blast(player) {
+    const aim = this.effectiveAimDir ?? player.aimDir;
+    const mz = this._muzzlePos(player);
+    const power = 16 + Math.min(20, this._captured * 0.5); this._captured = 0;
+    for (const p of this.game.players) {
+      if (!p || p === player || !p.alive) continue;
+      const dx = p.position.x - mz.x, dy = p.position.y - mz.y; const d = Math.hypot(dx, dy) || 1;
+      if (d > 5.5) continue;
+      const dot = (dx / d) * aim.x + (dy / d) * aim.y;
+      if (dot < 0) continue;
+      p.takeDamage(10, { attacker: player, weapon: 'vacuum', kb: { x: (dx / d) * power, y: Math.abs((dy / d) * power) + 6 }, stun: 0.3 });
+    }
+    audio.explode(); this.game.fx?.camera.punch(0.3);
+    player.applyImpulse(-aim.x * 5, -aim.y * 5);
+  }
+}
+
 export const SPAWN_TABLE = [
   // melee
   { cls: Sword,         w: 12,  id: 'sword',        label: 'Katana',        cat: 'melee' },
@@ -3213,6 +3400,9 @@ export const SPAWN_TABLE = [
   { cls: Revolver,      w: 14,  id: 'revolver',     label: 'Revolver',      cat: 'ranged' },
   { cls: Crossbow,      w: 6,   id: 'crossbow',     label: 'Crossbow',      cat: 'ranged' },
   { cls: Flamethrower,  w: 5,   id: 'flamethrower', label: 'Flamethrower',  cat: 'ranged' },
+  { cls: SpikeThrower,  w: 7,   id: 'spikethrower', label: 'Spike Thrower', cat: 'ranged' },
+  { cls: ShrinkRay,     w: 5,   id: 'shrinkray',    label: 'Shrink Ray',    cat: 'ranged' },
+  { cls: VacuumGun,     w: 5,   id: 'vacuum',       label: 'Vacuum Gun',    cat: 'ranged' },
   // joke
   { cls: RubberChicken, w: 2,   id: 'chicken',      label: 'Rubber Chicken',cat: 'joke' },
   { cls: Boomerang,     w: 5,   id: 'boomerang',    label: 'Boomerang',     cat: 'joke' },
@@ -3224,6 +3414,7 @@ export const SPAWN_TABLE = [
   { cls: Kamehameha,    w: 2,   id: 'kamehameha',   label: 'Kamehameha',    cat: 'super' },
   { cls: Nuke,          w: 1.5, id: 'nuke',         label: 'Nuke',          cat: 'super' },
   { cls: Lightsaber,    w: 5,   id: 'lightsaber',   label: 'Lightsaber',    cat: 'super' },
+  { cls: MeteorStorm,   w: 3,   id: 'meteorstorm',  label: 'Meteor Storm',  cat: 'super' },
   // pickups
   { cls: HealthPack,    w: 8,   id: 'healthpack',   label: 'Health Pack',   cat: 'pickup' },
   { cls: ArmorPlate,    w: 6,   id: 'armor',        label: 'Armor',         cat: 'pickup' },

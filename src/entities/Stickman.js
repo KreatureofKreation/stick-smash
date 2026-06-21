@@ -285,6 +285,8 @@ export class Stickman {
     this.gumGumUntil = 0;
     this._frozenUntil = 0;
     this._freezeImmuneUntil = 0;  // anti-permafreeze cooldown
+    this._pinnedUntil = 0;        // Spike Thrower impale-root
+    this._shrinkUntil = 0;        // Shrink Ray
 
     // Misc visuals
     this._handAnchorWorld = new THREE.Vector3();
@@ -356,6 +358,8 @@ export class Stickman {
   }
 
   applyKnockback(vx, vy, stun = 0.25) {
+    // Shrunk targets get launched harder (Shrink Ray).
+    if (performance.now() < this._shrinkUntil) { vx *= 1.6; vy *= 1.6; }
     this.body.wakeUp();
     this.body.velocity.x = vx;
     this.body.velocity.y = vy;
@@ -1920,7 +1924,9 @@ export class Stickman {
     // Must run before the GRABBED early-return so _updateGrabEscape sees
     // fresh jumpPressed/attackPressed/grabPressed edges for mash detection.
     const now = this.input;
-    const frozen = performance.now() < this._frozenUntil;
+    // "frozen" = immobilized: Ice Sword freeze OR Spike Thrower pin. Both lock
+    // movement + suppress action edges.
+    const frozen = performance.now() < this._frozenUntil || performance.now() < this._pinnedUntil;
     now.jumpPressed = !frozen && now.jump && !this._prev.jump;
     now.attackPressed = !frozen && now.attack && !this._prev.attack;
     now.attackReleased = !frozen && !now.attack && this._prev.attack;
@@ -1995,7 +2001,8 @@ export class Stickman {
       // Frozen solid (Ice Sword) — locked in place, no actions. Physics can
       // still shove the ice block around, but no self-movement.
       this.body.velocity.x *= 0.5;
-      if (this.game?.fx && Math.random() < 0.3) this.game.fx.particles.spark.spawn({
+      // Frost shimmer only for actual ice-freeze (not spike-pin).
+      if (performance.now() < this._frozenUntil && this.game?.fx && Math.random() < 0.3) this.game.fx.particles.spark.spawn({
         x: this.position.x + (Math.random() - 0.5) * 0.5, y: this.position.y + Math.random() * 1.0,
         z: 0, vx: 0, vy: 0.5, life: 0.5, size: 0.12, color: 0xbfeaff, gravity: 0, drag: 0.9, shrink: 1,
       });
@@ -2249,6 +2256,10 @@ export class Stickman {
     params.blocking = this._blocking;
     this.rig.update(rigPos, params);
     this._updateShieldVisual();
+    // Shrink Ray — ease the visual rig toward a small scale while active.
+    const targetScale = performance.now() < this._shrinkUntil ? 0.5 : 1;
+    const cur = this.rig.group.scale.x || 1;
+    this.rig.group.scale.setScalar(cur + (targetScale - cur) * Math.min(1, dt * 8));
 
     if (rigInLocal) {
       // Group carries body's transform; limbs are in local space.
