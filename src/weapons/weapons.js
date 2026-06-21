@@ -3379,6 +3379,103 @@ export class VacuumGun extends Weapon {
   }
 }
 
+// SNAIL — a slow, INVULNERABLE crawler that instakills on contact. Deployed by
+// the Snail weapon; ducks into game.projectiles so it gets update(dt) each frame
+// and is reaped when .dead. Touch = death for ANYONE (incl. the owner, after a
+// short grace so they can flee). Despawns after a while.
+export class Snail {
+  constructor(game, x, y, owner) {
+    this.game = game; this.owner = owner; this.dead = false;
+    this.life = 14; this._grace = 2.0;
+    const grp = new THREE.Group();
+    const shell = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 10), new THREE.MeshLambertMaterial({ color: 0x9a5a2a, emissive: 0x3a1a08, emissiveIntensity: 0.3 }));
+    shell.scale.set(1, 0.95, 0.7); shell.position.set(-0.05, 0.12, 0);
+    const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.62, 10), new THREE.MeshLambertMaterial({ color: 0x9fbf7a }));
+    foot.rotation.z = Math.PI / 2; foot.position.set(0.08, -0.18, 0);
+    const headBall = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), new THREE.MeshLambertMaterial({ color: 0x9fbf7a }));
+    headBall.position.set(0.38, -0.08, 0);
+    const mkStalk = (dz) => {
+      const s = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.18, 5), new THREE.MeshLambertMaterial({ color: 0x9fbf7a }));
+      s.position.set(0.42, 0.06, dz); s.rotation.z = -0.3;
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 6), new THREE.MeshLambertMaterial({ color: 0x111111 }));
+      eye.position.set(0.47, 0.15, dz);
+      return [s, eye];
+    };
+    grp.add(shell, foot, headBall, ...mkStalk(0.07), ...mkStalk(-0.07));
+    grp.position.set(x, y, 0);
+    this.mesh = grp; game.scene.add(grp);
+
+    this.body = new CANNON.Body({
+      mass: 6, material: game.physics.materials.prop,
+      collisionFilterGroup: COL_GROUPS.PROP, collisionFilterMask: COL_GROUPS.WORLD,
+      fixedRotation: true, linearDamping: 0.3,
+    });
+    this.body.addShape(new CANNON.Box(new CANNON.Vec3(0.34, 0.26, 0.3)));
+    this.body.position.set(x, y, 0);
+    game.physics.add(this.body);
+    game.registerProjectile(this);
+    audio.spawn?.();
+  }
+  // Invulnerable — projectiles/melee that try to damage it are ignored (no hp).
+  takeDamage() { return false; }
+  update(dt) {
+    if (this.dead || !this.body) return;
+    this.life -= dt; this._grace -= dt;
+    if (this.life <= 0) { this.destroy(); return; }
+    let best = null, bd = Infinity;
+    for (const p of this.game.players) {
+      if (!p || !p.alive) continue;
+      if (p === this.owner && this._grace > 0) continue;   // owner gets a head start
+      const d = Math.abs(p.position.x - this.body.position.x);
+      if (d < bd) { bd = d; best = p; }
+    }
+    if (best) {
+      const dir = Math.sign(best.position.x - this.body.position.x) || 1;
+      // Crawl by nudging position (a velocity gets eaten by ground contact) —
+      // slow + relentless. Gravity still handles the Y so it rides terrain.
+      this.body.position.x += dir * 1.7 * dt;
+      const dx = best.position.x - this.body.position.x;
+      const dy = best.position.y - this.body.position.y;
+      if (dx * dx + dy * dy < 0.75 * 0.75) {
+        best.lastDamager = this.owner;
+        best.takeDamage(9999, { attacker: this.owner, weapon: 'snail', kb: { x: dir * 4, y: 6 } });
+      }
+      this.mesh.scale.x = dir < 0 ? -1 : 1;
+    }
+    this.mesh.position.set(this.body.position.x, this.body.position.y, 0);
+    this.mesh.position.y += Math.sin(performance.now() * 0.006) * 0.03;  // gentle bob
+  }
+  destroy() {
+    if (this.dead) return; this.dead = true;
+    if (this.mesh?.parent) this.mesh.parent.remove(this.mesh);
+    this.mesh?.traverse?.((o) => { o.geometry?.dispose?.(); o.material?.dispose?.(); });
+    if (this.body) { this.game.physics.remove(this.body); this.body = null; }
+  }
+}
+
+// SNAIL deployer weapon.
+export class SnailDeployer extends Weapon {
+  constructor(game) {
+    super(game);
+    this.name = 'Snail'; this.icon = '🐌'; this.ammo = 1; this.fireDelay = 0.5; this.throwImpulse = 3;
+  }
+  _buildMesh() {
+    const grp = new THREE.Group();
+    const shell = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), new THREE.MeshLambertMaterial({ color: 0x9a5a2a }));
+    shell.scale.set(1, 0.9, 0.7); shell.position.y = 0.08;
+    const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.3, 8), new THREE.MeshLambertMaterial({ color: 0x9fbf7a }));
+    foot.rotation.z = Math.PI / 2; foot.position.x = 0.05;
+    grp.add(shell, foot); this.mesh = grp;
+  }
+  fire(player) {
+    const dir = player.facing || 1;
+    new Snail(this.game, player.position.x + dir * 0.9, player.position.y + 0.2, player);
+    audio.click?.();
+    player.weapon = null;
+    this.destroy();
+  }
+}
+
 export const SPAWN_TABLE = [
   // melee
   { cls: Sword,         w: 12,  id: 'sword',        label: 'Katana',        cat: 'melee' },
@@ -3405,6 +3502,7 @@ export const SPAWN_TABLE = [
   { cls: VacuumGun,     w: 5,   id: 'vacuum',       label: 'Vacuum Gun',    cat: 'ranged' },
   // joke
   { cls: RubberChicken, w: 2,   id: 'chicken',      label: 'Rubber Chicken',cat: 'joke' },
+  { cls: SnailDeployer, w: 2,   id: 'snail',        label: 'Snail',         cat: 'joke' },
   { cls: Boomerang,     w: 5,   id: 'boomerang',    label: 'Boomerang',     cat: 'joke' },
   { cls: FishSlap,      w: 2,   id: 'trout',        label: 'Trout',         cat: 'joke' },
   // super
