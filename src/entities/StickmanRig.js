@@ -844,6 +844,21 @@ export class StickmanRig {
     this.chestArmor.visible = false;
     this.group.add(this.chestArmor);
 
+    // Dismemberment part groups (Phase 4). orientLimb only sets transforms, not
+    // visibility, so hidden parts stay hidden until resetParts().
+    this._partMap = {
+      armL: [this.upperArmL, this.lowerArmL, this.handL],
+      armR: [this.upperArmR, this.lowerArmR, this.handR],
+      legL: [this.upperLegL, this.lowerLegL, this.footL],
+      legR: [this.upperLegR, this.lowerLegR, this.footR],
+      head: [this.head],
+    };
+    this._allParts = [
+      this.head, this.torso, this.chestArmor,
+      this.upperArmL, this.lowerArmL, this.handL, this.upperArmR, this.lowerArmR, this.handR,
+      this.upperLegL, this.lowerLegL, this.footL, this.upperLegR, this.lowerLegR, this.footR,
+    ];
+
     // Anim state
     this.t = 0;
     this.walkPhase = 0;
@@ -943,6 +958,11 @@ export class StickmanRig {
     this._headLagX += ix;
     this._headLagY += iy;
   }
+
+  // Dismemberment visuals (Phase 4).
+  hidePart(part) { for (const m of (this._partMap[part] || [])) if (m) m.visible = false; }
+  hideAll() { for (const m of this._allParts) if (m) m.visible = false; }
+  resetParts() { for (const m of this._allParts) if (m) m.visible = true; }
 
   // pos: world-space body center (or {0,0,0} when ragdolled — the group carries the body transform).
   update(pos, params) {

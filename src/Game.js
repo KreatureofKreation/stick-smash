@@ -1026,6 +1026,9 @@ export class Game {
         sl: p.sliding ? 1 : 0,
         cr: p.crouching ? 1 : 0,
         bk: p._blocking ? 1 : 0, sdx: p._shieldDirX, sdy: p._shieldDirY,
+        sv: (p._severed?.has('armL') ? 1 : 0) | (p._severed?.has('armR') ? 2 : 0)
+          | (p._severed?.has('legL') ? 4 : 0) | (p._severed?.has('legR') ? 8 : 0),
+        gb: p._gibbed ? 1 : 0,
       } : null),
       // Only ship damaged tiles (hp < maxHp) instead of every tile.
       // Cuts payload from ~hundreds of entries to whatever is broken.
@@ -1105,6 +1108,16 @@ export class Game {
       p.grounded = sp.gd != null ? !!sp.gd : Math.abs(sp.vy) < 0.5;
       p._blocking = !!sp.bk;
       if (sp.sdx != null) { p._shieldDirX = sp.sdx; p._shieldDirY = sp.sdy; }
+      // Dismemberment sync: hide severed limbs / gib / reset on respawn.
+      const sv = sp.sv | 0;
+      if (sv === 0 && (p._severed?.size || p._gibbed)) {
+        p._severed?.clear(); p._gibbed = false; p.rig.resetParts?.();
+      } else if (sv) {
+        for (const [name, bit] of [['armL', 1], ['armR', 2], ['legL', 4], ['legR', 8]]) {
+          if ((sv & bit) && !p._severed.has(name)) { p._severed.add(name); p.rig.hidePart?.(name); }
+        }
+      }
+      if (sp.gb && !p._gibbed) p._gib?.();
     }
     // BUG 2: destroy ghost players when host roster shrinks.
     for (let i = snap.players.length; i < this.players.length; i++) {

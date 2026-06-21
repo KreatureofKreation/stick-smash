@@ -792,6 +792,7 @@ export class Menu {
           </label>
           <label><input type="checkbox" id="mc-lefty" ${localStorage.getItem('mc_lefty') === '1' ? 'checked' : ''} /> Left-handed (mirror layout)</label>
           <label><input type="checkbox" id="mc-haptics" ${localStorage.getItem('mc_haptics') !== '0' ? 'checked' : ''} /> Haptic feedback</label>
+          <label><input type="checkbox" id="mc-gore" ${localStorage.getItem('mc_gore') !== '0' ? 'checked' : ''} /> Gore (dismemberment)</label>
           <button class="btn small" data-act="replay-tut">SHOW TUTORIAL AGAIN</button>
         </div>
         <div class="btn-row">
@@ -840,6 +841,9 @@ export class Menu {
     el.querySelector('#mc-haptics').onchange = (e) => {
       setHapticsEnabled(e.target.checked);  // writes localStorage + updates cache
       this._applyMobileSettings();
+    };
+    el.querySelector('#mc-gore').onchange = (e) => {
+      localStorage.setItem('mc_gore', e.target.checked ? '1' : '0');
     };
     el.querySelector('[data-act="replay-tut"]').onclick = () => {
       localStorage.removeItem('touch_tutorial_done');

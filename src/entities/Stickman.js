@@ -76,6 +76,15 @@ const SHIELD_PARRY_MS = 180;      // parry window after raising
 const SHIELD_ARC_DOT = 0.0;       // block cone: front hemisphere of the shield dir
 const BLOCK_MOVE_SCALE = 0.35;    // movement slowed while blocking
 
+// Dismemberment (Phase 4, NO bleed). A LETHAL hit from a bladed/lightsaber/
+// explosion weapon — or a headshot — gibs the body; a NON-lethal blade/saber
+// hit can lop a single limb (drops weapon for arms, hobbles for legs).
+const DISMEMBER_WEAPONS = new Set(['sword', 'longsword', 'halberd', 'saber', 'flame', 'ice', 'explosion']);
+const BLADE_WEAPONS = new Set(['sword', 'longsword', 'halberd', 'saber', 'flame', 'ice']);
+const SEVER_PARTS = ['armL', 'armR', 'legL', 'legR'];
+const LIMB_SEVER_CHANCE = 0.33;
+const goreOn = () => { try { return localStorage.getItem('mc_gore') !== '0'; } catch (_) { return true; } };
+
 export class Stickman {
   constructor(world, scene, opts) {
     this.world = world;
@@ -287,6 +296,8 @@ export class Stickman {
     this._freezeImmuneUntil = 0;  // anti-permafreeze cooldown
     this._pinnedUntil = 0;        // Spike Thrower impale-root
     this._shrinkUntil = 0;        // Shrink Ray
+    this._severed = new Set();    // dismembered limbs: 'armL'|'armR'|'legL'|'legR'
+    this._gibbed = false;
 
     // Misc visuals
     this._handAnchorWorld = new THREE.Vector3();
@@ -534,8 +545,16 @@ export class Stickman {
     }
 
     if (this.health <= 0) {
-      this.die();
+      // Gib if the killing blow was bladed/lightsaber/explosion, or a headshot.
+      const gib = (!!opts.isHead || DISMEMBER_WEAPONS.has(opts.weapon));
+      this.die('ko', { gib });
       return true;
+    }
+    // Survived — a non-lethal blade/lightsaber hit can lop off a single limb
+    // (cap at 2 so a player isn't fully dismantled). No bleed.
+    if (goreOn() && BLADE_WEAPONS.has(opts.weapon) && this._severed.size < 2 && Math.random() < LIMB_SEVER_CHANCE) {
+      const avail = SEVER_PARTS.filter(p => !this._severed.has(p));
+      if (avail.length) this._severLimb(avail[(Math.random() * avail.length) | 0]);
     }
     return false;
   }
@@ -562,8 +581,46 @@ export class Stickman {
     }
   }
 
-  die(reason = 'ko') {
+  // Lop off one limb (no bleed). Arms drop the held weapon; legs hobble.
+  _severLimb(part) {
+    if (!part || this._severed.has(part)) return;
+    this._severed.add(part);
+    this.rig.hidePart?.(part);
+    const fx = this.game?.fx;
+    if (fx && goreOn()) {
+      const px = this.position.x;
+      const py = this.position.y + (part.startsWith('arm') ? 0.4 : -0.2);
+      fx.particles.blood(px, py, 0, 0, 1);
+      fx.particles.debris(px, py, 0, 0xcc9977, 8);   // limb chunks
+    }
+    if (part.startsWith('arm') && this.weapon) {
+      this.weapon.detach();
+      this.weapon.dropAt(this.position, this.body.velocity);
+      this.weapon = null;
+    }
+    audio.break?.();
+  }
+
+  // Full gib — the body bursts into bloody chunks. Visual only (death is handled
+  // by die()); skipped when gore is off.
+  _gib() {
+    if (this._gibbed) return;
+    this._gibbed = true;
+    this.rig.hideAll?.();
+    const fx = this.game?.fx;
+    if (fx) {
+      const px = this.position.x, py = this.position.y + 0.3;
+      for (let i = 0; i < 3; i++) fx.particles.blood(px, py, 0, Math.random() * 2 - 1, 1);
+      fx.particles.debris(px, py, 0, 0x8a1a1a, 14);   // bloody bits
+      fx.particles.debris(px, py, 0, 0xcc9977, 14);   // body bits
+      fx.camera?.punch?.(0.4);
+    }
+    audio.explode?.();
+  }
+
+  die(reason = 'ko', opts = {}) {
     if (this.state === STATE.DEAD) return;
+    if (opts.gib && goreOn()) this._gib();
     this._clearCombatState();
     this.state = STATE.DEAD;
     this.health = 0;
@@ -643,6 +700,12 @@ export class Stickman {
     this.body.updateMassProperties();
     this.killStreak = 0;
     this.spawnTime = performance.now();
+    // Reattach any severed limbs / un-gib.
+    if (this._severed.size || this._gibbed) {
+      this._severed.clear();
+      this._gibbed = false;
+      this.rig.resetParts?.();
+    }
     audio.spawn();
   }
 
@@ -2008,6 +2071,8 @@ export class Stickman {
       });
     } else if (this.hitstun <= 0) {
       this._move(dt);
+      // Hobble on a severed leg.
+      if (this._severed.has('legL') || this._severed.has('legR')) this.body.velocity.x *= 0.55;
 
       if (this._blocking) {
         // While blocking: no attacks/grabs, slowed shuffle. The shield itself
