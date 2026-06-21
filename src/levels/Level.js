@@ -464,7 +464,7 @@ export class Hazard {
       this._tipConstraint = cTip;
 
       // Kick the chain off-axis so it actually swings on spawn.
-      tipBody.velocity.set(this.speed * 4 * (this.t < 0 ? -1 : 1), 0, 0);
+      tipBody.velocity.set(this.speed * 4 * (Math.cos(this._t) < 0 ? -1 : 1), 0, 0);
 
       // Driver: nudge the tip body's horizontal velocity each tick toward a
       // sinusoidal target. cannon-shim (Rapier-backed) doesn't expose
@@ -1003,7 +1003,8 @@ export class Level {
     const px = pos.x, py = pos.y;
     if (h.kind === 'saw' || h.kind === 'pendulum') {
       const dx = px - h.body.position.x, dy = py - h.body.position.y;
-      return dx * dx + dy * dy < 0.85 * 0.85;
+      const r = h.sawR ?? 0.85;
+      return dx * dx + dy * dy < r * r;
     }
     return Math.abs(px - h.body.position.x) < (h.w / 2 + 0.35) &&
            Math.abs(py - h.body.position.y) < (h.h / 2 + 0.7);

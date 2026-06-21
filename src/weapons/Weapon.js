@@ -337,6 +337,12 @@ export class Weapon {
   altFire(player) { /* optional */ }
 
   destroy() {
+    if (this._floatHalo) {
+      this.mesh.remove(this._floatHalo);
+      this._floatHalo.geometry.dispose();
+      this._floatHalo.material.dispose();
+      this._floatHalo = null;
+    }
     if (this.mesh && this.mesh.parent) this.mesh.parent.remove(this.mesh);
     if (this.body) { this.game.physics.remove(this.body); this.body = null; }
     if (this.holder?.weapon === this) this.holder.weapon = null;

@@ -1057,6 +1057,8 @@ export class Stickman {
     other.body.velocity.y = 3;
     this.attackTimer = 0;
     other.attackTimer = 0;
+    this.moveId = null; this._pendingSelfLaunch = false;
+    other.moveId = null; other._pendingSelfLaunch = false;
     if (this.weapon) this.weapon.swingTimer = 0;
     if (other.weapon) other.weapon.swingTimer = 0;
     this.attackCooldown = Math.max(this.attackCooldown, 0.25);
@@ -1927,24 +1929,9 @@ export class Stickman {
       return;
     }
 
-    if (this.state === STATE.GRABBED) {
-      this._updateGrabEscape(dt);
-      return;
-    }
-
-    // Burn DoT — applied by Flamethrower cone or FirePatch ground fire.
-    if (this._burnDoT && this.alive) {
-      this._burnDoT.remaining -= dt;
-      this.takeDamage(this._burnDoT.dmgPerSec * dt, {
-        attacker: this._burnDoT.attacker,
-        weapon: 'fire',
-        kb: { x: 0, y: 0 },
-        stun: 0,
-      });
-      if (this._burnDoT.remaining <= 0) this._burnDoT = null;
-    }
-
     // Fire one-shot edges (suppressed when frozen).
+    // Must run before the GRABBED early-return so _updateGrabEscape sees
+    // fresh jumpPressed/attackPressed/grabPressed edges for mash detection.
     const now = this.input;
     const frozen = performance.now() < this._frozenUntil;
     now.jumpPressed = !frozen && now.jump && !this._prev.jump;
@@ -1962,6 +1949,23 @@ export class Stickman {
     this._prev.grab = now.grab;
     this._prev.special = now.special;
     this._prev.throw = now.throw;
+
+    if (this.state === STATE.GRABBED) {
+      this._updateGrabEscape(dt);
+      return;
+    }
+
+    // Burn DoT — applied by Flamethrower cone or FirePatch ground fire.
+    if (this._burnDoT && this.alive) {
+      this._burnDoT.remaining -= dt;
+      this.takeDamage(this._burnDoT.dmgPerSec * dt, {
+        attacker: this._burnDoT.attacker,
+        weapon: 'fire',
+        kb: { x: 0, y: 0 },
+        stun: 0,
+      });
+      if (this._burnDoT.remaining <= 0) this._burnDoT = null;
+    }
 
     if (this.invuln > 0) this.invuln -= dt;
     if (this.hitstun > 0) { this.hitstun -= dt; }
@@ -2098,7 +2102,7 @@ export class Stickman {
     this._attackTick(dt, players);
 
     // Aim direction (used by rig & weapons)
-    if (this.input.aimActive) {
+    if (this.input.aimActive && (this.input.aimX !== 0 || this.input.aimY !== 0)) {
       this.aimDir.set(this.input.aimX, this.input.aimY).normalize();
     } else {
       this.aimDir.set(this.facing, 0);
@@ -2310,6 +2314,8 @@ export class Stickman {
   }
 
   destroy() {
+    if (this.grabbing) this.releaseGrab();
+    if (this.grabbedBy) this.grabbedBy.releaseGrab();
     if (this._corpseHitFn) {
       try { this.body.removeEventListener('collide', this._corpseHitFn); } catch (_) {}
       this._corpseHitFn = null;

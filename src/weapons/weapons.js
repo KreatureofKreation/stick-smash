@@ -1166,8 +1166,9 @@ export class DualPistols extends Weapon {
     const a = Math.atan2(aim.y, aim.x) + rand(-0.018, 0.018);
     const sp = 38;
     const handBone = (this._nextHand === 'R') ? player.rig?.handR : player.rig?.handL;
-    const mx = handBone?.position?.x ?? (player.position.x + aim.x * 0.7);
-    const my = handBone?.position?.y ?? (player.position.y + 0.7);
+    const muzzleVec = handBone ? handBone.getWorldPosition(_w2a) : null;
+    const mx = muzzleVec ? muzzleVec.x : (player.position.x + aim.x * 0.7);
+    const my = muzzleVec ? muzzleVec.y : (player.position.y + 0.7);
     new Projectile(this.game, {
       x: mx + aim.x * 0.3, y: my + aim.y * 0.3,
       vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
@@ -2875,9 +2876,8 @@ export class Kamehameha extends Weapon {
     // Now decrement ammo (deferred from tryFire). With ammo=1, this drops
     // the weapon — the technique is single-use per pickup.
     this.ammo--;
-    if (this.ammo <= 0 && this.holder) {
-      const h = this.holder;
-      h.weapon = null;
+    if (this.ammo <= 0) {
+      if (this.holder) { this.holder.weapon = null; }
       this.destroy();
     }
   }
@@ -2929,7 +2929,8 @@ export class Nuke extends Weapon {
     const game = this.game;
     proj.explode = function () {
       if (this.dead) return;
-      const x = this.body.position.x, y = this.body.position.y;
+      const x = this.body?.position?.x ?? this.mesh.position.x;
+      const y = this.body?.position?.y ?? this.mesh.position.y;
       // Three concentric particle bursts
       for (let i = 0; i < 60; i++) {
         const a = rand(0, Math.PI * 2);
