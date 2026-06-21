@@ -1047,7 +1047,7 @@ export class Flamethrower extends Weapon {
       mesh: flameMesh,
       gravity: true, gravityScale: 0.25,
       life: 0.6, radius: 0.08,
-      sticky: true, stickLife: 1.5,
+      noPush: true,               // ignite without shoving/lifting the victim
       tracerColor: 0xff8833,
     });
     // On impact: ignite players hit, drop a fire patch on world hits.
@@ -2512,6 +2512,34 @@ export class FlameSword extends Weapon {
     this.swingTimer = 0.28; this._swingDur = 0.28; this.hits.clear();
     audio.swing(); audio.beep(180, 0.15, 'sawtooth', 0.25);
     player.attackTimer = 0.28;
+    this._spawnFireArc(player);
+  }
+  // Throw a fan of fire in the swing direction — ignites anyone it touches and
+  // drops ground-fire patches on the floor. noPush so the flames never shove.
+  _spawnFireArc(player) {
+    const base = player.input?.aimActive
+      ? Math.atan2(player.aimDir.y, player.aimDir.x)
+      : (player.facing > 0 ? 0 : Math.PI);
+    const mx = player.position.x + player.facing * 0.6;
+    const my = player.position.y + 0.2;
+    for (let i = 0; i < 5; i++) {
+      const a = base + (i - 2) * 0.28;     // ~64° fan
+      const sp = 15 + rand(-1, 1);
+      const flameMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.1, 6, 5),
+        new THREE.MeshLambertMaterial({ color: 0xff5511, emissive: 0xff8833, emissiveIntensity: 1.3 }),
+      );
+      const proj = new Projectile(this.game, {
+        x: mx, y: my, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        damage: 0, owner: player, mesh: flameMesh,
+        gravity: true, gravityScale: 0.3, life: 0.45, radius: 0.1,
+        noPush: true, tracerColor: 0xff8833,
+      });
+      proj.onHit = (pr, other) => {
+        if (other.userData?.kind === 'player') other.userData.stickman?.applyBurn?.(2.5, 5, player);
+        else if (other.userData?.kind === 'tile') spawnFirePatch(this.game, { x: pr.body.position.x, y: pr.body.position.y, owner: player });
+      };
+    }
   }
   worldTick(dt) {
     super.worldTick(dt);
@@ -2543,9 +2571,7 @@ export class FlameSword extends Weapon {
               attacker: this.holder, weapon: 'flame',
               kb: { x: this.holder.facing * 12, y: 6 }, stun: 0.35,
             });
-            // Burn DoT — apply via repeated small ticks
-            p._burnUntil = performance.now() + 2500;
-            p._burnSrc = this.holder;
+            p.applyBurn?.(2.5, 5, this.holder);
             this.hits.add(p.id);
             this.game.fx.particles.burst(p.position.x, p.position.y + 0.4, 0, { count: 14, speed: 5, color: 0xff5500 });
             this.game.fx.camera.punch(0.25);
@@ -2602,14 +2628,21 @@ export class IceSword extends Weapon {
           if (this.hits.has(p.id)) continue;
           const dx = p.position.x - cx, dy = p.position.y - cy;
           if (dx * dx + dy * dy < 1.1 * 1.1) {
-            p.takeDamage(30, {
+            const tNow = performance.now();
+            const alreadyFrozen = tNow < p._frozenUntil;
+            const canFreeze = tNow >= (p._freezeImmuneUntil ?? 0);
+            // Shatter: a hit on an already-frozen target does bonus damage.
+            p.takeDamage(alreadyFrozen ? 45 : 30, {
               attacker: this.holder, weapon: 'ice',
-              kb: { x: this.holder.facing * 8, y: 5 }, stun: 1.2,
+              kb: { x: this.holder.facing * 8, y: 5 }, stun: alreadyFrozen ? 0.3 : 1.2,
             });
-            p._frozenUntil = performance.now() + 1500;
+            if (canFreeze && !alreadyFrozen) {
+              p._frozenUntil = tNow + 1400;
+              p._freezeImmuneUntil = tNow + 1400 + 2000;  // no re-freeze for 2s after thaw
+            }
             this.hits.add(p.id);
-            this.game.fx.particles.burst(p.position.x, p.position.y + 0.4, 0, { count: 18, speed: 5, color: 0x9bdcff });
-            this.game.fx.camera.punch(0.2);
+            this.game.fx.particles.burst(p.position.x, p.position.y + 0.4, 0, { count: alreadyFrozen ? 26 : 18, speed: 6, color: 0xbfeaff });
+            this.game.fx.camera.punch(alreadyFrozen ? 0.3 : 0.2);
           }
         }
         this._reflectProjectiles(cx, cy, 1.2);
