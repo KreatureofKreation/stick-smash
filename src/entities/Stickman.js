@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { COL_GROUPS } from '../physics/PhysicsWorld.js';
 import { StickmanRig } from './StickmanRig.js';
+import { GibChunk } from '../effects/GibChunk.js';
 import { clamp, damp, lerp, sign, rand } from '../util/math.js';
 import { audio } from '../audio/Audio.js';
 import { vibrate } from '../util/haptics.js';
@@ -581,17 +582,39 @@ export class Stickman {
     }
   }
 
+  // Fling a rig part's meshes off as real tumbling GibChunks (clones of the
+  // actual limb geometry), then hide the originals so the body shows the stump.
+  _flingPart(part, outX, speed = 1) {
+    const meshes = this.rig.partMeshes?.(part) ?? [];
+    for (const src of meshes) {
+      if (!src) continue;
+      src.updateWorldMatrix?.(true, false);
+      const wp = src.getWorldPosition(new THREE.Vector3());
+      const wq = src.getWorldQuaternion(new THREE.Quaternion());
+      const ws = src.getWorldScale(new THREE.Vector3());
+      const m = new THREE.Mesh(src.geometry.clone(), src.material.clone());
+      m.quaternion.copy(wq); m.scale.copy(ws); m.castShadow = false;
+      const vx = outX * rand(2, 5) * speed + rand(-1.5, 1.5);
+      const vy = rand(3, 7) * speed;
+      new GibChunk(this.game, m, wp.x, wp.y, vx, vy);
+    }
+    this.rig.hidePart?.(part);
+  }
+
   // Lop off one limb (no bleed). Arms drop the held weapon; legs hobble.
   _severLimb(part) {
     if (!part || this._severed.has(part)) return;
     this._severed.add(part);
-    this.rig.hidePart?.(part);
-    const fx = this.game?.fx;
-    if (fx && goreOn()) {
-      const px = this.position.x;
-      const py = this.position.y + (part.startsWith('arm') ? 0.4 : -0.2);
-      fx.particles.blood(px, py, 0, 0, 1);
-      fx.particles.debris(px, py, 0, 0xcc9977, 8);   // limb chunks
+    const outX = part.endsWith('R') ? 1 : -1;
+    if (goreOn()) {
+      this._flingPart(part, outX);
+      const fx = this.game?.fx;
+      if (fx) {
+        const py = this.position.y + (part.startsWith('arm') ? 0.4 : -0.2);
+        fx.particles.blood(this.position.x, py, 0, outX, 1);
+      }
+    } else {
+      this.rig.hidePart?.(part);
     }
     if (part.startsWith('arm') && this.weapon) {
       this.weapon.detach();
@@ -601,18 +624,21 @@ export class Stickman {
     audio.break?.();
   }
 
-  // Full gib — the body bursts into bloody chunks. Visual only (death is handled
-  // by die()); skipped when gore is off.
+  // Full gib — the body comes apart into its actual limbs + head, each flying
+  // off as a tumbling chunk, plus blood. Visual only (death handled by die()).
   _gib() {
     if (this._gibbed) return;
     this._gibbed = true;
-    this.rig.hideAll?.();
     const fx = this.game?.fx;
+    // Fling every part outward radially.
+    for (const part of ['armL', 'armR', 'legL', 'legR', 'head']) {
+      if (!this._severed.has(part)) this._flingPart(part, part.endsWith('L') ? -1 : 1, 1.4);
+    }
+    this.rig.hideAll?.();   // also drops the torso/armor (covered by blood burst)
     if (fx) {
       const px = this.position.x, py = this.position.y + 0.3;
-      for (let i = 0; i < 3; i++) fx.particles.blood(px, py, 0, Math.random() * 2 - 1, 1);
-      fx.particles.debris(px, py, 0, 0x8a1a1a, 14);   // bloody bits
-      fx.particles.debris(px, py, 0, 0xcc9977, 14);   // body bits
+      for (let i = 0; i < 4; i++) fx.particles.blood(px, py, 0, Math.random() * 2 - 1, 1);
+      fx.particles.debris(px, py, 0, 0x8a1a1a, 12);   // bloody bits
       fx.camera?.punch?.(0.4);
     }
     audio.explode?.();
