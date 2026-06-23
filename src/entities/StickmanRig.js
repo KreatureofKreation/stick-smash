@@ -963,6 +963,8 @@ export class StickmanRig {
   hidePart(part) { for (const m of (this._partMap[part] || [])) if (m) m.visible = false; }
   hideAll() { for (const m of this._allParts) if (m) m.visible = false; }
   resetParts() { for (const m of this._allParts) if (m) m.visible = true; }
+  partMeshes(part) { return this._partMap[part] || []; }
+  allMeshes() { return this._allParts; }
 
   // pos: world-space body center (or {0,0,0} when ragdolled — the group carries the body transform).
   update(pos, params) {
