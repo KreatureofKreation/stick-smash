@@ -388,37 +388,31 @@ const ALL_LEVELS = [
     id: 'ice',
     name: 'Ice Tower',
     bgColor: 0x081628,
+    killBound: { x: 16, y: 19 },
     tiles: [
-      ...row(0, -10, 10, { material: 'ice', hp: 30, color: 0xa8d4f0 }),
-      ...tough(-1, -9, 9, { color: 0x1a2a4a }),
-      // Tier 1.
-      ...row(3, -8, -4, { material: 'ice', hp: 22, color: 0xbce8ff }),
-      ...row(3,  4, 8, { material: 'ice', hp: 22, color: 0xbce8ff }),
-      // Tier 2 — center bridge.
-      ...row(6, -3, 3, { material: 'ice', hp: 18, color: 0xcceffe }),
-      // Tier 3 — staggered side spires.
-      ...row(9, -6, -4, { material: 'ice', hp: 14, color: 0xddf6ff }),
-      ...row(9,  4,  6, { material: 'ice', hp: 14, color: 0xddf6ff }),
-      // Summit.
-      ...row(12, -1, 1, { material: 'ice', hp: 10, color: 0xeefcff }),
+      // ── Snow base (soft white) over a freezing pit ──
+      ...row(0, -11, 11, { material: 'ice', hp: 45, color: 0xdfeefc }),
+      ...tough(-1, -10, 10, { color: 0x1a2a4a }),
+      // ── Climb tiers (slippery ice) up to the summit ──
+      ...row(3, -8, -4, { material: 'ice', hp: 24, color: 0xbce8ff }),
+      ...row(3,  4,  8, { material: 'ice', hp: 24, color: 0xbce8ff }),
+      ...row(6, -3, 3,  { material: 'ice', hp: 20, color: 0xcceffe }),
+      ...row(9, -7, -4, { material: 'ice', hp: 16, color: 0xddf6ff }),
+      ...row(9,  4,  7, { material: 'ice', hp: 16, color: 0xddf6ff }),
+      ...row(12, -2, 2, { material: 'ice', hp: 14, color: 0xeefcff }),   // summit prize
       // Frozen base pillars.
-      { x: -8, y: 1, shape: 'box', w: 0.6, h: 2, material: 'ice', hp: 50, color: 0x88c0e8 },
-      { x:  8, y: 1, shape: 'box', w: 0.6, h: 2, material: 'ice', hp: 50, color: 0x88c0e8 },
-      // Mid-tier crystal cover (sphere).
-      { x: -1, y: 7.5, shape: 'sphere', radius: 0.5, material: 'ice', hp: 30, color: 0x88e0ff },
-      { x:  1, y: 7.5, shape: 'sphere', radius: 0.5, material: 'ice', hp: 30, color: 0x88e0ff },
+      { x: -9, y: 1, shape: 'box', w: 0.6, h: 2, material: 'ice', hp: 60, color: 0x88c0e8 },
+      { x:  9, y: 1, shape: 'box', w: 0.6, h: 2, material: 'ice', hp: 60, color: 0x88c0e8 },
+      // ── HANGING ICICLES (breakable) under each tier. A hit/explosion nearby
+      //    knocks them loose and they drop as spears on whoever's below. ──
+      ...[-7, -5, 5, 7].map(x => ({ x, y: 2.2, shape: 'box', w: 0.34, h: 1.1, material: 'ice', hp: 8, color: 0xcceeff, icicle: true })),
+      ...[-2, 0, 2].map(x => ({ x, y: 5.2, shape: 'box', w: 0.34, h: 1.1, material: 'ice', hp: 8, color: 0xcceeff, icicle: true })),
+      ...[-5, 5].map(x => ({ x, y: 8.2, shape: 'box', w: 0.34, h: 1.1, material: 'ice', hp: 8, color: 0xcceeff, icicle: true })),
+      ...[-1, 1].map(x => ({ x, y: 11.2, shape: 'box', w: 0.34, h: 1.0, material: 'ice', hp: 8, color: 0xcceeff, icicle: true })),
     ],
     hazards: [
-      { kind: 'lava', x: 0, y: -5, w: 36, h: 1.4, dps: 60 },
-      // ICICLES — hanging beneath the tier-1 platforms (y=3 → bottom y=2.5).
-      // pointDown: true rotates the cones to face the floor and the hit
-      // knocks the player down toward the lava.
-      { kind: 'spike', x: -6, y: 2.5, w: 2.0, pointDown: true, color: 0xddeeff },
-      { kind: 'spike', x:  6, y: 2.5, w: 2.0, pointDown: true, color: 0xddeeff },
-      // Icicles under the center bridge (y=6 → bottom y=5.5).
-      { kind: 'spike', x: 0, y: 5.5, w: 1.6, pointDown: true, color: 0xddeeff },
-      // Summit pendulum — wind-blown bell.
-      { kind: 'pendulum', x: 0, y: 16, length: 4, amplitude: Math.PI / 2.5, speed: 0.9 },
+      // Freezing pit below = death.
+      { kind: 'lava', x: 0, y: -5, w: 40, h: 1.4, dps: 999, color: 0x1a3a5a },
     ],
     spawns: [
       { x: -8, y: 1 }, { x: 8, y: 1 },
