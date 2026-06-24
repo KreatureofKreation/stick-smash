@@ -44,6 +44,9 @@ export class Tile {
     // Moving platform (elevator): { axis:'y'|'x', from, to, speed, phase? } —
     // a kinematic body that oscillates and carries riders.
     this.move = opts.move || null;
+    // Hanging icicle: a breakable shard. When knocked loose (destroyed by a
+    // nearby hit/explosion) it drops as a falling spear onto players below.
+    this.icicle = opts.icicle || null;
     // Optional Z-axis rotation (radians) for tilted decorative shards (e.g., crystal spire).
     // Applied to both the physics body and mesh before the static-tile matrix bake.
     this.rotZ = opts.rotZ ?? 0;
@@ -209,6 +212,8 @@ export class Tile {
     const y = this.body?.position?.y ?? this.gy * TILE;
     // Smashed window → open a vacuum breach at this spot.
     if (this.breach) this.level._spawnBreach?.(x, y);
+    // Knocked-loose icicle → drop a falling spear.
+    if (this.icicle) this.level._spawnFallingIcicle?.(x, y);
     // Cascade: drop any tiles that named this one as their parent. Each
     // child becomes dynamic and will recursively drop its own children via
     // Level._dropSuspendedTile.
@@ -704,6 +709,7 @@ export class Level {
     // player is knocked OUTSIDE it. `stationBounds` = { x0, x1 } interior span.
     this._stationBounds = def.stationBounds ?? null;
     this._breaches = [];   // active vacuum breaches (suck players toward space)
+    this._icicles = [];    // falling icicle spears (knocked loose by hits)
     this.planetConfigs = def.planets ?? [];
     this.planets = [];
     this.cameraClamp = def.cameraClamp ?? null;
@@ -970,6 +976,7 @@ export class Level {
     this._applyBuoyancy(dt);
     this._applyStationGravity();
     this._updateBreaches(dt);
+    this._updateIcicles(dt);
     // Sync dynamic tiles' meshes to their physics bodies.
     for (const t of this._dynamicTiles) {
       if (!t.mesh || !t.body) continue;
@@ -1226,6 +1233,41 @@ export class Level {
     }
   }
 
+  // A knocked-loose icicle drops as a falling spear, damaging whoever's below.
+  _spawnFallingIcicle(x, y) {
+    const m = new THREE.Mesh(
+      new THREE.ConeGeometry(0.22, 1.1, 7),
+      new THREE.MeshStandardMaterial({ color: 0xbfe8ff, emissive: 0x2a4a6a, emissiveIntensity: 0.4, metalness: 0.1, roughness: 0.2 }),
+    );
+    m.rotation.x = Math.PI;             // tip down
+    m.position.set(x, y, 0);
+    this.scene.add(m);
+    this._icicles.push({ m, x, y, vy: -2 });
+    if (this.game?.fx) this.game.fx.particles.debris(x, y, 0, 0xbfe8ff, 5);
+  }
+  _updateIcicles(dt) {
+    if (!this._icicles.length) return;
+    const floorY = this.killBound ? -this.killBound.y : -12;
+    for (let i = this._icicles.length - 1; i >= 0; i--) {
+      const ic = this._icicles[i];
+      ic.vy -= 30 * dt; ic.y += ic.vy * dt;
+      ic.m.position.y = ic.y;
+      let hit = false;
+      for (const p of this.game.players) {
+        if (!p || !p.alive || p.invuln > 0) continue;
+        if (Math.abs(p.body.position.x - ic.x) < 0.55 && Math.abs(p.body.position.y - ic.y) < 0.6) {
+          p.takeDamage(22, { attacker: null, weapon: 'icicle', kb: { x: 0, y: -3 }, stun: 0.3 });
+          hit = true; break;
+        }
+      }
+      if (hit || ic.y < floorY) {
+        if (this.game?.fx) this.game.fx.particles.debris(ic.x, ic.y, 0, 0xbfe8ff, 6);
+        this.scene.remove(ic.m); ic.m.geometry.dispose(); ic.m.material.dispose();
+        this._icicles.splice(i, 1);
+      }
+    }
+  }
+
   _aabbOverlap(pos, body, h) {
     const px = pos.x, py = pos.y;
     if (h.kind === 'saw' || h.kind === 'pendulum') {
@@ -1245,6 +1287,8 @@ export class Level {
     if (this.meteorShower) { this.meteorShower.destroy(); this.meteorShower = null; }
     for (const t of this.tiles.values()) t.destroy();
     for (const h of this.hazards) h.destroy();
+    for (const ic of this._icicles) { this.scene.remove(ic.m); ic.m.geometry.dispose(); ic.m.material.dispose(); }
+    this._icicles.length = 0;
     // Sweep any chain segs not already released by a hazard or tile destroy
     // (e.g. orphan suspensions whose tile and hazard both went away cleanly).
     for (const seg of [...this._chainSegs]) seg.destroy();
