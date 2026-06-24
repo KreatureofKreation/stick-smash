@@ -296,6 +296,19 @@ export class Hazard {
       m.position.set(this.x, this.y, 0);
       scene.add(m);
       this.mesh = m;
+      // Buoyant lava: things that enter float + bob on it (see Level._applyBuoyancy)
+      // instead of instakilling. Add a rippling wave surface for the liquid read.
+      this.buoyant = !!opts.buoyant;
+      if (this.buoyant) {
+        const segs = Math.max(8, Math.round(this.w / 1.5));
+        const wgeo = new THREE.PlaneGeometry(this.w, 1.0, segs, 1);
+        this._waveBase = wgeo.attributes.position.array.slice();
+        const wmat = new THREE.MeshLambertMaterial({ color: 0xff5a18, emissive: 0xff7722, emissiveIntensity: 1.2 });
+        const wave = new THREE.Mesh(wgeo, wmat);
+        wave.position.set(this.x, this.y + this.h / 2, 0.6);
+        scene.add(wave);
+        this._wave = wave;
+      }
 
       const body = new CANNON.Body({
         mass: 0, isTrigger: true,
@@ -534,6 +547,20 @@ export class Hazard {
         this.mesh.position.y = y;
         if (this.body) this.body.position.y = y;
       }
+      // Rippling wave surface, parked at the current lava top.
+      if (this._wave) {
+        const topY = (this.body ? this.body.position.y : this.y) + this.h / 2;
+        this._wave.position.y = topY;
+        const pos = this._wave.geometry.attributes.position;
+        const base = this._waveBase, t = performance.now() * 0.002;
+        for (let i = 0; i < pos.count; i++) {
+          const bx = base[i * 3], by = base[i * 3 + 1];
+          // Only the top edge waves; bottom edge stays flat against the magma.
+          const amp = by > 0 ? 0.18 : 0;
+          pos.array[i * 3 + 1] = by + Math.sin(bx * 0.8 + t) * amp + Math.sin(bx * 1.7 - t * 1.3) * amp * 0.5;
+        }
+        pos.needsUpdate = true;
+      }
     }
     if (this.kind === 'saw') {
       this.spinning.rotation.z += dt * 18;
@@ -564,6 +591,11 @@ export class Hazard {
   contactPlayer(player, dt) {
     if (player.invuln > 0 || !player.alive) return;
     if (this.kind === 'lava') {
+      // Buoyant lava only burns when meaningfully submerged — a 0.7 deadzone
+      // below the surface so standing at the waterline on a bobbing raft (which
+      // can dip slightly as the tide rises faster than its passenger) is safe;
+      // only being properly IN the magma burns.
+      if (this.buoyant && player.position.y > (this.body.position.y + this.h / 2 - 0.7)) return;
       // Continuous DoT — no knockback so the player can walk over briefly.
       player.takeDamage(this.dps * dt, { attacker: null, weapon: 'lava' });
     } else if (this.kind === 'spike') {
@@ -611,6 +643,7 @@ export class Hazard {
     if (this.blade?.parent) this.blade.parent.remove(this.blade);
     // Generic mesh+body (lava / spike / saw, and pendulum's tip body).
     if (this.mesh?.parent) this.mesh.parent.remove(this.mesh);
+    if (this._wave?.parent) { this._wave.parent.remove(this._wave); this._wave.geometry.dispose(); this._wave.material.dispose(); this._wave = null; }
     if (this.body) { this.level.physics.remove(this.body); this.body = null; }
   }
 }
@@ -898,6 +931,7 @@ export class Level {
         if (this._aabbOverlap(p.position, p.body, h)) h.contactPlayer(p, dt);
       }
     }
+    this._applyBuoyancy(dt);
     // Sync dynamic tiles' meshes to their physics bodies.
     for (const t of this._dynamicTiles) {
       if (!t.mesh || !t.body) continue;
@@ -1080,6 +1114,33 @@ export class Level {
       for (const child of tile._children) this._dropSuspendedTile(child);
     }
   }
+  // Buoyancy for `buoyant` lava — players, dynamic tiles (obsidian rafts) and
+  // free weapons that enter the magma get pushed up + bob on the surface with
+  // viscous horizontal drag, instead of just sinking/dying. A damped spring
+  // toward the lava top fights gravity, so things float and bob.
+  _applyBuoyancy(dt) {
+    // Strong spring (rafts ride decks ABOVE the waterline so players on them
+    // stay clear of the DoT) + firm damping for a stable, non-jittery bob.
+    const K = 95, DAMP = 11, MAX = 60, DRAG = 0.22;
+    for (const h of this.hazards) {
+      if (h.kind !== 'lava' || !h.buoyant || !h.body) continue;
+      const surfY = h.body.position.y + h.h / 2;
+      const hx = h.body.position.x, halfW = h.w / 2;
+      const apply = (b) => {
+        if (!b) return;
+        if (Math.abs(b.position.x - hx) > halfW) return;
+        if (b.position.y > surfY + 0.4) return;          // sitting above the magma
+        let up = K * (surfY - b.position.y) - DAMP * b.velocity.y;
+        if (up > MAX) up = MAX;
+        if (up > 0) { b.wakeUp?.(); b.velocity.y += up * dt; }
+        b.velocity.x *= Math.pow(DRAG, dt);              // viscous drag
+      };
+      for (const p of this.game.players) if (p && p.body && p.alive) apply(p.body);
+      for (const t of this._dynamicTiles) apply(t.body);
+      for (const w of (this.game.weapons || [])) apply(w.body);
+    }
+  }
+
   _aabbOverlap(pos, body, h) {
     const px = pos.x, py = pos.y;
     if (h.kind === 'saw' || h.kind === 'pendulum') {

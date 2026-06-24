@@ -637,72 +637,48 @@ const ALL_LEVELS = [
     id: 'volcano',
     name: 'Volcano',
     bgColor: 0x1e0608,
-    killBound: { x: 18, y: 16 },
+    killBound: { x: 24, y: 22 },
     tiles: [
-      // ── LOW pads (y=0) — flood every cycle, risky weapon spots ──
-      ...row(0, -15, -10, { material: 'stone', hp: 60, color: 0x3a1a10 }),
-      ...row(0,  10,  15, { material: 'stone', hp: 60, color: 0x3a1a10 }),
+      // ── Safe side ledges (spawn pads), high above the max lava tide (~4.5) ──
+      ...row(8, -18, -13, { material: 'stone', hp: 80, color: 0x2a1610 }),
+      ...row(8,  13,  18, { material: 'stone', hp: 80, color: 0x2a1610 }),
+      ...tough(7, -18, -13, { color: 0x180c08 }),
+      ...tough(7,  13,  18, { color: 0x180c08 }),
+      // Short ramps down toward the sea.
+      ...row(6, -13, -11, { material: 'stone', hp: 60, color: 0x281410 }),
+      ...row(6,  11,  13, { material: 'stone', hp: 60, color: 0x281410 }),
 
-      // ── MID ledges (y=4) — flood at peak, risky ──
-      ...row(4, -12, -8, { material: 'stone', hp: 50, color: 0x2e1610 }),
-      ...row(4,   8, 12, { material: 'stone', hp: 50, color: 0x2e1610 }),
+      // ── Central obsidian spire — static high ground rising from the magma ──
+      ...col(0, 2, 8, { shape: 'box', w: 1.4, h: 1, material: 'stone', hp: 140, color: 0x1a0e0a }),
+      { x: 0, y: 9, shape: 'box', w: 3.2, h: 0.6, material: 'stone', hp: 110, color: 0x241410 },
 
-      // ── UPPER ledges (y=8) — SAFE above flood crest 5.5 ──
-      // Tile surface = 8.5 > 5.8 ✓ — first safe tier.
-      ...row(8, -7, -4, { material: 'stone', hp: 50, color: 0x281410 }),
-      ...row(8,  4,  7, { material: 'stone', hp: 50, color: 0x281410 }),
-
-      // ── SUMMIT (y=11) — prize, most exposed ──
-      ...row(11, -3, 3, { material: 'stone', hp: 80, color: 0x1a0c08 }),
-
-      // ── DYNAMIC BOULDERS on upper rim — roll/tumble as chaos objects ──
-      { x: -6, y: 8.6, shape: 'sphere', radius: 0.5,
-        material: 'stone', hp: 30, color: 0x5a3a2a, dynamic: true, tileMass: 8 },
-      { x:  6, y: 8.6, shape: 'sphere', radius: 0.5,
-        material: 'stone', hp: 30, color: 0x5a3a2a, dynamic: true, tileMass: 8 },
-      { x: -5, y: 8.6, shape: 'sphere', radius: 0.5,
-        material: 'stone', hp: 30, color: 0x4a2a1a, dynamic: true, tileMass: 8 },
-      { x:  5, y: 8.6, shape: 'sphere', radius: 0.5,
-        material: 'stone', hp: 30, color: 0x4a2a1a, dynamic: true, tileMass: 8 },
-
-      // ── Brittle glowing molten rocks — static cover on mid ledges ──
-      { x: -9,  y: 5.0, shape: 'sphere', radius: 0.42, material: 'stone', hp: 18, color: 0xff4422 },
-      { x:  9,  y: 5.0, shape: 'sphere', radius: 0.42, material: 'stone', hp: 18, color: 0xff4422 },
+      // ── FLOATING OBSIDIAN RAFTS — dynamic; bob + drift on the lava sea ──
+      { x: -8, y: 4,   shape: 'box', w: 3.0, h: 0.5, material: 'stone', hp: 70, color: 0x141016, dynamic: true, tileMass: 5 },
+      { x: -3, y: 4.4, shape: 'box', w: 2.4, h: 0.5, material: 'stone', hp: 70, color: 0x18121a, dynamic: true, tileMass: 4.5 },
+      { x:  3, y: 4.2, shape: 'box', w: 2.6, h: 0.5, material: 'stone', hp: 70, color: 0x141016, dynamic: true, tileMass: 4.5 },
+      { x:  8, y: 4,   shape: 'box', w: 3.0, h: 0.5, material: 'stone', hp: 70, color: 0x18121a, dynamic: true, tileMass: 5 },
+      { x:  0, y: 3.6, shape: 'box', w: 2.2, h: 0.5, material: 'stone', hp: 60, color: 0x100c12, dynamic: true, tileMass: 4 },
     ],
     hazards: [
-      // ── THE CENTERPIECE: central rising-lava pool — the eruption clock ──
-      // Base top at y=-1.5; flood crest at y=5.5 (drowns low+mid tiers).
-      // Period 11 s: dwell ~2.5 s bottom, surge, dwell ~2.5 s top, recede.
-      { kind: 'lava', x: 0, y: -3, w: 22, h: 3, dps: 70,
-        rise: { height: 7, period: 11 } },
-
-      // ── Kill plane far below ──
-      { kind: 'lava', x: 0, y: -10, w: 50, h: 2.0, dps: 999 },
-
-      // ── Summit rim spikes ──
-      { kind: 'spike', x: -4, y: 12.5, w: 1.6 },
-      { kind: 'spike', x:  4, y: 12.5, w: 1.6 },
+      // ── THE LAVA SEA — wide + buoyant. Damaging but survivable: you bob on
+      // the surface taking DoT and struggle back onto a raft or ledge. Gentle
+      // tide raises/lowers the whole sea (and the rafts riding it).
+      { kind: 'lava', x: 0, y: -2, w: 46, h: 10, dps: 28, buoyant: true,
+        rise: { height: 1.5, period: 16 } },
+      // ── Deep backstop kill plane (only reached if something sinks through) ──
+      { kind: 'lava', x: 0, y: -16, w: 60, h: 2.0, dps: 999 },
     ],
-    // ── Spawns — ALL on surfaces > 5.8 (above flood crest 5.5) ──
-    //   Upper ledges y=8: surface = 8.5 > 5.8 ✓
-    //   Summit y=11: surface = 11.5 > 5.8 ✓
     spawns: [
-      { x: -6, y: 9 },   // upper left ledge (tile x:-7..-4, y=8, surface 8.5)
-      { x:  6, y: 9 },   // upper right ledge (tile x:4..7, y=8, surface 8.5)
-      { x: -5, y: 9 },   // upper left inner
-      { x:  5, y: 9 },   // upper right inner
-      { x: -2, y: 12 },  // summit left (tile x:-3..3, y=11, surface 11.5)
-      { x:  2, y: 12 },  // summit right
-      { x:  0, y: 12 },  // summit center
+      { x: -16, y: 9 }, { x: 16, y: 9 },   // side ledges
+      { x: -15, y: 9 }, { x: 15, y: 9 },
+      { x:  0,  y: 10 },                    // spire cap
+      { x: -14, y: 9 }, { x: 14, y: 9 },
     ],
     weaponSpawns: [
-      // Summit prize — most exposed king-of-the-hill reward.
-      { x:  0, y: 12 },
-      // Tempting mid-tier weapons — they flood at peak, grab fast!
-      { x: -10, y: 1 }, { x: 10, y: 1 },   // low pads
-      { x: -10, y: 5 }, { x: 10, y: 5 },   // mid ledges
-      // Safe upper weapons.
-      { x: -6, y: 9 }, { x: 6, y: 9 },
+      { x:  0, y: 10 },                     // spire prize
+      { x: -8, y: 5 }, { x: 8, y: 5 },      // outer rafts
+      { x:  0, y: 5 },                      // centre raft (risky)
+      { x: -16, y: 9 }, { x: 16, y: 9 },    // side ledges
     ],
     background: [
       // Sky gradient — deep red/black.
