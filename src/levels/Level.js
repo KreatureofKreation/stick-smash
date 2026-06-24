@@ -38,6 +38,9 @@ export class Tile {
     // Two-end chain suspension of a single rigid platform: { y, segs?, hp? }.
     // A chain hangs from a crossbar at y down to EACH end of this tile.
     this.suspend = opts.suspend || null;
+    // Breakable station window: when destroyed, opens a vacuum breach that
+    // sucks nearby players out toward space (see Level._spawnBreach).
+    this.breach = opts.breach || null;
     // Optional Z-axis rotation (radians) for tilted decorative shards (e.g., crystal spire).
     // Applied to both the physics body and mesh before the static-tile matrix bake.
     this.rotZ = opts.rotZ ?? 0;
@@ -178,6 +181,8 @@ export class Tile {
   destroy() {
     const x = this.body?.position?.x ?? this.gx * TILE;
     const y = this.body?.position?.y ?? this.gy * TILE;
+    // Smashed window → open a vacuum breach at this spot.
+    if (this.breach) this.level._spawnBreach?.(x, y);
     // Cascade: drop any tiles that named this one as their parent. Each
     // child becomes dynamic and will recursively drop its own children via
     // Level._dropSuspendedTile.
@@ -668,6 +673,10 @@ export class Level {
     // get planet-source gravity instead of the global world gravity. Camera, kill
     // bound, and meteor shower are also planet-level features.
     this.curvedGravity = !!def.curvedGravity;
+    // Space station: low-grav inside the module footprint, zero-g (float) once a
+    // player is knocked OUTSIDE it. `stationBounds` = { x0, x1 } interior span.
+    this._stationBounds = def.stationBounds ?? null;
+    this._breaches = [];   // active vacuum breaches (suck players toward space)
     this.planetConfigs = def.planets ?? [];
     this.planets = [];
     this.cameraClamp = def.cameraClamp ?? null;
@@ -932,6 +941,8 @@ export class Level {
       }
     }
     this._applyBuoyancy(dt);
+    this._applyStationGravity();
+    this._updateBreaches(dt);
     // Sync dynamic tiles' meshes to their physics bodies.
     for (const t of this._dynamicTiles) {
       if (!t.mesh || !t.body) continue;
@@ -1138,6 +1149,53 @@ export class Level {
       for (const p of this.game.players) if (p && p.body && p.alive) apply(p.body);
       for (const t of this._dynamicTiles) apply(t.body);
       for (const w of (this.game.weapons || [])) apply(w.body);
+    }
+  }
+
+  // Space station gravity: full (low-grav) gravity scale inside the module
+  // footprint, ZERO once you're knocked outside it — so you float in space and
+  // drift toward the vacuum kill bound.
+  _applyStationGravity() {
+    const sb = this._stationBounds;
+    if (!sb) return;
+    for (const p of this.game.players) {
+      if (!p || !p.body || !p.alive) continue;
+      const inside = p.body.position.x > sb.x0 && p.body.position.x < sb.x1;
+      p.body.setGravityScale?.(inside ? 1 : 0);
+    }
+  }
+
+  // A smashed window opens a vacuum breach: for a few seconds it sucks nearby
+  // players toward the breach point (and out into space), with an air-rush
+  // particle plume. Position-nudge pull so it overpowers normal movement.
+  _spawnBreach(x, y) {
+    this._breaches.push({ x, y, life: 5 });
+    if (this.game?.fx) this.game.fx.camera?.punch?.(0.3);
+  }
+  _updateBreaches(dt) {
+    if (!this._breaches.length) return;
+    for (let i = this._breaches.length - 1; i >= 0; i--) {
+      const b = this._breaches[i];
+      b.life -= dt;
+      if (b.life <= 0) { this._breaches.splice(i, 1); continue; }
+      for (const p of this.game.players) {
+        if (!p || !p.body || !p.alive) continue;
+        const dx = b.x - p.body.position.x, dy = b.y - p.body.position.y;
+        const d = Math.hypot(dx, dy) || 1;
+        if (d > 9) continue;
+        const pull = 14 * (1 - d / 9);
+        const step = Math.min(0.22, pull * dt);
+        p.body.wakeUp?.();
+        p.body.position.x += (dx / d) * step;
+        p.body.position.y += (dy / d) * step;
+        p.body.velocity.x += (dx / d) * 6 * dt;
+      }
+      if (this.game?.fx && Math.random() < dt * 30) {
+        this.game.fx.particles.spark.spawn({
+          x: b.x + (Math.random() - 0.5) * 6, y: b.y + (Math.random() - 0.5) * 4, z: 0,
+          vx: 0, vy: 0, life: 0.3, size: 0.1, color: 0xcce0ff, gravity: 0, drag: 0.85, shrink: 1,
+        });
+      }
     }
   }
 
