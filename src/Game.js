@@ -297,6 +297,11 @@ export class Game {
   _startMatch({ character, name, bots, levelId, isOnline, asClient, localPlayerId, localMP = false, extras = null, externalPlayers = null, externalOptions = null }) {
     this._cleanup();
     this.lobbyActive = false;   // any match start exits the lobby state
+    // Clear any leftover pause from a previous match's pause-menu quit —
+    // otherwise the new match spawns but the loop (running && !paused) never
+    // ticks until Esc is pressed (players appear frozen / unspawned).
+    this.paused = false;
+    this.menu.hide?.();
     this._matchOverReported = false;
     this.levelId = levelId;
     this.level = new Level(this.scene, this.physics, this.fx, getLevel(levelId), this);
