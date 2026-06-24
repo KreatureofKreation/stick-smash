@@ -19,7 +19,7 @@ import { rand, clamp, lerp } from './util/math.js';
 import { Projectile } from './weapons/Projectile.js';
 
 export class Game {
-  constructor() {
+  constructor(options = {}) {
     // Renderer
     const canvas = document.getElementById('game');
     const isCoarse = matchMedia('(pointer: coarse)').matches;
@@ -88,6 +88,10 @@ export class Game {
     this.paused = false;
     this.running = false;
     this.lobbyActive = false;
+    this.onMatchOver = options.onMatchOver ?? null;
+    this._matchOverReported = false;
+    this._externalMatch = null;
+    this._externalBodyClass = null;
 
     // Restore the player's weapon-toggle preferences before any spawn pool
     // pick happens. Stored as a JSON array of disabled item ids.
@@ -269,9 +273,31 @@ export class Game {
     this.running = true;
   }
 
-  _startMatch({ character, name, bots, levelId, isOnline, asClient, localPlayerId, localMP = false, extras = null }) {
+  startExternalMatch({ players = [], levelId = 'arena', minFighters = 2, bodyClass = 'external-mode', hideMenu = true, context = null } = {}) {
+    this.net?.disconnect();
+    this._lastLocalMP = false;
+    this._lastExtras = null;
+    this._startMatch({
+      character: null,
+      name: null,
+      bots: 0,
+      levelId,
+      isOnline: false,
+      externalPlayers: players,
+      externalOptions: { minFighters },
+    });
+    this._externalMatch = { context, startedAt: Date.now() };
+    this._externalBodyClass = bodyClass;
+    this._matchOverReported = false;
+    if (hideMenu) this.menu.hide();
+    if (bodyClass) document.body.classList.add(bodyClass);
+    this.running = true;
+  }
+
+  _startMatch({ character, name, bots, levelId, isOnline, asClient, localPlayerId, localMP = false, extras = null, externalPlayers = null, externalOptions = null }) {
     this._cleanup();
     this.lobbyActive = false;   // any match start exits the lobby state
+    this._matchOverReported = false;
     this.levelId = levelId;
     this.level = new Level(this.scene, this.physics, this.fx, getLevel(levelId), this);
     this.camera._level = this.level;
@@ -284,7 +310,36 @@ export class Game {
     this.matchTimer = 0;
     this.weaponSpawnTimer = 1.5;
 
-    if (!asClient) {
+    if (externalPlayers) {
+      const used = new Set();
+      for (let i = 0; i < externalPlayers.length; i++) {
+        const player = externalPlayers[i] || {};
+        const pick = this._pickRosterCharacter(player.characterId || player.character?.id, player.slot ?? i, used);
+        const sm = this._spawnPlayer({
+          name: player.name || player.displayName || `P${i + 1}`,
+          character: pick,
+          isLocal: true,
+          inputSource: player.inputSource || { kind: player.inputKind || 'external', slot: player.slot ?? i },
+        });
+        sm.externalPlayer = player;
+        if (player.metadata) sm.externalMetadata = player.metadata;
+        this.localPlayers.push(sm);
+      }
+      this.localPlayer = this.localPlayers[0] ?? null;
+      this.character = this.localPlayer?.character ?? null;
+
+      const minFighters = externalOptions?.minFighters ?? 2;
+      const botsToAdd = Math.max(0, minFighters - externalPlayers.length);
+      for (let i = 0; i < botsToAdd; i++) {
+        const pick = this._pickRosterCharacter(null, externalPlayers.length + i + 1, used);
+        const bsm = this._spawnPlayer({
+          name: pick.name,
+          character: pick,
+          isBot: true,
+        });
+        bsm.botBrain = new Bot(bsm);
+      }
+    } else if (!asClient) {
       // Local-MP is offline-only AND opt-in. PLAY SOLO never spawns extras
       // even with pads plugged in; only the LOCAL MULTIPLAYER menu sets the
       // localMP flag.
@@ -389,6 +444,16 @@ export class Game {
     }
   }
 
+  _pickRosterCharacter(preferredId, fallbackIndex, used) {
+    let pick = preferredId ? rosterById(preferredId) : null;
+    pick = pick || ROSTER[fallbackIndex % ROSTER.length];
+    if (used.has(pick.id)) {
+      pick = ROSTER.find(c => !used.has(c.id)) || pick;
+    }
+    used.add(pick.id);
+    return pick;
+  }
+
   _startCountdown() {
     // Cancel any pending countdown from the previous match. Without this,
     // a fast PLAY AGAIN (or map rotation) restarts before the prior 3-2-1
@@ -428,6 +493,9 @@ export class Game {
     // they don't peek through behind the menu after game over.
     document.body.classList.remove('in-game');
     document.body.classList.remove('local-mp');
+    if (this._externalBodyClass) document.body.classList.remove(this._externalBodyClass);
+    this._externalMatch = null;
+    this._externalBodyClass = null;
     if (this.hud) this.hud.clear();
   }
 
@@ -973,6 +1041,7 @@ export class Game {
       const local = this.localPlayer;
       if (local && local.lives <= 0 && local.state === STATE.DEAD) {
         this.running = false;
+        if (this._notifyMatchOver({ winner: null, reason: 'ko' })) return;
         audio.death();
         this.net.broadcast?.({ t: 'gameover', text: 'KO!', sub: `${local.name} eliminated.` });
         setTimeout(() => this.menu.show('over', 'KO!', `${local.name} eliminated.`), 1200);
@@ -985,6 +1054,7 @@ export class Game {
     // All locals dead AND no one alive → simultaneous wipeout = draw.
     if (stillIn.length === 0) {
       this.running = false;
+      if (this._notifyMatchOver({ winner: null, reason: 'draw' })) return;
       audio.death();
       this.net.broadcast?.({ t: 'gameover', text: 'DRAW', sub: 'Everyone went down.' });
       setTimeout(() => this.menu.show('over', 'DRAW', 'Everyone went down.'), 1200);
@@ -995,12 +1065,28 @@ export class Game {
     if (stillIn.length === 1) {
       const winner = stillIn[0];
       this.running = false;
+      if (this._notifyMatchOver({ winner, reason: 'victory' })) return;
       const localWon = this.localPlayers.includes(winner);
       if (localWon) audio.win(); else audio.death();
       const sub = `${winner.name} wins!`;
       this.net.broadcast?.({ t: 'gameover', text: 'VICTORY', sub });
       setTimeout(() => this.menu.show('over', 'VICTORY', sub), 800);
     }
+  }
+
+  _notifyMatchOver({ winner, reason }) {
+    if (this._matchOverReported) return true;
+    this._matchOverReported = true;
+    const result = {
+      winner,
+      players: this.players,
+      reason,
+      external: !!this._externalMatch,
+      context: this._externalMatch?.context ?? null,
+      startedAt: this._externalMatch?.startedAt ?? null,
+      endedAt: Date.now(),
+    };
+    return this.onMatchOver?.(result) === true;
   }
 
   _snapshot() {

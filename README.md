@@ -91,6 +91,37 @@ Left side = analog joystick. Right cluster: **✊** Attack, **⤴** Jump, **✋*
 - PeerJS (WebRTC matchmaking via public broker)
 - Pure ES modules + import maps — **no build step**
 
+## Embedding / host hooks
+
+Stick Smash can still run standalone through `src/main.js`. Host apps can also
+import `Game` directly and use optional hooks:
+
+```js
+const game = new Game({
+  onMatchOver(result) {
+    // Return true to suppress the built-in game-over menu.
+    host.reportResult(result);
+    return true;
+  },
+});
+
+game.input.registerInputProvider('host', {
+  getSnapshotFor(source) {
+    return host.getInputSnapshot(source.slot);
+  },
+});
+
+game.startExternalMatch({
+  context: { sessionId: 'abc' },
+  players: [
+    { name: 'P1', inputSource: { kind: 'host', slot: 0 } },
+    { name: 'P2', inputSource: { kind: 'host', slot: 1 } },
+  ],
+  levelId: 'arena',
+  minFighters: 2,
+});
+```
+
 ## Hacking
 
 Drop a new weapon class in `src/weapons/weapons.js` and add it to `SPAWN_TABLE`. New levels go in `src/levels/definitions.js` (just a tile grid + hazards). New characters: append to `src/characters/roster.js`.
