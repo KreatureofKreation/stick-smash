@@ -992,20 +992,35 @@ export class Stickman {
     audio.click();
   }
 
+  // A real round shield — wood planks, an iron rim, a domed boss + rivets.
+  // Held out along the aim direction and turned to face the cursor (see
+  // _updateShieldVisual), so it reads like a wielded weapon, not an energy bubble.
   _makeShieldMesh() {
-    const disc = new THREE.Mesh(
-      new THREE.CircleGeometry(0.6, 22),
-      new THREE.MeshBasicMaterial({ color: 0x5bc8ff, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false }),
-    );
-    const rim = new THREE.Mesh(
-      new THREE.RingGeometry(0.55, 0.66, 26),
-      new THREE.MeshBasicMaterial({ color: 0xb0ecff, transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false }),
-    );
-    disc.add(rim);
-    disc.visible = false;
-    disc.renderOrder = 6;
-    this.scene.add(disc);
-    return disc;
+    const grp = new THREE.Group();
+    const R = 0.5;
+    const wood = new THREE.MeshStandardMaterial({ color: 0x7a4a24, roughness: 0.85, metalness: 0.05 });
+    const iron = new THREE.MeshStandardMaterial({ color: 0x6b7079, roughness: 0.4, metalness: 0.85 });
+    // Vertical planks clipped to a disc by their chord height.
+    const nP = 5, pw = (R * 2) / nP;
+    for (let i = 0; i < nP; i++) {
+      const cx = -R + pw * (i + 0.5);
+      const h = 2 * Math.sqrt(Math.max(0.01, R * R - cx * cx));
+      const mat = wood.clone(); mat.color.offsetHSL(0, 0, (i % 2 ? 0.05 : -0.05));
+      const plank = new THREE.Mesh(new THREE.BoxGeometry(pw * 0.9, h, 0.07), mat);
+      plank.position.set(cx, 0, 0); grp.add(plank);
+    }
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(R, 0.05, 8, 30), iron);
+    rim.position.z = 0.01; grp.add(rim);
+    const boss = new THREE.Mesh(new THREE.SphereGeometry(0.12, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), iron);
+    boss.rotation.x = -Math.PI / 2; boss.position.z = 0.06; grp.add(boss);
+    for (let a = 0; a < 8; a++) {
+      const ang = (a / 8) * Math.PI * 2;
+      const rv = new THREE.Mesh(new THREE.SphereGeometry(0.028, 6, 6), iron);
+      rv.position.set(Math.cos(ang) * R * 0.88, Math.sin(ang) * R * 0.88, 0.05); grp.add(rv);
+    }
+    grp.visible = false; grp.renderOrder = 4;
+    this.scene.add(grp);
+    return grp;
   }
 
   // Hold Special → raise the directional shield. Drains a meter; breaks at 0
@@ -1047,14 +1062,18 @@ export class Stickman {
     if (!m) return;
     m.visible = this._blocking && this.state !== STATE.DEAD;
     if (!m.visible) return;
+    const dx = this._shieldDirX, dy = this._shieldDirY;
+    // Held out in front along the aim direction (chest height, toward camera).
     m.position.set(
-      this.position.x + this._shieldDirX * 0.62,
-      this.position.y + 0.35 + this._shieldDirY * 0.3,
-      0.18,
+      this.position.x + dx * 0.5,
+      this.position.y + 0.3 + dy * 0.35,
+      0.25,
     );
-    const lowPulse = this._shieldMeter < 0.3 ? 0.5 + 0.5 * Math.abs(Math.sin(performance.now() * 0.02)) : 1;
-    m.scale.setScalar(0.88 + 0.12 * lowPulse);
-    m.material.opacity = 0.22 + 0.12 * lowPulse;
+    // Turn the shield to point where the cursor is aiming.
+    m.rotation.z = Math.atan2(dy, dx);
+    // Low-meter wobble (scale only — it's an opaque mesh group now).
+    const s = this._shieldMeter < 0.3 ? 0.9 + 0.1 * Math.abs(Math.sin(performance.now() * 0.02)) : 1;
+    m.scale.setScalar(s);
   }
 
   _throwWeapon() {
@@ -2416,7 +2435,11 @@ export class Stickman {
     this.world.remove(this.body);
     this.scene.remove(this.rig.group);
     if (this.nameSprite) this.scene.remove(this.nameSprite);
-    if (this._shieldMesh) { this.scene.remove(this._shieldMesh); this._shieldMesh.geometry?.dispose(); this._shieldMesh.material?.dispose(); this._shieldMesh = null; }
+    if (this._shieldMesh) {
+      this.scene.remove(this._shieldMesh);
+      this._shieldMesh.traverse?.((o) => { o.geometry?.dispose?.(); o.material?.dispose?.(); });
+      this._shieldMesh = null;
+    }
     if (this.weapon) this.weapon.destroy();
   }
 }
