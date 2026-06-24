@@ -2156,6 +2156,14 @@ export class Stickman {
     this.prevGrounded = this.grounded;
     this._updateGroundCheck();
     this._tickShield(dt);
+    // Anti-explosion clamp — a spawn penetrating a high-restitution (bouncy)
+    // tile, or any solver blowup, can fling the body at hundreds of m/s into the
+    // kill bound. Cap to a sane max so a glitch never instantly rings someone out.
+    {
+      const v = this.body.velocity;
+      const vmag = Math.hypot(v.x, v.y);
+      if (vmag > 60) { const f = 60 / vmag; v.x *= f; v.y *= f; }
+    }
 
     // Climbing logic — body stays DYNAMIC so floor/ceiling collisions work.
     if (this.climbing) {
