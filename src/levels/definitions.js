@@ -543,54 +543,54 @@ const ALL_LEVELS = [
     id: 'skyscraper',
     name: 'Skyscraper',
     bgColor: 0x080c1a,
+    // Tight side bound — knock someone through a smashed window and they ring
+    // out into the void (the street far below).
+    killBound: { x: 14, y: 22 },
     tiles: [
-      // Side tower roofs.
-      ...row(0, -16, -10, { material: 'metal', hp: 80, color: 0x6a7080 }),
-      ...row(0, 10, 16,   { material: 'metal', hp: 80, color: 0x6a7080 }),
-      ...row(-1, -16, -10, { material: 'metal', hp: 100, color: 0x4a5060 }),
-      ...row(-1, 10, 16,   { material: 'metal', hp: 100, color: 0x4a5060 }),
-      ...tough(-2, -16, -10, { color: 0x202830 }),
-      ...tough(-2, 10, 16,   { color: 0x202830 }),
-      // Glass walkway tier 1 (y=3).
-      ...row(3, -8, -3, { material: 'ice', hp: 14, color: 0x80c0e0 }),
-      ...row(3,  3,  8, { material: 'ice', hp: 14, color: 0x80c0e0 }),
-      // Mid bridge (y=6) — single rigid slab hung by a chain at each end from
-      // the antenna mast above.
-      chainPlat(6, -2, 2, 14, { material: 'ice', hp: 14, color: 0x90d0f0, segs: 6 }),
-      // Glass walkway tier 2 (y=9).
-      ...row(9, -7, -3, { material: 'ice', hp: 12, color: 0xa0e0ff }),
-      ...row(9,  3,  7, { material: 'ice', hp: 12, color: 0xa0e0ff }),
-      // Glass walkway tier 3 (y=12).
-      ...row(12, -3, 3, { material: 'ice', hp: 10, color: 0xb0f0ff }),
-      // Steel I-beams (corner posts).
-      { x: -10, y: 4, shape: 'box', w: 0.5, h: 1, material: 'metal', hp: 150, color: 0x9a8060 },
-      { x:  10, y: 4, shape: 'box', w: 0.5, h: 1, material: 'metal', hp: 150, color: 0x9a8060 },
-      { x: -10, y: 10, shape: 'box', w: 0.5, h: 1, material: 'metal', hp: 150, color: 0x9a8060 },
-      { x:  10, y: 10, shape: 'box', w: 0.5, h: 1, material: 'metal', hp: 150, color: 0x9a8060 },
-      // Antenna mast at top center (cylinder).
-      { x: 0, y: 14.5, shape: 'cylinder', w: 0.6, h: 2.5, radius: 0.3, material: 'metal', hp: 80, color: 0x808898 },
+      // ── Ground floor (full base) ──
+      ...row(0, -12, 12, { material: 'metal', hp: 90, color: 0x707888 }),
+      ...tough(-1, -12, 12, { color: 0x2a3038 }),
+      // ── Office floors — decks with side gaps for the elevator shafts ──
+      ...row(5,  -8, 8, { material: 'metal', hp: 70, color: 0x808898 }),
+      ...row(10, -8, 8, { material: 'metal', hp: 70, color: 0x808898 }),
+
+      // ── EXTERIOR GLASS WINDOWS (breakable) — smash + knock players OUT into
+      //    the void beyond. The signature defenestration ring-out. ──
+      { x: -11, y: 2.2, shape: 'box', w: 0.3, h: 4.4, material: 'ice', hp: 14, color: 0x9bd0ff },
+      { x:  11, y: 2.2, shape: 'box', w: 0.3, h: 4.4, material: 'ice', hp: 14, color: 0x9bd0ff },
+      { x: -11, y: 7.2, shape: 'box', w: 0.3, h: 4.4, material: 'ice', hp: 14, color: 0x9bd0ff },
+      { x:  11, y: 7.2, shape: 'box', w: 0.3, h: 4.4, material: 'ice', hp: 14, color: 0x9bd0ff },
+      { x: -11, y: 12,  shape: 'box', w: 0.3, h: 4.0, material: 'ice', hp: 14, color: 0x9bd0ff },
+      { x:  11, y: 12,  shape: 'box', w: 0.3, h: 4.0, material: 'ice', hp: 14, color: 0x9bd0ff },
+
+      // ── INTERIOR GLASS DIVIDERS (breakable) — partition each office floor ──
+      { x: 0, y: 6.4,  shape: 'box', w: 0.25, h: 2.6, material: 'ice', hp: 10, color: 0xb0e8ff },
+      { x: 0, y: 11.4, shape: 'box', w: 0.25, h: 2.6, material: 'ice', hp: 10, color: 0xb0e8ff },
+
+      // ── Office desks (cover) ──
+      { x: -5, y: 5.6,  shape: 'box', w: 1.4, h: 0.6, material: 'wood', hp: 40, color: 0x6a4a2a },
+      { x:  5, y: 5.6,  shape: 'box', w: 1.4, h: 0.6, material: 'wood', hp: 40, color: 0x6a4a2a },
+      { x: -4, y: 10.6, shape: 'box', w: 1.4, h: 0.6, material: 'wood', hp: 40, color: 0x6a4a2a },
+      { x:  4, y: 10.6, shape: 'box', w: 1.4, h: 0.6, material: 'wood', hp: 40, color: 0x6a4a2a },
+
+      // ── ELEVATORS — continuous up/down platforms in the side shafts ──
+      { x: -10, y: 5, shape: 'box', w: 2.2, h: 0.4, material: 'metal', hp: 250, color: 0xb0b8c8, move: { axis: 'y', from: 0.6, to: 11, speed: 1.0 } },
+      { x:  10, y: 5, shape: 'box', w: 2.2, h: 0.4, material: 'metal', hp: 250, color: 0xb0b8c8, move: { axis: 'y', from: 0.6, to: 11, speed: 1.0, phase: Math.PI } },
     ],
     hazards: [
-      // Void death plane below.
-      { kind: 'lava', x: 0, y: -6, w: 50, h: 1.4, dps: 999 },
-      // Window-cleaner pendulum at top — hits the y=12 walkway.
-      { kind: 'pendulum', x: 0, y: 18, length: 5, amplitude: Math.PI / 2.5, speed: 1.2 },
-      // Broken-glass spikes on the inner edges of the side roofs.
-      { kind: 'spike', x: -9, y: 1, w: 1.6 },
-      { kind: 'spike', x:  9, y: 1, w: 1.6 },
-      // Mid-tier glass shard hazard (point-down — falling shards from above).
-      { kind: 'spike', x: 0, y: 8.5, w: 2.0, pointDown: true, color: 0xc0e0f0 },
+      { kind: 'lava', x: 0, y: -7, w: 64, h: 1.6, dps: 999, color: 0x0a1020 },   // the street far below
     ],
     spawns: [
-      { x: -13, y: 1 }, { x: 13, y: 1 },
-      { x: -5, y: 4 }, { x: 5, y: 4 },
-      { x: 0, y: 13 },
+      { x: -6, y: 1 }, { x: 6, y: 1 },       // ground floor
+      { x: -4, y: 6 }, { x: 4, y: 6 },       // 2nd floor
+      { x:  0, y: 11 },                       // top floor
+      { x: -2, y: 1 }, { x: 2, y: 1 },
     ],
     weaponSpawns: [
-      { x: 0, y: 13 },                        // antenna platform prize
-      { x: 0, y: 7 },
-      { x: -5, y: 10 }, { x: 5, y: 10 },
-      { x: -13, y: 1 }, { x: 13, y: 1 },
+      { x: 0, y: 11 },                        // top-floor prize
+      { x: -4, y: 6 }, { x: 4, y: 6 },
+      { x: -6, y: 1 }, { x: 6, y: 1 },
+      { x: 0, y: 1 },
     ],
     background: [
       ...(() => {

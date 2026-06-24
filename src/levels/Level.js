@@ -41,6 +41,9 @@ export class Tile {
     // Breakable station window: when destroyed, opens a vacuum breach that
     // sucks nearby players out toward space (see Level._spawnBreach).
     this.breach = opts.breach || null;
+    // Moving platform (elevator): { axis:'y'|'x', from, to, speed, phase? } —
+    // a kinematic body that oscillates and carries riders.
+    this.move = opts.move || null;
     // Optional Z-axis rotation (radians) for tilted decorative shards (e.g., crystal spire).
     // Applied to both the physics body and mesh before the static-tile matrix bake.
     this.rotZ = opts.rotZ ?? 0;
@@ -110,6 +113,29 @@ export class Tile {
     this.body = body;
     this.dynamic = dyn;
 
+    // Elevator / moving platform — KINEMATIC body driven by velocity so it
+    // carries riders by contact. Oscillates along an axis between from..to.
+    if (this.move) {
+      const mv = this.move;
+      const axis = mv.axis ?? 'y';
+      const from = mv.from ?? (body.position[axis] - 3);
+      const to = mv.to ?? (body.position[axis] + 3);
+      const center = (from + to) / 2, amp = (to - from) / 2;
+      const speed = mv.speed ?? 1, phase = mv.phase ?? 0;
+      body.type = CANNON.Body.KINEMATIC;
+      body.collisionResponse = true;
+      body.updateMassProperties?.();
+      body.position[axis] = center + amp * Math.sin(phase);
+      this.dynamic = true;                 // mesh follows the body
+      let t = phase;
+      this._moveDrive = (dt) => {
+        t += dt * speed;
+        body.velocity[axis] = amp * speed * Math.cos(t);
+        body.velocity[axis === 'y' ? 'x' : 'y'] = 0;
+      };
+      this.level._hazardDrivers.add(this._moveDrive);
+    }
+
     // Per-material detail texture (wood grain / brushed metal / stone speckle /
     // ice crackle), tinted by the tile colour and shared across all tiles of
     // that material (one GPU texture). The texture fills each box face. Full-
@@ -142,14 +168,14 @@ export class Tile {
     // Static tiles never move — bake the matrix once and skip per-frame
     // updateMatrix() in the renderer's traverse. Saves N matrix multiplies
     // every frame across hundreds of tiles per level.
-    if (!dyn) {
+    if (!dyn && !this.move) {
       mesh.updateMatrix();
       mesh.matrixAutoUpdate = false;
     }
     scene.add(mesh);
     this.mesh = mesh;
 
-    if (dyn) this.level._dynamicTiles.add(this);
+    if (dyn || this.move) this.level._dynamicTiles.add(this);
 
     // Chain suspension: hang this (static) tile from a static anchor via N
     // chain link bodies. The tile remains static until any chain seg is
@@ -219,6 +245,7 @@ export class Tile {
       this.body = null;
     }
     this.level._dynamicTiles?.delete(this);
+    if (this._moveDrive) this.level._hazardDrivers?.delete(this._moveDrive);
     this.level.fx.particles.debris(x, y, 0, this.color, 14);
     audio.break();
     this.level.tiles.delete(this._key);
