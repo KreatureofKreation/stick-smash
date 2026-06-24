@@ -83,8 +83,17 @@ const BLOCK_MOVE_SCALE = 0.35;    // movement slowed while blocking
 const DISMEMBER_WEAPONS = new Set(['sword', 'longsword', 'halberd', 'saber', 'flame', 'ice', 'explosion']);
 const BLADE_WEAPONS = new Set(['sword', 'longsword', 'halberd', 'saber', 'flame', 'ice']);
 const SEVER_PARTS = ['armL', 'armR', 'legL', 'legR'];
-const LIMB_SEVER_CHANCE = 0.33;
+const LIMB_SEVER_CHANCE = 0.42;
 const goreOn = () => { try { return localStorage.getItem('mc_gore') !== '0'; } catch (_) { return true; } };
+// Monty Python Black Knight — the more you lose, the more defiant.
+const TAUNT_LINES = {
+  armR: ["'Tis but a scratch!", "I've had worse!", "Just a flesh wound!"],
+  armL: ["It's just a flesh wound!", "Had enough?", "Come on then!"],
+  legR: ["Right, I'll do you for that!", "Chicken!", "I'm invincible!"],
+  legL: ["The Black Knight always triumphs!", "Running away?!", "Have at you!"],
+  none: ["Come back here! I'll bite your legs off!", "We'll call it a draw."],
+};
+const pickTaunt = (part) => { const a = TAUNT_LINES[part] || TAUNT_LINES.none; return a[(Math.random() * a.length) | 0]; };
 
 export class Stickman {
   constructor(world, scene, opts) {
@@ -353,6 +362,8 @@ export class Stickman {
   get alive() { return this.state !== STATE.DEAD && this.lives > 0; }
 
   setWeapon(weapon) {
+    // No weapon arm → can't pick up or hold a weapon ('tis but a scratch).
+    if (weapon && this._severed?.has('armR')) return;
     if (this.charging) this._clearCombatState();
     if (this.weapon) {
       const old = this.weapon;
@@ -551,9 +562,9 @@ export class Stickman {
       this.die('ko', { gib });
       return true;
     }
-    // Survived — a non-lethal blade/lightsaber hit can lop off a single limb
-    // (cap at 2 so a player isn't fully dismantled). No bleed.
-    if (goreOn() && BLADE_WEAPONS.has(opts.weapon) && this._severed.size < 2 && Math.random() < LIMB_SEVER_CHANCE) {
+    // Survived — a non-lethal blade/lightsaber hit can lop off a limb. Black
+    // Knight rules: you can lose all four and keep fighting. No bleed.
+    if (goreOn() && BLADE_WEAPONS.has(opts.weapon) && this._severed.size < 4 && Math.random() < LIMB_SEVER_CHANCE) {
       const avail = SEVER_PARTS.filter(p => !this._severed.has(p));
       if (avail.length) this._severLimb(avail[(Math.random() * avail.length) | 0]);
     }
@@ -601,27 +612,70 @@ export class Stickman {
     this.rig.hidePart?.(part);
   }
 
-  // Lop off one limb (no bleed). Arms drop the held weapon; legs hobble.
+  // Limb counts → drive movement + what you can still do.
+  _legCount() { return 2 - (this._severed.has('legL') ? 1 : 0) - (this._severed.has('legR') ? 1 : 0); }
+  _armCount() { return 2 - (this._severed.has('armL') ? 1 : 0) - (this._severed.has('armR') ? 1 : 0); }
+  // armR = weapon arm, armL = grab arm.
+  _hasWeaponArm() { return !this._severed.has('armR'); }
+  _hasGrabArm() { return !this._severed.has('armL'); }
+
+  // Lop off one limb (no bleed) + apply its consequence. Black Knight: keep
+  // fighting and taunt about it.
   _severLimb(part) {
     if (!part || this._severed.has(part)) return;
     this._severed.add(part);
     const outX = part.endsWith('R') ? 1 : -1;
     if (goreOn()) {
       this._flingPart(part, outX);
-      const fx = this.game?.fx;
-      if (fx) {
+      if (this.game?.fx) {
         const py = this.position.y + (part.startsWith('arm') ? 0.4 : -0.2);
-        fx.particles.blood(this.position.x, py, 0, outX, 1);
+        this.game.fx.particles.blood(this.position.x, py, 0, outX, 1.4);
       }
     } else {
       this.rig.hidePart?.(part);
     }
-    if (part.startsWith('arm') && this.weapon) {
+    // Weapon arm (right) gone → drop the weapon (can't re-arm; see setWeapon).
+    if (part === 'armR' && this.weapon) {
       this.weapon.detach();
       this.weapon.dropAt(this.position, this.body.velocity);
       this.weapon = null;
     }
+    // Grab arm (left) gone → let go of anything held.
+    if (part === 'armL' && this.grabbing) this.releaseGrab?.();
+    // Spawn a defiant taunt over the head.
+    this._spawnTaunt(this._severed.size >= 4 ? pickTaunt('none') : pickTaunt(part));
     audio.break?.();
+  }
+
+  // Floating Monty-Python taunt sprite above the player; rises + fades.
+  _spawnTaunt(text) {
+    if (this._taunt) { this.scene.remove(this._taunt.spr); this._taunt.spr.material.map?.dispose(); this._taunt.spr.material.dispose(); }
+    const cnv = document.createElement('canvas');
+    cnv.width = 512; cnv.height = 96;
+    const ctx = cnv.getContext('2d');
+    ctx.font = 'bold 34px Georgia, serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+    ctx.strokeText(text, 256, 48);
+    ctx.fillStyle = '#ffe28a';
+    ctx.fillText(text, 256, 48);
+    const tex = new THREE.CanvasTexture(cnv);
+    tex.minFilter = THREE.LinearFilter; tex.colorSpace = THREE.SRGBColorSpace;
+    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }));
+    spr.scale.set(3.2, 0.6, 1); spr.renderOrder = 1000;
+    this.scene.add(spr);
+    this._taunt = { spr, life: 1.8 };
+  }
+
+  _updateTaunt(dt) {
+    const t = this._taunt; if (!t) return;
+    t.life -= dt;
+    if (t.life <= 0) {
+      this.scene.remove(t.spr); t.spr.material.map?.dispose(); t.spr.material.dispose();
+      this._taunt = null; return;
+    }
+    t.spr.position.set(this.position.x, this.position.y + 1.7 + (1.8 - t.life) * 0.6, this.position.z);
+    t.spr.material.opacity = Math.min(1, t.life * 1.5);
   }
 
   // Full gib — the body comes apart into its actual limbs + head, each flying
@@ -732,6 +786,7 @@ export class Stickman {
       this._gibbed = false;
       this.rig.resetParts?.();
     }
+    if (this._taunt) { this.scene.remove(this._taunt.spr); this._taunt.spr.material.map?.dispose(); this._taunt.spr.material.dispose(); this._taunt = null; }
     audio.spawn();
   }
 
@@ -874,6 +929,8 @@ export class Stickman {
   }
 
   _tryGrab(world, players) {
+    // No grab arm → can't grab or climb.
+    if (this._severed.has('armL')) return;
     // Grab origin = the right hand's projected world position when in grab pose.
     // Restricts grabs to actual hand contact (not torso/leg pass-throughs).
     // Reach is generous (Stick-Fight scale) — players slide into grab range
@@ -1181,6 +1238,8 @@ export class Stickman {
     // Compatibility entry-point — still called from tick() on attackPressed.
     // Routes to weapon path if armed, otherwise enters the unarmed FSM.
     if (this.weapon) { this.weapon.tryFire(this); return; }
+    // No arms left → can't punch. Headbutt instead ("I'll bite your legs off!").
+    if (this._armCount() === 0) { this._headbutt(); return; }
     // Slide-kick short-circuit — committed even mid-slide.
     if (this.sliding && this.grounded) {
       this._fireMove('slideKick');
@@ -1201,6 +1260,28 @@ export class Stickman {
     this.charging = true;
     this.chargeStartedAt = performance.now();
     this._pressDir = { x: this.input.moveX, y: this.input.moveY };
+  }
+
+  // Armless desperation attack — a lunging headbutt.
+  _headbutt() {
+    const tNow = performance.now();
+    if (tNow < (this._headbuttCD || 0)) return;
+    this._headbuttCD = tNow + 550;
+    this.attackTimer = 0.22;
+    this.body.velocity.x = this.facing * 7;
+    this.body.velocity.y = Math.max(this.body.velocity.y, 2.5);
+    audio.swing?.();
+    const cx = this.position.x + this.facing * 0.7, cy = this.position.y + 0.45;
+    for (const p of this.game.players) {
+      if (!p || p === this || !p.alive || p.invuln > 0) continue;
+      const dx = p.position.x - cx, dy = p.position.y - cy;
+      if (dx * dx + dy * dy < 0.9 * 0.9) {
+        p.lastDamager = this;
+        p.takeDamage(8, { attacker: this, weapon: 'fist', kb: { x: this.facing * 10, y: 5 }, stun: 0.3 });
+        this.game.fx?.camera.punch?.(0.15);
+        break;
+      }
+    }
   }
 
   // Called per-frame from tick() to resolve a held attack on release.
@@ -1877,6 +1958,23 @@ export class Stickman {
 
     let speedMax = this.crouching ? 2.5 : (boosted ? 9 : (flying ? 7 : 6.5));
     let accel = this.grounded ? (boosted ? 65 : 45) : (flying ? 36 : 18);
+
+    // Dismembered locomotion (Black Knight). One leg = a slow bouncy hop; no
+    // legs = a slow torso shuffle along the ground. Severed-leg movement is
+    // gated below in the jump block too.
+    const legCount = this._severed.size ? this._legCount() : 2;
+    if (legCount === 1) {
+      speedMax *= 0.55; accel *= 0.7;
+      // Auto-hop while moving on the ground.
+      if (this.grounded && Math.abs(moveX) > 0.1 && now >= (this._hopT || 0)) {
+        this._hopT = now + 360;
+        this.body.velocity.y = 5.2;
+        this.grounded = false;
+        if (Math.random() < 0.5) audio.jump?.();
+      }
+    } else if (legCount === 0) {
+      speedMax *= 0.3; accel *= 0.5;     // torso flop-shuffle
+    }
     // Heavy carry penalty — grabbing a crate (or anything mass > 4) slows
     // the wielder. Scales gently so a 1×1 crate (~7kg) is a noticeable
     // drag and the precariously-perched 1.2× heavy crates (~14kg) feel
@@ -1912,9 +2010,9 @@ export class Stickman {
     const tNowJump = performance.now();
     const inJumpCD = tNowJump < (this._jumpInputCooldown || 0);
     if (this.input.jumpPressed && !inJumpCD) this.jumpBuffer = 0.12;
-    if (this.jumpBuffer > 0 && !inJumpCD && (this.coyote > 0 || this.grounded)) {
+    if (this.jumpBuffer > 0 && !inJumpCD && (this.coyote > 0 || this.grounded) && legCount > 0) {
       if (this.charging) this._clearCombatState();
-      this.body.velocity.y = 11;
+      this.body.velocity.y = legCount === 1 ? 8 : 11;   // weaker hop on one leg
       this.jumpBuffer = 0;
       this.coyote = 0;
       this.grounded = false;
@@ -1923,9 +2021,9 @@ export class Stickman {
       this._jumpInputCooldown = tNowJump + 90;
       audio.jump();
       if (this === this.game?.localPlayer) vibrate(12);
-    } else if (this.input.jumpPressed && !inJumpCD && this.airJumpsLeft > 0 && !this.grounded) {
+    } else if (this.input.jumpPressed && !inJumpCD && this.airJumpsLeft > 0 && !this.grounded && legCount > 0) {
       if (this.charging) this._clearCombatState();
-      this.body.velocity.y = 10;
+      this.body.velocity.y = legCount === 1 ? 8 : 10;
       this.airJumpsLeft--;
       this._jumpLockUntil = tNowJump + 100;
       this._jumpInputCooldown = tNowJump + 90;
@@ -2078,6 +2176,19 @@ export class Stickman {
         });
       }
       if (this._burnDoT.remaining <= 0) this._burnDoT = null;
+    }
+
+    // Black Knight blood fountains — each stump spurts while alive.
+    if (this._severed.size && this.alive && goreOn() && this.game?.fx) {
+      this._spurtT = (this._spurtT || 0) - dt;
+      if (this._spurtT <= 0) {
+        this._spurtT = 0.22 + Math.random() * 0.2;
+        for (const part of this._severed) {
+          const side = part.endsWith('R') ? 1 : -1;
+          const oy = part.startsWith('arm') ? 0.4 : -0.05;
+          this.game.fx.particles.blood(this.position.x + side * 0.22, this.position.y + oy, 0, side, 1.2);
+        }
+      }
     }
 
     if (this.invuln > 0) this.invuln -= dt;
@@ -2366,6 +2477,7 @@ export class Stickman {
     params.blocking = this._blocking;
     this.rig.update(rigPos, params);
     this._updateShieldVisual();
+    this._updateTaunt(dt);
     // Shrink Ray — ease the visual rig toward a small scale while active.
     const targetScale = performance.now() < this._shrinkUntil ? 0.5 : 1;
     const cur = this.rig.group.scale.x || 1;
@@ -2440,6 +2552,7 @@ export class Stickman {
       this._shieldMesh.traverse?.((o) => { o.geometry?.dispose?.(); o.material?.dispose?.(); });
       this._shieldMesh = null;
     }
+    if (this._taunt) { this.scene.remove(this._taunt.spr); this._taunt.spr.material.map?.dispose(); this._taunt.spr.material.dispose(); this._taunt = null; }
     if (this.weapon) this.weapon.destroy();
   }
 }
