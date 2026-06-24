@@ -86,7 +86,7 @@ const bgRow = (y, x0, x1, w, h, color, z = -8, extra = {}) => {
   return out;
 };
 
-export const LEVELS = [
+const ALL_LEVELS = [
   // ---------------------------------------------------------------------
   // ARENA — Roman colosseum. Sand floor pit, tiered stands, banners, sun.
   // ---------------------------------------------------------------------
@@ -498,11 +498,11 @@ export const LEVELS = [
     ],
     hazards: [
       { kind: 'lava', x: 0, y: -5, w: 44, h: 1.4, dps: 55 },
-      // Big main pendulum swinging across the central crossbar — wide arc.
-      { kind: 'pendulum', x: 0, y: 16, length: 7, amplitude: Math.PI / 2, speed: 0.8 },
-      // Side pendulums sweeping over the y=9 upper platforms.
-      { kind: 'pendulum', x: -8, y: 14, length: 4.5, amplitude: Math.PI / 3, speed: 1.4, phase: 0.5 },
-      { kind: 'pendulum', x:  8, y: 14, length: 4.5, amplitude: Math.PI / 3, speed: 1.4, phase: 2.5 },
+      // Pendulums raised to sweep just ABOVE the top platform (y=12 crossbeam) —
+      // a hazard for whoever climbs to the top, not the mid arena.
+      { kind: 'pendulum', x: 0, y: 19, length: 6, amplitude: Math.PI / 2, speed: 0.8 },
+      { kind: 'pendulum', x: -8, y: 18, length: 5, amplitude: Math.PI / 3, speed: 1.4, phase: 0.5 },
+      { kind: 'pendulum', x:  8, y: 18, length: 5, amplitude: Math.PI / 3, speed: 1.4, phase: 2.5 },
       // Floor spikes punishing missed jumps onto the alcove edges.
       { kind: 'spike', x: -10, y: 1, w: 1.4 },
       { kind: 'spike', x:  10, y: 1, w: 1.4 },
@@ -1030,8 +1030,6 @@ export const LEVELS = [
     ],
     hazards: [
       { kind: 'lava', x: 0, y: -5, w: 40, h: 1.4, dps: 50 },
-      // Bell pendulum — anchor above the roof.
-      { kind: 'pendulum', x: 0, y: 16, length: 4, amplitude: Math.PI / 2.8, speed: 1.0 },
     ],
     spawns: [
       { x: -12, y: 1 }, { x: 12, y: 1 },
@@ -1227,18 +1225,18 @@ export const LEVELS = [
         ...castleFrame(),
         // Tier 1 (y=4) — symmetric short bridges. HP raised so the castle
         // structure holds up under combat instead of crumbling early.
-        ...row(4, -8, -5, { material: 'bouncy', hp: 120, color: TIER[1] }),
-        ...row(4,  5,  8, { material: 'bouncy', hp: 120, color: TIER[1] }),
+        ...row(4, -8, -5, { material: 'bouncy', hp: 320, color: TIER[1] }),
+        ...row(4,  5,  8, { material: 'bouncy', hp: 320, color: TIER[1] }),
         // Tier 2 (y=8) — wider center bridge.
-        ...row(8, -6,  6, { material: 'bouncy', hp: 120, color: TIER[2] }),
+        ...row(8, -6,  6, { material: 'bouncy', hp: 320, color: TIER[2] }),
         // Tier 3 (y=12) — symmetric short bridges + center trampoline pad.
-        ...row(12, -8, -5, { material: 'bouncy', hp: 120, color: TIER[3] }),
-        ...row(12,  5,  8, { material: 'bouncy', hp: 120, color: TIER[3] }),
-        { x: 0, y: 12, shape: 'box', w: 1.6, h: 0.6, material: 'bouncy', hp: 100, color: TRAMP },
+        ...row(12, -8, -5, { material: 'bouncy', hp: 320, color: TIER[3] }),
+        ...row(12,  5,  8, { material: 'bouncy', hp: 320, color: TIER[3] }),
+        { x: 0, y: 12, shape: 'box', w: 1.6, h: 0.6, material: 'bouncy', hp: 280, color: TRAMP },
         // Tier 4 (y=16) — narrow top bridge.
-        ...row(16, -3, 3, { material: 'bouncy', hp: 100, color: 0xffffff }),
+        ...row(16, -3, 3, { material: 'bouncy', hp: 280, color: 0xffffff }),
         // Bell prize sphere atop center.
-        { x: 0, y: 18.2, shape: 'sphere', radius: 0.7, material: 'bouncy', hp: 120, color: 0xffffff },
+        { x: 0, y: 18.2, shape: 'sphere', radius: 0.7, material: 'bouncy', hp: 320, color: 0xffffff },
       ],
       hazards: [],
       spawns: [
@@ -1481,9 +1479,7 @@ export const LEVELS = [
       // Light-blue color to read as crystal-frosted, not torch-orange.
       { kind: 'spike', x: -8.5, y: 5.5,  w: 2.4, pointDown: true, color: 0xa8c8d8 },  // under y=6 wood left
       { kind: 'spike', x:  8.5, y: 5.5,  w: 2.4, pointDown: true, color: 0xa8c8d8 },  // under y=6 wood right
-      { kind: 'spike', x:  9,   y: 9.5,  w: 2.6, pointDown: true, color: 0xa8c8d8 },  // under y=10 wood right
       { kind: 'spike', x:  9,   y: 13.5, w: 2.6, pointDown: true, color: 0xa8c8d8 },  // under y=14 wood right
-      { kind: 'spike', x:  9,   y: 16.5, w: 2.6, pointDown: true, color: 0xa8c8d8 },  // under y=17 chain wood right
     ],
     spawns: [
       // Lower floor.
@@ -1615,5 +1611,9 @@ export const LEVELS = [
     ],
   },
 ];
+
+// Spike Pit + Falling Tower retired — filtered out of the playable set.
+const RETIRED = new Set(['spikes', 'falling']);
+export const LEVELS = ALL_LEVELS.filter(l => !RETIRED.has(l.id));
 
 export function getLevel(id) { return LEVELS.find(l => l.id === id) ?? LEVELS[0]; }
