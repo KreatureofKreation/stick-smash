@@ -1218,17 +1218,20 @@ const ALL_LEVELS = [
         { x: 0, y: 18.2, shape: 'sphere', radius: 0.7, material: 'bouncy', hp: 320, color: 0xffffff },
       ],
       hazards: [],
+      // Spawns raised ~0.8 above each bouncy surface — sitting flush would
+      // penetrate the high-restitution tile and the solver launches the player
+      // (a spawn-on-trampoline explosion).
       spawns: [
-        { x: -9, y: 1 }, { x: 9, y: 1 },
-        { x: -7, y: 5 }, { x: 7, y: 5 },
-        { x:  0, y: 9 },
-        { x:  0, y: 17 },
+        { x: -9, y: 1.8 }, { x: 9, y: 1.8 },
+        { x: -7, y: 5.8 }, { x: 7, y: 5.8 },
+        { x:  0, y: 9.8 },
+        { x:  0, y: 17.8 },
       ],
       weaponSpawns: [
-        { x: 0, y: 18.5 },                   // bell prize
-        { x: 0, y: 9 },
-        { x: -7, y: 5 }, { x: 7, y: 5 },
-        { x: -7, y: 13 }, { x: 7, y: 13 },
+        { x: 0, y: 19.0 },                   // bell prize
+        { x: 0, y: 9.8 },
+        { x: -7, y: 5.8 }, { x: 7, y: 5.8 },
+        { x: -7, y: 13.8 }, { x: 7, y: 13.8 },
       ],
       background: castleBg(),
     }];
