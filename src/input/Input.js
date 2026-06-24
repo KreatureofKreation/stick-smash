@@ -42,8 +42,11 @@ export class InputManager {
     });
 
     this.game = null; // set later for mouse->world aim conversion
+    this.inputProviders = new Map();
   }
   bindGame(game) { this.game = game; }
+  registerInputProvider(kind, provider) { this.inputProviders.set(kind, provider); }
+  unregisterInputProvider(kind) { this.inputProviders.delete(kind); }
 
   _handleKey(e, down) {
     const k = e.code;
@@ -180,6 +183,11 @@ export class InputManager {
   //   'gamepad'  → strict-by-index pad poll for P2/P3/P4.
   getSnapshotFor(source) {
     if (!source) return null;
+    const provider = this.inputProviders.get(source.kind);
+    if (provider) {
+      if (typeof provider === 'function') return provider(source);
+      return provider.getSnapshotFor?.(source) ?? null;
+    }
     if (source.kind === 'kb-mouse') return this.getCombined();
     if (source.kind === 'kb-only') return this.getKbMouseTouch();
     if (source.kind === 'gamepad') return this.getGamepadSnapshotByIndex(source.gamepadIdx);
