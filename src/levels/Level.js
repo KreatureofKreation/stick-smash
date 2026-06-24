@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
+import { getTileTexture, TILE_PBR } from './tileTextures.js';
 import * as CANNON from 'cannon-es';
 import { COL_GROUPS } from '../physics/PhysicsWorld.js';
 import { audio } from '../audio/Audio.js';
@@ -106,11 +107,26 @@ export class Tile {
     this.body = body;
     this.dynamic = dyn;
 
-    const mat = new THREE.MeshLambertMaterial({
+    // Per-material detail texture (wood grain / brushed metal / stone speckle /
+    // ice crackle), tinted by the tile colour and shared across all tiles of
+    // that material (one GPU texture). The texture fills each box face. Full-
+    // quality path uses MeshStandard so metal reads metallic + ice glossy; lowQ
+    // keeps cheaper Lambert (still textured).
+    const lowQ = !!this.level?.game?._lowQ;
+    const tex = getTileTexture(this.material);
+    const matOpts = {
       color: this.color,
+      map: tex,
       emissive: this.emissive ?? 0x000000,
       emissiveIntensity: this.emissiveIntensity,
-    });
+    };
+    let mat;
+    if (lowQ) {
+      mat = new THREE.MeshLambertMaterial(matOpts);
+    } else {
+      const pbr = TILE_PBR[this.material] ?? { metalness: 0.0, roughness: 0.9 };
+      mat = new THREE.MeshStandardMaterial({ ...matOpts, metalness: pbr.metalness, roughness: pbr.roughness });
+    }
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(x, y, 0);
     if (this.rotZ) mesh.rotation.z = this.rotZ;
@@ -118,7 +134,6 @@ export class Tile {
     // dynamic tiles (crates) since static platforms casting onto each
     // other doubled the shadow-pass scene (100+ tile draws). Statics
     // still receive shadows either way.
-    const lowQ = !!this.level?.game?._lowQ;
     mesh.castShadow = lowQ ? dyn : true;
     mesh.receiveShadow = true;
     // Static tiles never move — bake the matrix once and skip per-frame
