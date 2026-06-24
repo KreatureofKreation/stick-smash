@@ -847,12 +847,16 @@ export class StickmanRig {
     // Dismemberment part groups (Phase 4). orientLimb only sets transforms, not
     // visibility, so hidden parts stay hidden until resetParts().
     this._partMap = {
-      armL: [this.upperArmL, this.lowerArmL, this.handL],
-      armR: [this.upperArmR, this.lowerArmR, this.handR],
-      legL: [this.upperLegL, this.lowerLegL, this.footL],
-      legR: [this.upperLegR, this.lowerLegR, this.footR],
+      armL: [this.upperArmL, this.lowerArmL, this.handL, this.shoulderL, this.elbowL],
+      armR: [this.upperArmR, this.lowerArmR, this.handR, this.shoulderR, this.elbowR],
+      legL: [this.upperLegL, this.lowerLegL, this.footL, this.hipL, this.kneeL],
+      legR: [this.upperLegR, this.lowerLegR, this.footR, this.hipR, this.kneeR],
       head: [this.head],
     };
+    // Meshes hidden by dismemberment. The per-frame limb solver (orientLimb /
+    // _drawArm / _drawLeg) re-shows limbs every update, so we re-hide these at
+    // the end of update() — otherwise a severed limb pops back on the body.
+    this._hidden = new Set();
     this._allParts = [
       this.head, this.torso, this.chestArmor,
       this.upperArmL, this.lowerArmL, this.handL, this.upperArmR, this.lowerArmR, this.handR,
@@ -960,9 +964,9 @@ export class StickmanRig {
   }
 
   // Dismemberment visuals (Phase 4).
-  hidePart(part) { for (const m of (this._partMap[part] || [])) if (m) m.visible = false; }
-  hideAll() { for (const m of this._allParts) if (m) m.visible = false; }
-  resetParts() { for (const m of this._allParts) if (m) m.visible = true; }
+  hidePart(part) { for (const m of (this._partMap[part] || [])) if (m) { m.visible = false; this._hidden.add(m); } }
+  hideAll() { for (const m of this._allParts) if (m) { m.visible = false; this._hidden.add(m); } }
+  resetParts() { for (const m of this._allParts) if (m) m.visible = true; this._hidden.clear(); }
   partMeshes(part) { return this._partMap[part] || []; }
   allMeshes() { return this._allParts; }
 
@@ -1828,6 +1832,9 @@ export class StickmanRig {
     this._drawArm(sRX, sRY, this._handRPos.x, this._handRPos.y, zR, this.upperArmR, this.lowerArmR, this.handR, this.shoulderR, this.elbowR, true, !!params.gumGumPunch, aimBendR, params);
     this._drawLeg(hipLX, hipLY, this._footLPos.x, this._footLPos.y, zL, this.upperLegL, this.lowerLegL, this.footL, this.hipL, this.kneeL, false, params);
     this._drawLeg(hipRX, hipRY, this._footRPos.x, this._footRPos.y, zR, this.upperLegR, this.lowerLegR, this.footR, this.hipR, this.kneeR, true, params);
+
+    // Keep dismembered limbs hidden — the limb solver above force-sets visible.
+    if (this._hidden.size) for (const m of this._hidden) m.visible = false;
 
     // Hand orientation for aim
     if (params.armPoseR === 'aim' || params.armPoseR === 'attack' || params.armPoseR === 'strikePosed') {
