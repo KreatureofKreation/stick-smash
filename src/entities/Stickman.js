@@ -85,15 +85,6 @@ const BLADE_WEAPONS = new Set(['sword', 'longsword', 'halberd', 'saber', 'flame'
 const SEVER_PARTS = ['armL', 'armR', 'legL', 'legR'];
 const LIMB_SEVER_CHANCE = 0.42;
 const goreOn = () => { try { return localStorage.getItem('mc_gore') !== '0'; } catch (_) { return true; } };
-// Monty Python Black Knight — the more you lose, the more defiant.
-const TAUNT_LINES = {
-  armR: ["'Tis but a scratch!", "I've had worse!", "Just a flesh wound!"],
-  armL: ["It's just a flesh wound!", "Had enough?", "Come on then!"],
-  legR: ["Right, I'll do you for that!", "Chicken!", "I'm invincible!"],
-  legL: ["The Black Knight always triumphs!", "Running away?!", "Have at you!"],
-  none: ["Come back here! I'll bite your legs off!", "We'll call it a draw."],
-};
-const pickTaunt = (part) => { const a = TAUNT_LINES[part] || TAUNT_LINES.none; return a[(Math.random() * a.length) | 0]; };
 
 export class Stickman {
   constructor(world, scene, opts) {
@@ -642,40 +633,7 @@ export class Stickman {
     }
     // Grab arm (left) gone → let go of anything held.
     if (part === 'armL' && this.grabbing) this.releaseGrab?.();
-    // Spawn a defiant taunt over the head.
-    this._spawnTaunt(this._severed.size >= 4 ? pickTaunt('none') : pickTaunt(part));
     audio.break?.();
-  }
-
-  // Floating Monty-Python taunt sprite above the player; rises + fades.
-  _spawnTaunt(text) {
-    if (this._taunt) { this.scene.remove(this._taunt.spr); this._taunt.spr.material.map?.dispose(); this._taunt.spr.material.dispose(); }
-    const cnv = document.createElement('canvas');
-    cnv.width = 512; cnv.height = 96;
-    const ctx = cnv.getContext('2d');
-    ctx.font = 'bold 34px Georgia, serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(0,0,0,0.85)';
-    ctx.strokeText(text, 256, 48);
-    ctx.fillStyle = '#ffe28a';
-    ctx.fillText(text, 256, 48);
-    const tex = new THREE.CanvasTexture(cnv);
-    tex.minFilter = THREE.LinearFilter; tex.colorSpace = THREE.SRGBColorSpace;
-    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }));
-    spr.scale.set(3.2, 0.6, 1); spr.renderOrder = 1000;
-    this.scene.add(spr);
-    this._taunt = { spr, life: 1.8 };
-  }
-
-  _updateTaunt(dt) {
-    const t = this._taunt; if (!t) return;
-    t.life -= dt;
-    if (t.life <= 0) {
-      this.scene.remove(t.spr); t.spr.material.map?.dispose(); t.spr.material.dispose();
-      this._taunt = null; return;
-    }
-    t.spr.position.set(this.position.x, this.position.y + 1.7 + (1.8 - t.life) * 0.6, this.position.z);
-    t.spr.material.opacity = Math.min(1, t.life * 1.5);
   }
 
   // Full gib — the body comes apart into its actual limbs + head, each flying
@@ -786,7 +744,6 @@ export class Stickman {
       this._gibbed = false;
       this.rig.resetParts?.();
     }
-    if (this._taunt) { this.scene.remove(this._taunt.spr); this._taunt.spr.material.map?.dispose(); this._taunt.spr.material.dispose(); this._taunt = null; }
     audio.spawn();
   }
 
@@ -2477,7 +2434,6 @@ export class Stickman {
     params.blocking = this._blocking;
     this.rig.update(rigPos, params);
     this._updateShieldVisual();
-    this._updateTaunt(dt);
     // Shrink Ray — ease the visual rig toward a small scale while active.
     const targetScale = performance.now() < this._shrinkUntil ? 0.5 : 1;
     const cur = this.rig.group.scale.x || 1;
@@ -2552,7 +2508,6 @@ export class Stickman {
       this._shieldMesh.traverse?.((o) => { o.geometry?.dispose?.(); o.material?.dispose?.(); });
       this._shieldMesh = null;
     }
-    if (this._taunt) { this.scene.remove(this._taunt.spr); this._taunt.spr.material.map?.dispose(); this._taunt.spr.material.dispose(); this._taunt = null; }
     if (this.weapon) this.weapon.destroy();
   }
 }
