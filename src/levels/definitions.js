@@ -734,47 +734,56 @@ const ALL_LEVELS = [
     id: 'space',
     name: 'Space Station',
     bgColor: 0x000010,
-    gravity: -5.0,
+    gravity: -5.0,                         // low-grav inside the modules
+    stationBounds: { x0: -17, x1: 17 },    // outside this = zero-g float into space
+    killBound: { x: 24, y: 20 },
     tiles: [
-      ...row(0, -10, 10, { material: 'metal', hp: 100, color: 0x707888 }),
-      ...row(-1, -8, 8, { material: 'metal', hp: 100, color: 0x4a5060 }),
-      ...tough(-2, -6, 6, { color: 0x202830 }),
-      // Side asteroid floats.
-      ...row(3, -12, -9, { material: 'stone', hp: 30, color: 0x6a605a }),
-      ...row(3,  9, 12, { material: 'stone', hp: 30, color: 0x6a605a }),
-      // Mid station deck.
-      ...row(6, -3, 3, { material: 'metal', hp: 50, color: 0x808898 }),
-      // Upper asteroid floats — staggered.
-      ...row(9, -8, -5, { material: 'stone', hp: 25, color: 0x6a605a }),
-      ...row(9,  5,  8, { material: 'stone', hp: 25, color: 0x6a605a }),
-      // Top dock.
-      ...row(12, -2, 2, { material: 'metal', hp: 60, color: 0x90a0b0 }),
-      // Solar-panel pillars.
-      { x: -6, y: 1.5, shape: 'box', w: 0.4, h: 2.2, material: 'metal', hp: 80, color: 0x305080 },
-      { x:  6, y: 1.5, shape: 'box', w: 0.4, h: 2.2, material: 'metal', hp: 80, color: 0x305080 },
-      // Crystal asteroid mid prop.
-      { x: 0, y: 4, shape: 'sphere', radius: 0.7, material: 'stone', hp: 50, color: 0x88aaff },
+      // ── CORE module — the long pressurized cylinder deck. A cupola window
+      //    sits in the middle of the floor: smash it to open a vacuum breach. ──
+      ...row(0, -13, -2, { material: 'metal', hp: 80, color: 0x9098a8 }),
+      ...row(0,  2,  13, { material: 'metal', hp: 80, color: 0x9098a8 }),
+      { x: 0, y: 0, shape: 'box', w: 3.2, h: 0.5, material: 'ice', hp: 16, color: 0x9bdcff, breach: true },
+      ...tough(-1, -13, 13, { color: 0x3a4150 }),   // module underbelly
+
+      // ── Side modules (raised), reached by node-connector struts ──
+      ...row(5, -16, -11, { material: 'metal', hp: 70, color: 0x808a9a }),
+      ...row(5,  11,  16, { material: 'metal', hp: 70, color: 0x808a9a }),
+      ...col(-11, 1, 4, { shape: 'box', w: 0.6, h: 1, material: 'metal', hp: 90, color: 0x687080 }),
+      ...col( 11, 1, 4, { shape: 'box', w: 0.6, h: 1, material: 'metal', hp: 90, color: 0x687080 }),
+
+      // ── Upper central node / hub, on a corridor tube ──
+      ...row(9, -3, 3, { material: 'metal', hp: 80, color: 0x90a0b0 }),
+      ...col(-3, 1, 8, { shape: 'box', w: 0.4, h: 1, material: 'metal', hp: 70, color: 0x586070 }),
+      ...col( 3, 1, 8, { shape: 'box', w: 0.4, h: 1, material: 'metal', hp: 70, color: 0x586070 }),
     ],
     hazards: [
-      { kind: 'lava', x: 0, y: -6, w: 50, h: 1.4, dps: 999 },
-      { kind: 'pendulum', x: 0, y: 16, length: 5, amplitude: Math.PI / 2.8, speed: 0.8 },
-      { kind: 'spike', x: -7, y: 10.0, w: 1.6 },
-      { kind: 'spike', x:  7, y: 10.0, w: 1.6 },
+      // The void below = open space. Drift/fall into it and you're gone.
+      { kind: 'lava', x: 0, y: -10, w: 70, h: 2.0, dps: 999, color: 0x000010 },
     ],
     spawns: [
-      { x: -10, y: 1 }, { x: 10, y: 1 },
-      { x: -10, y: 4 }, { x: 10, y: 4 },
-      { x: 0, y: 7 },
-      { x: 0, y: 13 },
+      { x: -8, y: 1 }, { x: 8, y: 1 },       // core deck
+      { x: -13, y: 6 }, { x: 13, y: 6 },     // side modules
+      { x: 0, y: 10 },                        // upper node
+      { x: -4, y: 1 }, { x: 4, y: 1 },
     ],
     weaponSpawns: [
-      { x: 0, y: 13 },                        // top dock prize
-      { x: 0, y: 7 },
-      { x: -10, y: 4 }, { x: 10, y: 4 },
-      { x: -6, y: 10 }, { x: 6, y: 10 },
-      { x: 0, y: 1 },
+      { x: 0, y: 10 },                        // upper node prize
+      { x: -13, y: 6 }, { x: 13, y: 6 },      // side modules
+      { x: -6, y: 1 }, { x: 6, y: 1 },        // core deck (near the cupola)
+      { x: 0, y: 1 },                         // ON the window — risky
     ],
     background: [
+      // Solar-array wings flanking the station (out past the module footprint).
+      bg(-21, 6, 5.2, 0.4, 0x2a3a6a, -13),
+      bg(-21, 6, 4.8, 6.2, 0x16244a, -13.1),
+      bg(-24, 6, 0.3, 7, 0x0a1230, -13.2),
+      bgGlow(-21, 8, 4.6, 0.08, 0x3a5a9a, -12.9),
+      bgGlow(-21, 4, 4.6, 0.08, 0x3a5a9a, -12.9),
+      bg( 21, 6, 5.2, 0.4, 0x2a3a6a, -13),
+      bg( 21, 6, 4.8, 6.2, 0x16244a, -13.1),
+      bg( 24, 6, 0.3, 7, 0x0a1230, -13.2),
+      bgGlow( 21, 8, 4.6, 0.08, 0x3a5a9a, -12.9),
+      bgGlow( 21, 4, 4.6, 0.08, 0x3a5a9a, -12.9),
       bgSphere(-18, 6, 7, 0x2a4a8a, -16, { emissive: 0x102040, emissiveIntensity: 0.3 }),
       bgDisc(-18, 6, 8, 0x4070cc, -16.2, { emissiveIntensity: 0.2 }),
       bgSphere(15, 18, 1.6, 0xa0a0a0, -15),
