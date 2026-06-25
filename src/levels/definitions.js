@@ -734,72 +734,109 @@ const ALL_LEVELS = [
     tiles: [
       // ── CORE module — the long pressurized cylinder deck. A cupola window
       //    sits in the middle of the floor: smash it to open a vacuum breach. ──
-      ...row(0, -13, -2, { material: 'metal', hp: 80, color: 0x9098a8 }),
-      ...row(0,  2,  13, { material: 'metal', hp: 80, color: 0x9098a8 }),
-      { x: 0, y: 0, shape: 'box', w: 3.2, h: 0.5, material: 'ice', hp: 16, color: 0x9bdcff, breach: true },
-      ...tough(-1, -13, 13, { color: 0x3a4150 }),   // module underbelly
+      // ── CORE MODULE floor — you fight INSIDE the tube (hull drawn behind) ──
+      ...row(0, -9, 9, { material: 'metal', hp: 80, color: 0xd6dce6 }),
+      { x: 0, y: 0, shape: 'box', w: 3, h: 0.5, material: 'ice', hp: 16, color: 0x7fe0ff, emissive: 0x2a7aaa, emissiveIntensity: 0.8, breach: true },
+      ...tough(-1, -9, 9, { color: 0x6a7280 }),
 
-      // ── Side modules (raised), reached by node-connector struts ──
-      ...row(5, -16, -11, { material: 'metal', hp: 70, color: 0x808a9a }),
-      ...row(5,  11,  16, { material: 'metal', hp: 70, color: 0x808a9a }),
-      ...col(-11, 1, 4, { shape: 'box', w: 0.6, h: 1, material: 'metal', hp: 90, color: 0x687080 }),
-      ...col( 11, 1, 4, { shape: 'box', w: 0.6, h: 1, material: 'metal', hp: 90, color: 0x687080 }),
+      // ── TRUSS CATWALKS extending out each side (exterior spine) ──
+      ...row(0, -15, -10, { material: 'metal', hp: 90, color: 0x9098a8 }),
+      ...row(0,  10,  15, { material: 'metal', hp: 90, color: 0x9098a8 }),
 
-      // ── Upper central node / hub, on a corridor tube ──
-      ...row(9, -3, 3, { material: 'metal', hp: 80, color: 0x90a0b0 }),
-      ...col(-3, 1, 8, { shape: 'box', w: 0.4, h: 1, material: 'metal', hp: 70, color: 0x586070 }),
-      ...col( 3, 1, 8, { shape: 'box', w: 0.4, h: 1, material: 'metal', hp: 70, color: 0x586070 }),
+      // ── SOLAR-PANEL PLATFORMS (gold) — stand and fight on the arrays ──
+      ...row(5, -17, -12, { material: 'metal', hp: 60, color: 0xc89a34 }),
+      ...row(5,  12,  17, { material: 'metal', hp: 60, color: 0xc89a34 }),
+      ...col(-12, 1, 4, { shape: 'box', w: 0.4, h: 1, material: 'metal', hp: 80, color: 0x707888 }),
+      ...col( 12, 1, 4, { shape: 'box', w: 0.4, h: 1, material: 'metal', hp: 80, color: 0x707888 }),
+
+      // ── UPPER MODULE node on a corridor tube ──
+      ...row(9, -3, 3, { material: 'metal', hp: 80, color: 0xd6dce6 }),
+      ...col(-3, 1, 8, { shape: 'box', w: 0.5, h: 1, material: 'metal', hp: 70, color: 0x9aa2b0 }),
+      ...col( 3, 1, 8, { shape: 'box', w: 0.5, h: 1, material: 'metal', hp: 70, color: 0x9aa2b0 }),
     ],
     hazards: [
       // The void below = open space. Drift/fall into it and you're gone.
       { kind: 'lava', x: 0, y: -10, w: 70, h: 2.0, dps: 999, color: 0x000010 },
     ],
     spawns: [
-      { x: -8, y: 1 }, { x: 8, y: 1 },       // core deck
-      { x: -13, y: 6 }, { x: 13, y: 6 },     // side modules
+      { x: -7, y: 1 }, { x: 7, y: 1 },       // core module
+      { x: -13, y: 1 }, { x: 13, y: 1 },     // truss catwalks
+      { x: -14, y: 6 }, { x: 14, y: 6 },     // solar-panel platforms
       { x: 0, y: 10 },                        // upper node
-      { x: -4, y: 1 }, { x: 4, y: 1 },
     ],
     weaponSpawns: [
       { x: 0, y: 10 },                        // upper node prize
-      { x: -13, y: 6 }, { x: 13, y: 6 },      // side modules
-      { x: -6, y: 1 }, { x: 6, y: 1 },        // core deck (near the cupola)
-      { x: 0, y: 1 },                         // ON the window — risky
+      { x: -14, y: 6 }, { x: 14, y: 6 },      // solar platforms
+      { x: -6, y: 1 }, { x: 6, y: 1 },        // core module
+      { x: 0, y: 1 },                         // near the cupola — risky
     ],
-    background: [
-      // Solar-array wings flanking the station (out past the module footprint).
-      bg(-21, 6, 5.2, 0.4, 0x2a3a6a, -13),
-      bg(-21, 6, 4.8, 6.2, 0x16244a, -13.1),
-      bg(-24, 6, 0.3, 7, 0x0a1230, -13.2),
-      bgGlow(-21, 8, 4.6, 0.08, 0x3a5a9a, -12.9),
-      bgGlow(-21, 4, 4.6, 0.08, 0x3a5a9a, -12.9),
-      bg( 21, 6, 5.2, 0.4, 0x2a3a6a, -13),
-      bg( 21, 6, 4.8, 6.2, 0x16244a, -13.1),
-      bg( 24, 6, 0.3, 7, 0x0a1230, -13.2),
-      bgGlow( 21, 8, 4.6, 0.08, 0x3a5a9a, -12.9),
-      bgGlow( 21, 4, 4.6, 0.08, 0x3a5a9a, -12.9),
-      bgSphere(-18, 6, 7, 0x2a4a8a, -16, { emissive: 0x102040, emissiveIntensity: 0.3 }),
-      bgDisc(-18, 6, 8, 0x4070cc, -16.2, { emissiveIntensity: 0.2 }),
-      bgSphere(15, 18, 1.6, 0xa0a0a0, -15),
-      bgGlow(-2, 22, 30, 1.5, 0x4d4080, -15),
-      bgGlow(8,  19, 18, 1.0, 0x803060, -15),
-      bgGlow(-6, 12, 22, 0.8, 0x5050a0, -15),
-      ...(() => {
-        const stars = [];
-        const seeds = [
-          [-22, 8], [-19, 16], [-15, 22], [-11, 9], [-7, 14], [-3, 21], [1, 11],
-          [5, 18], [9, 23], [13, 9], [17, 14], [20, 20], [22, 11], [-25, 12],
-          [-2, 7], [3, 25], [11, 7], [-13, 4], [16, 5], [-21, 25], [21, 4],
-        ];
-        for (const [x, y] of seeds) {
-          stars.push(bgGlow(x, y, 0.18, 0.18, 0xffffff, -16));
+    background: (() => {
+      const o = [];
+      // ── Stars — many small dim dots across the whole sky ──
+      const starSeeds = [
+        [-26, 22], [-22, 8], [-19, 16], [-15, 24], [-11, 9], [-7, 19], [-3, 26],
+        [1, 13], [5, 23], [9, 28], [13, 10], [17, 18], [20, 26], [24, 12], [26, 22],
+        [-24, 4], [-2, 7], [3, 28], [11, 6], [-13, 28], [16, 4], [-9, 27], [22, 6],
+        [-17, 2], [7, 4], [19, 9], [-5, 4], [14, 27], [-20, 27], [25, 17],
+      ];
+      for (const [x, y] of starSeeds) o.push(bg(x, y, 0.12, 0.12, 0xdfe4f0, -18));
+      // ── EARTH below-left (atmosphere rim + ocean + continents + cloud) ──
+      o.push(bgGlow(-15, 1, 13.5, 13.5, 0x3a6acc, -17.2));               // atmosphere glow
+      o.push(bgSphere(-15, 1, 11.5, 0x1f4a9a, -17, { emissive: 0x0a2a6a, emissiveIntensity: 0.4 }));
+      o.push(bgDisc(-18, 4, 4.2, 0x2f7a4a, -16.8));                       // continent
+      o.push(bgDisc(-10, -3, 3.6, 0x3a8a55, -16.8));                      // continent
+      o.push(bgDisc(-13, 7, 2.6, 0xe6eef8, -16.7));                       // cloud
+      o.push(bgDisc(-19, -1, 2.0, 0xe6eef8, -16.7));                      // cloud
+      o.push(bgGlow(-15, 1, 12.6, 0.5, 0x8ab8ff, -16.9));                 // bright atmosphere rim
+      // ── ISS TRUSS SPINE (long horizontal lattice) ──
+      o.push(bg(0, 17, 42, 0.55, 0x9aa2b0, -12), bg(0, 17, 42, 0.22, 0xccd4e0, -11.9));
+      for (let x = -20; x <= 20; x += 2) o.push(bg(x, 17, 0.1, 0.5, 0x6a7280, -11.85));   // lattice ticks
+      // ── Pressurised MODULE capsules clustered at centre ──
+      const capsule = (cx, cy, len) => {
+        o.push(bg(cx, cy, len, 1.5, 0xc4cad6, -11.6));
+        o.push(bgDisc(cx - len / 2, cy, 0.75, 0xd6dce6, -11.55), bgDisc(cx + len / 2, cy, 0.75, 0xd6dce6, -11.55));
+        o.push(bg(cx, cy + 0.55, len, 0.07, 0x8890a0, -11.5), bg(cx, cy - 0.55, len, 0.07, 0x8890a0, -11.5));
+        o.push(bgGlow(cx - len / 4, cy + 0.2, 0.18, 0.18, 0x7fe0ff, -11.45));   // lit window
+      };
+      capsule(-3.5, 19.2, 4.5); capsule(2.5, 19.2, 4.5); capsule(-0.5, 21.4, 3.5);
+      // ── GOLD SOLAR ARRAYS (2 panels per end on the truss) ──
+      const wing = (cx) => {
+        for (const dy of [4.2, -4.2]) {
+          const py = 17 + dy;
+          o.push(bg(cx, py, 7, 3.1, 0x6a5212, -12.6));                    // frame
+          o.push(bg(cx, py, 6.6, 2.8, 0xc89a34, -12.5, { emissive: 0x5a4012, emissiveIntensity: 0.4 }));
+          for (let i = -2; i <= 2; i++) o.push(bg(cx + i * 1.32, py, 0.05, 2.8, 0x4a380e, -12.4));   // cell columns
+          o.push(bg(cx, py + 0.92, 6.6, 0.05, 0x4a380e, -12.4), bg(cx, py - 0.92, 6.6, 0.05, 0x4a380e, -12.4));
         }
-        return stars;
-      })(),
-      bg(12, 14, 1.4, 0.4, 0x808898, -14),
-      bg(12, 14.6, 0.2, 0.8, 0x808898, -14),
-      bgGlow(11.5, 14, 0.2, 0.2, 0xff4444, -13.9),
-    ],
+        o.push(bg(cx + (cx < 0 ? 3.5 : -3.5), 17, 4, 0.12, 0x8890a0, -12.3));   // boom to spine
+      };
+      wing(-19); wing(19);
+      // ── RADIATOR panels (white, perpendicular) ──
+      o.push(bg(7, 20, 0.2, 4.4, 0xdfe4ec, -11.7), bg(7, 20, 3, 0.1, 0xb0b8c4, -11.65), bg(7, 20, 3, 0.1, 0xb0b8c4, -11.65));
+      o.push(bg(-6.5, 13.5, 0.2, 3.8, 0xdfe4ec, -11.7), bg(-6.5, 13.5, 2.6, 0.1, 0xb0b8c4, -11.65));
+      // ── A distant docked supply craft + its beacon ──
+      o.push(bg(12, 14, 1.4, 0.5, 0x808898, -13.4), bgDisc(12.8, 14, 0.5, 0xb0b8c4, -13.35), bgGlow(11.3, 14, 0.18, 0.18, 0xff4444, -13.3));
+
+      // ── FOREGROUND module hulls — the playable decks are floors INSIDE these
+      //    pressurised tubes (drawn just behind the play plane so players render
+      //    in front, standing inside the module). ──
+      const moduleHull = (cx, cy, len, h) => {
+        o.push(bg(cx, cy, len, h, 0xc8ced8, -0.6));                                  // tube body
+        o.push(bgDisc(cx - len / 2, cy, h / 2, 0xd6dce6, -0.55));                     // end dome
+        o.push(bgDisc(cx + len / 2, cy, h / 2, 0xd6dce6, -0.55));                     // end dome
+        o.push(bg(cx, cy + h / 2 - 0.18, len, 0.14, 0x9098a8, -0.5));                 // top rib
+        for (let wx = cx - len / 2 + 1.6; wx <= cx + len / 2 - 1.6; wx += 2.3)
+          o.push(bgGlow(wx, cy + h * 0.18, 0.55, 0.4, 0x7fe0ff, -0.45));              // lit windows
+      };
+      moduleHull(0, 1.1, 20, 3.0);     // core module wrapping the y=0 deck
+      moduleHull(0, 9.7, 7.5, 2.3);    // upper-node module
+      // Corridor tubes behind the connector struts.
+      o.push(bg(-3, 5, 1.2, 8, 0xbcc4d0, -0.7), bg(3, 5, 1.2, 8, 0xbcc4d0, -0.7));
+      o.push(bg(-3, 5, 1.2, 8, 0x7fe0ff, -0.68, { emissive: 0x2a6a9a, emissiveIntensity: 0.15 }));
+      // Solar-array booms behind the gold platforms.
+      o.push(bg(-14.5, 5.4, 5.5, 2.2, 0x6a5212, -0.65), bg(14.5, 5.4, 5.5, 2.2, 0x6a5212, -0.65));
+      return o;
+    })(),
   },
 
   // ---------------------------------------------------------------------
