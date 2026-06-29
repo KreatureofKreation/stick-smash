@@ -118,8 +118,11 @@ export class InputManager {
     out.moveX = mx;
     out.moveY = my;
 
-    // === AIM === R-stick.
-    const ax = dz(axis(2)), ay = -dz(axis(3));
+    // === AIM === R-stick. RADIAL deadzone — gate on the stick's overall
+    // magnitude, then pass the FULL direction (both axes) through. A per-axis
+    // deadzone would zero the minor axis on a shallow diagonal and snap the aim
+    // to the nearest cardinal (the "can't aim between 90°s" bug).
+    const ax = axis(2), ay = -axis(3);
     if (Math.hypot(ax, ay) > 0.35) {
       out.aimX = ax; out.aimY = ay; out.aimActive = true;
     }
@@ -160,7 +163,8 @@ export class InputManager {
     out.moveX = mx;
     out.moveY = my;
 
-    const ax = dz(axis(2)), ay = -dz(axis(3));
+    // Radial deadzone (see getGamepadSnapshot) — preserve the full aim direction.
+    const ax = axis(2), ay = -axis(3);
     if (Math.hypot(ax, ay) > 0.35) {
       out.aimX = ax; out.aimY = ay; out.aimActive = true;
     }
