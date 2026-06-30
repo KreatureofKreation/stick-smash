@@ -17,6 +17,7 @@ import { TutorialOverlay } from './ui/TutorialOverlay.js';
 import { Net } from './network/Net.js';
 import { rand, clamp, lerp } from './util/math.js';
 import { Projectile } from './weapons/Projectile.js';
+import * as spawnSolver from './levels/spawnSolver.js';
 
 export class Game {
   constructor(options = {}) {
@@ -534,149 +535,31 @@ export class Game {
     this.startLocal(data);
   }
 
-  // Pick spawn point farthest from existing live players AND clear of
-  // tile geometry. Prevents stacking and the "spawned inside the floor /
-  // wedged into a 1-cell gap" bug.
+  // Snapshot of the level bits the spawn solver needs. Kept as a getter so it
+  // always reflects live tile/hazard destruction.
+  _spawnWorld() {
+    if (!this.level) return null;
+    return { tiles: this.level.tiles, hazards: this.level.hazards, killBound: this.level.killBound };
+  }
+
+  // Pick spawn point farthest from existing live players AND clear of tile
+  // geometry. Prevents stacking and the "spawned inside the floor / wedged
+  // into a 1-cell gap" bug. See levels/spawnSolver.js for the math (unit-tested).
   _pickSpawn() {
-    const points = this.level?.spawnPoints || [{ x: 0, y: 5 }];
-    const live = this.players.filter(p => p?.alive);
-    // Score = minDist² to nearest live player + jitter; reject blocked points
-    // unless every candidate is blocked, in which case fall back to the
-    // best-scoring point with a vertical lift to escape any overlap.
-    const scored = points.map(sp => {
-      let minD = Infinity;
-      for (const p of live) {
-        const dx = sp.x - p.position.x, dy = sp.y - p.position.y;
-        const d2 = dx * dx + dy * dy;
-        if (d2 < minD) minD = d2;
-      }
-      if (!live.length) minD = 100;
-      return { sp, score: minD + Math.random() * 0.5, clear: this._isSpawnClear(sp) };
-    });
-    scored.sort((a, b) => b.score - a.score);
-    for (const s of scored) {
-      if (s.clear) return s.sp;
-    }
-    // Fallback: every spawn was blocked (probably mid-match destruction
-    // landed on every spawn point). Lift the highest-scoring spawn above
-    // any obstruction and use it.
-    const best = scored[0].sp;
-    return this._liftSpawnClear(best);
+    const points = this.level?.spawnPoints;
+    const live = this.players.filter(p => p?.alive).map(p => ({ x: p.position.x, y: p.position.y }));
+    return spawnSolver.pickSpawn(this._spawnWorld(), points, live);
   }
 
-  // Returns true if the player capsule (BODY_HEIGHT 1.5, BODY_RADIUS 0.32)
-  // fits at this spawn without overlapping any integer-grid tile. Does not
-  // catch off-grid sphere/cylinder tiles or dynamic crates — acceptable
-  // because those rarely sit on a spawn cell.
-  _isSpawnClear(sp) {
-    if (!this.level) return true;
-    const radius = 0.32;
-    const halfH = 0.75;
-    // 1. Reject only if the capsule penetrates a tile by more than the
-    //    stand-on slop (0.3 units). The old check rejected ANY AABB
-    //    overlap, which falsely killed every spawn point that sits ON
-    //    top of a platform — those have a small intended overlap
-    //    between capsule bottom and tile top. Symptom was players
-    //    spawning nowhere on Gauntlet (every spawn directly above a
-    //    chain-suspended tile) until something nudged the world.
-    const tiles = this.level.tiles;
-    if (tiles) {
-      const x0 = Math.floor(sp.x - radius);
-      const x1 = Math.floor(sp.x + radius);
-      const y0 = Math.floor(sp.y - halfH - 0.1);
-      const y1 = Math.floor(sp.y + halfH + 0.1);
-      for (let gx = x0; gx <= x1; gx++) {
-        for (let gy = y0; gy <= y1; gy++) {
-          if (!tiles.has(`${gx},${gy}`)) continue;
-          const tileTop = gy + 0.5;
-          const tileBot = gy - 0.5;
-          const capBot = sp.y - halfH;
-          const capTop = sp.y + halfH;
-          if (capTop <= tileBot || capBot >= tileTop) continue; // no overlap
-          // capsule bottom more than 0.3 inside tile = real interpenetration
-          if (capBot < tileTop - 0.3) return false;
-        }
-      }
-    }
-    // 2. Reject if a static hazard's trigger volume overlaps the capsule.
-    // Skips kinetic hazards (saw, pendulum) since they move — those would
-    // give false rejections anywhere they pass through.
-    for (const h of this.level.hazards ?? []) {
-      if (h.kind !== 'lava' && h.kind !== 'spike') continue;
-      const hx = h.body?.position?.x ?? h.x;
-      const hy = h.body?.position?.y ?? h.y;
-      const hw = (h.w ?? 1) / 2 + radius;
-      const hh = (h.h ?? 0.4) / 2 + halfH;
-      if (Math.abs(sp.x - hx) < hw && Math.abs(sp.y - hy) < hh) return false;
-    }
-    // 3. Require solid ground within a reasonable drop. Spawns on top of
-    //    destroyed tile columns pass checks 1+2 (no overlap, no hazard)
-    //    but drop the player straight into the void on respawn.
-    if (!this._hasGroundBelow(sp.x, sp.y, 14)) return false;
-    return true;
-  }
+  _isSpawnClear(sp) { return spawnSolver.isSpawnClear(this._spawnWorld(), sp); }
 
-  // Walk down the tile grid from spawn y; return true if we hit a tile
-  // within `maxDrop` units. Scans the spawn column and ±1 since the capsule
-  // has width and may straddle a column boundary.
   _hasGroundBelow(x, y, maxDrop = 14) {
-    if (!this.level?.tiles) return true;
-    const startGy = Math.floor(y - 0.75); // bottom of capsule
-    for (let dx = -1; dx <= 1; dx++) {
-      const gx = Math.round(x) + dx;
-      for (let dy = 0; dy <= maxDrop; dy++) {
-        if (this.level.tiles.has(`${gx},${startGy - dy}`)) return true;
-      }
-    }
-    return false;
+    return spawnSolver.hasGroundBelow(this._spawnWorld(), x, y, maxDrop);
   }
 
-  // Pick an x for a sky drop that (a) stays within the map's playable
-  // x-range and (b) has solid ground below. Tries a few jittered candidates
-  // near `refX`; if none have ground (e.g., floor is gone), scans outward
-  // from refX for the nearest column that still does.
-  _safeDropX(refX) {
-    let minX = -Infinity, maxX = Infinity;
-    if (this.level?.killBound) {
-      minX = -this.level.killBound.x + 1;
-      maxX = this.level.killBound.x - 1;
-    } else if (this.level?.tiles) {
-      let lo = Infinity, hi = -Infinity;
-      for (const key of this.level.tiles.keys()) {
-        const gx = parseInt(key, 10);
-        if (gx < lo) lo = gx;
-        if (gx > hi) hi = gx;
-      }
-      if (isFinite(lo)) { minX = lo + 1; maxX = hi - 1; }
-    }
-    const clamp = (v) => Math.max(minX, Math.min(maxX, v));
-    for (let i = 0; i < 8; i++) {
-      const x = clamp(refX + rand(-8, 8));
-      if (this._hasGroundBelow(x, 16, 20)) return x;
-    }
-    // Scan outward from refX for first column that has ground.
-    const start = Math.round(clamp(refX));
-    const range = Math.ceil(Math.max(start - minX, maxX - start));
-    for (let d = 0; d <= range; d++) {
-      for (const dir of [-1, 1]) {
-        const x = start + d * dir;
-        if (x < minX || x > maxX) continue;
-        if (this._hasGroundBelow(x, 16, 20)) return x;
-      }
-    }
-    return clamp(refX);
-  }
+  _safeDropX(refX) { return spawnSolver.safeDropX(this._spawnWorld(), refX); }
 
-  _liftSpawnClear(sp) {
-    // Step the spawn upward in 0.5-unit increments until it's clear OR we
-    // exceed the play area. Worst-case fallback: original sp.
-    let cur = { x: sp.x, y: sp.y };
-    for (let i = 0; i < 20; i++) {
-      if (this._isSpawnClear(cur)) return cur;
-      cur = { x: cur.x, y: cur.y + 0.5 };
-    }
-    return sp;
-  }
+  _liftSpawnClear(sp) { return spawnSolver.liftSpawnClear(this._spawnWorld(), sp); }
 
   _spawnPlayer({ name, character, isLocal = false, isBot = false, isNet = false, inputSource = null }) {
     const sp = this._pickSpawn();
