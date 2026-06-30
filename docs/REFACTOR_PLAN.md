@@ -91,7 +91,11 @@ Public room = anyone can join, so incoming peer data is untrusted.
 
 ---
 
-## Phase 5 — Decompose `Game.js` ⬜
+## Phase 5 — Decompose `Game.js` 🔜 (in progress)
+
+- ✅ **Match outcome** → `src/match/outcome.js`: `evaluateGameOver()` (pure +
+  unit-tested) decides win/draw/ko; `Game._checkGameOver` keeps only the
+  audio/menu/net presentation.
 
 `Game.js` (~1130 lines) owns rendering, physics, input, net, menu, HUD, the
 main loop, serialization, and game-over logic. Carve out cohesive units, each

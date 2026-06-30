@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Browser party brawler — stickman physics, weapons, destructible terrain, online multiplayer.",
   "scripts": {
-    "test": "node --test test/*.test.js test/integrity/*.test.js test/network/*.test.js",
+    "test": "node --test test/*.test.js test/integrity/*.test.js test/network/*.test.js test/match/*.test.js",
     "test:smoke": "node test/smoke/boot.smoke.mjs",
     "check": "node scripts/check.mjs",
     "start": "node scripts/start.mjs",

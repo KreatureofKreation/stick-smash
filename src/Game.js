@@ -20,6 +20,7 @@ import { Projectile } from './weapons/Projectile.js';
 import * as spawnSolver from './levels/spawnSolver.js';
 import { killVerb } from './weapons/killVerbs.js';
 import { encodeSnapshot, decodePlayerInto, applyTiles, applyCurved } from './network/Snapshot.js';
+import { evaluateGameOver } from './match/outcome.js';
 
 export class Game {
   constructor(options = {}) {
@@ -917,44 +918,24 @@ export class Game {
   _verb(w) { return killVerb(w); }
 
   _checkGameOver() {
-    if (!this.localPlayers || this.localPlayers.length === 0) return;
-    // A player is still "in the match" while they have lives remaining. Being
-    // mid-respawn (state===DEAD with lives>0) does NOT count them out — they'll
-    // be back. Only when lives==0 and state===DEAD are they truly eliminated.
-    const stillIn = this.players.filter(p => p && p.lives > 0);
-    const totalEverIn = this.players.filter(p => p).length;
+    // Decision (who won / draw / ko) lives in match/outcome.js (pure + tested);
+    // the audio/menu/net presentation stays here.
+    const outcome = evaluateGameOver(this.players, this.localPlayers, p => p.state === STATE.DEAD);
+    if (!outcome) return;
+    this.running = false;
+    if (this._notifyMatchOver(outcome)) return;
 
-    // Solo: keep the existing "you died" early exit so the over-screen fires
-    // the moment P1 runs out of lives.
-    if (this.localPlayers.length === 1) {
+    if (outcome.reason === 'ko') {
       const local = this.localPlayer;
-      if (local && local.lives <= 0 && local.state === STATE.DEAD) {
-        this.running = false;
-        if (this._notifyMatchOver({ winner: null, reason: 'ko' })) return;
-        audio.death();
-        this.net.broadcast?.({ t: 'gameover', text: 'KO!', sub: `${local.name} eliminated.` });
-        setTimeout(() => this.menu.show('over', 'KO!', `${local.name} eliminated.`), 1200);
-        return;
-      }
-    }
-
-    if (totalEverIn <= 1) return;
-
-    // All locals dead AND no one alive → simultaneous wipeout = draw.
-    if (stillIn.length === 0) {
-      this.running = false;
-      if (this._notifyMatchOver({ winner: null, reason: 'draw' })) return;
+      audio.death();
+      this.net.broadcast?.({ t: 'gameover', text: 'KO!', sub: `${local.name} eliminated.` });
+      setTimeout(() => this.menu.show('over', 'KO!', `${local.name} eliminated.`), 1200);
+    } else if (outcome.reason === 'draw') {
       audio.death();
       this.net.broadcast?.({ t: 'gameover', text: 'DRAW', sub: 'Everyone went down.' });
       setTimeout(() => this.menu.show('over', 'DRAW', 'Everyone went down.'), 1200);
-      return;
-    }
-
-    // Last fighter standing wins — anyone, not just P1.
-    if (stillIn.length === 1) {
-      const winner = stillIn[0];
-      this.running = false;
-      if (this._notifyMatchOver({ winner, reason: 'victory' })) return;
+    } else if (outcome.reason === 'victory') {
+      const winner = outcome.winner;
       const localWon = this.localPlayers.includes(winner);
       if (localWon) audio.win(); else audio.death();
       const sub = `${winner.name} wins!`;
