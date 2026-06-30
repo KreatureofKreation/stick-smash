@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   encodePlayer, decodePlayerInto, encodeSnapshot, applyTiles, applyCurved,
+  sanitizeInput, sanitizeSnapshot,
 } from '../../src/network/Snapshot.js';
 
 // Minimal duck-typed stand-ins for the Three vectors / Stickman the codec
@@ -182,4 +183,80 @@ test('applyCurved: applies quaternions and damages wedges', () => {
   assert.equal(p.body.quaternion.x, 0.1);
   assert.equal(p.body.quaternion.w, 0.9);
   assert.equal(dmg, 40); // hp 100 -> 60
+});
+
+// ── Untrusted-input sanitizers ──────────────────────────────────────────────
+
+test('sanitizeInput: whitelists keys and coerces types', () => {
+  const out = sanitizeInput({
+    moveX: 0.5, moveY: -0.3, jump: 1, attack: 'yes', grab: 0, special: true,
+    throw: null, aimX: 0.6, aimY: -0.8, aimActive: 1,
+    evil: 'DROP TABLE', __proto__: { polluted: true },
+  });
+  assert.deepEqual(Object.keys(out).sort(),
+    ['aimActive', 'aimX', 'aimY', 'attack', 'grab', 'jump', 'moveX', 'moveY', 'special', 'throw'].sort());
+  assert.equal(out.moveX, 0.5);
+  assert.equal(out.jump, true);
+  assert.equal(out.attack, true);
+  assert.equal(out.grab, false);
+  assert.equal(out.throw, false);
+  assert.equal(out.evil, undefined, 'unknown keys dropped');
+});
+
+test('sanitizeInput: clamps out-of-range / non-finite numbers', () => {
+  const out = sanitizeInput({ moveX: 999, moveY: -999, aimX: NaN, aimY: Infinity });
+  assert.equal(out.moveX, 1);
+  assert.equal(out.moveY, -1);
+  assert.equal(out.aimX, 1, 'NaN aimX → default 1');
+  assert.equal(out.aimY, 0, 'Infinity aimY → default 0');
+});
+
+test('sanitizeInput: non-object → null (caller ignores)', () => {
+  assert.equal(sanitizeInput(null), null);
+  assert.equal(sanitizeInput('hax'), null);
+});
+
+test('sanitizeSnapshot: rejects structurally invalid payloads', () => {
+  assert.equal(sanitizeSnapshot(null), null);
+  assert.equal(sanitizeSnapshot({}), null, 'no players array');
+  assert.equal(sanitizeSnapshot({ players: 'nope' }), null);
+});
+
+test('sanitizeSnapshot: replaces NaN/Infinity player numbers with safe values', () => {
+  const clean = sanitizeSnapshot({
+    players: [{ id: 0, x: NaN, y: Infinity, vx: -Infinity, vy: 'fast', hp: NaN, l: -5, sc: NaN, ax: 9, ay: NaN }],
+    tiles: [],
+  });
+  const p = clean.players[0];
+  assert.equal(p.x, 0); assert.equal(p.y, 0); assert.equal(p.vx, 0); assert.equal(p.vy, 0);
+  assert.equal(p.hp, 0);
+  assert.equal(p.l, 0, 'negative lives floored to 0');
+  assert.equal(p.ax, 1, 'out-of-range aimX clamped to 1');
+  assert.equal(p.ay, 0);
+});
+
+test('sanitizeSnapshot: preserves valid data and pose flags untouched', () => {
+  const clean = sanitizeSnapshot({
+    players: [{ id: 2, x: 3.5, y: -1, vx: 2, vy: 4, hp: 75, l: 3, sc: 10, ax: 0.6, ay: 0.8, mid: 'jab', cs: 2, sv: 9, gb: 1 }],
+    tiles: [[1, 0, 30]],
+  });
+  const p = clean.players[0];
+  assert.equal(p.x, 3.5); assert.equal(p.hp, 75); assert.equal(p.l, 3);
+  assert.equal(p.mid, 'jab'); assert.equal(p.cs, 2); assert.equal(p.sv, 9); assert.equal(p.gb, 1);
+  assert.deepEqual(clean.tiles, [[1, 0, 30]]);
+});
+
+test('sanitizeSnapshot: drops malformed tiles and caps player count', () => {
+  const clean = sanitizeSnapshot({
+    players: Array.from({ length: 50 }, (_, i) => ({ id: i, x: 0, y: 0, vx: 0, vy: 0, hp: 1, l: 1, sc: 0, ax: 1, ay: 0 })),
+    tiles: [[1, 2, 3], ['bad'], [4, 5], [6, 7, Infinity]],
+  });
+  assert.equal(clean.players.length, 16, 'player count capped');
+  assert.deepEqual(clean.tiles, [[1, 2, 3]], 'only well-formed finite triples kept');
+});
+
+test('sanitizeSnapshot: null player slots are preserved', () => {
+  const clean = sanitizeSnapshot({ players: [null, { id: 1, x: 0, y: 0, vx: 0, vy: 0, hp: 1, l: 1, sc: 0, ax: 1, ay: 0 }], tiles: [] });
+  assert.equal(clean.players[0], null);
+  assert.equal(clean.players[1].id, 1);
 });

@@ -72,16 +72,19 @@ netcode, so it landed behind the CI smoke test.**
 
 ---
 
-## Phase 4 — Harden the network boundary ⬜
+## Phase 4 — Harden the network boundary 🔜 (mostly done)
 
-Public room = anyone can join. Incoming peer data is currently trusted.
+Public room = anyone can join, so incoming peer data is untrusted.
 
-- ⬜ Validate/clamp every field in `Net._handleClientMessage` /
-  `_handleHostMessage` before it reaches `applySnapshot` (positions, hp, lives,
-  ids, array lengths, peer-supplied `character`).
-- ⬜ Replace the dedupe-by-message-string error suppression in `Game._tick`
-  with a ring buffer of distinct errors, so intermittent throws surface in
-  playtests instead of being swallowed.
+- ✅ **Sanitizers** in `network/Snapshot.js` (pure, unit-tested):
+  `sanitizeSnapshot` (rejects invalid payloads, coerces every numeric player
+  field finite, caps player count, drops malformed tiles) and `sanitizeInput`
+  (whitelists + type-coerces the canonical input keys). `Net.js` runs them at
+  the message boundary before anything reaches the sim.
+- ✅ Replaced the single-error suppression in `Game._tick` with a bounded
+  distinct-error ring buffer, so a second intermittent throw isn't swallowed.
+- ⬜ Deep-validate peer-supplied `character` on client-side construction
+  (currently passed through to `new Stickman`).
 - ⬜ **Gib churn**: a steady `{sv:0, gb:1}` snapshot stream resets-then-re-gibs
   the player every frame (documented in `test/network/snapshot.test.js`).
   Decide the intended behavior and make decode idempotent.

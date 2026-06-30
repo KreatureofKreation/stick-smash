@@ -677,10 +677,17 @@ export class Game {
       }
       window.__perf = probe;
     } catch (err) {
-      if (this._lastTickErr !== String(err)) {
+      // Surface each DISTINCT tick error once (bounded ring buffer), instead
+      // of suppressing everything after the first. A recurring single error
+      // still logs once, but a second, different intermittent throw is no
+      // longer swallowed — which is what hid bugs during playtests.
+      const key = String(err?.stack || err);
+      this._tickErrs ??= [];
+      if (!this._tickErrs.includes(key)) {
         console.error('Tick error:', err);
-        this._lastTickErr = String(err);
         this._showError(err);
+        this._tickErrs.push(key);
+        if (this._tickErrs.length > 20) this._tickErrs.shift();
       }
     }
     this.input.endFrame();
