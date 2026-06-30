@@ -11,8 +11,8 @@ import { spawnFirePatch } from './fx/FirePatch.js';
 // === SUPER WEAPONS — rare, dramatic ===
 
 // === LIGHTSABER ===
-
 const SABER_COLORS = [0x4d9fff, 0x66e2a3, 0xff4d6d, 0xb24dff, 0xffcc33];
+
 
 
 export class Lightsaber extends Weapon {
@@ -141,6 +141,7 @@ export class Lightsaber extends Weapon {
 }
 
 
+
 export class FlameSword extends Weapon {
   constructor(game) {
     super(game);
@@ -245,6 +246,7 @@ export class FlameSword extends Weapon {
 }
 
 
+
 export class IceSword extends Weapon {
   constructor(game) {
     super(game);
@@ -311,6 +313,7 @@ export class IceSword extends Weapon {
     }
   }
 }
+
 
 
 // =============================================================================
@@ -592,6 +595,7 @@ export class Kamehameha extends Weapon {
 }
 
 
+
 export class Nuke extends Weapon {
   constructor(game) {
     super(game);
@@ -672,6 +676,7 @@ export class Nuke extends Weapon {
 }
 
 
+
 export class LightningStaff extends Weapon {
   constructor(game) {
     super(game);
@@ -744,6 +749,7 @@ export class LightningStaff extends Weapon {
 }
 
 
+
 // === SUPERPOWER PICKUPS ===
 
 class SuperPickup {
@@ -783,12 +789,14 @@ class SuperPickup {
 }
 
 
+
 export class FlightPower {
   constructor(game) { return new SuperPickup(game, {
     kind: 'Flight', icon: '🪽', color: 0x9be8ff, duration: 6000,
     apply: (p, d) => { p.flightUntil = performance.now() + d; },
   }); }
 }
+
 
 export class InvisibilityPower {
   constructor(game) { return new SuperPickup(game, {
@@ -797,6 +805,7 @@ export class InvisibilityPower {
   }); }
 }
 
+
 export class TimeSlowPower {
   constructor(game) { return new SuperPickup(game, {
     kind: 'Bullet Time', icon: '⏱', color: 0xff4d6d, duration: 4000,
@@ -804,12 +813,14 @@ export class TimeSlowPower {
   }); }
 }
 
+
 export class SuperPunchPower {
   constructor(game) { return new SuperPickup(game, {
     kind: 'Super Punch', icon: '👊', color: 0xffcc33, duration: 7000,
     apply: (p, d) => { p.superPunchUntil = performance.now() + d; },
   }); }
 }
+
 
 
 export class GumGumFruit {
@@ -820,6 +831,7 @@ export class GumGumFruit {
 }
 
 
+
 // ===== FORCE POWERS — special key triggers ability while pickup active =====
 export class ForcePushPower {
   constructor(game) { return new SuperPickup(game, {
@@ -828,12 +840,14 @@ export class ForcePushPower {
   }); }
 }
 
+
 export class ForcePullPower {
   constructor(game) { return new SuperPickup(game, {
     kind: 'Force Pull', icon: '🧲', color: 0x4dccff, duration: 8000,
     apply: (p, d) => { p.forcePullUntil = performance.now() + d; },
   }); }
 }
+
 
 export class ForceLightningPower {
   constructor(game) { return new SuperPickup(game, {
@@ -842,41 +856,10 @@ export class ForceLightningPower {
   }); }
 }
 
+
 export class ForceChokePower {
   constructor(game) { return new SuperPickup(game, {
     kind: 'Force Choke', icon: '👐', color: 0xff4d6d, duration: 7000,
     apply: (p, d) => { p.forceChokeUntil = performance.now() + d; },
   }); }
-}
-
-
-// METEOR STORM (super) — calls a barrage of meteors down across the arena.
-// Spawned all at once from staggered heights so they rain in over ~2s.
-export class MeteorStorm extends Weapon {
-  constructor(game) {
-    super(game);
-    this.name = 'Meteor Storm'; this.icon = '☄'; this.ammo = 1; this.fireDelay = 0.5; this.throwImpulse = 3;
-  }
-  _buildMesh() {
-    const grp = new THREE.Group();
-    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.16), new THREE.MeshLambertMaterial({ color: 0x6a3a2a, emissive: 0xff4400, emissiveIntensity: 0.4 }));
-    const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.5, 6), new THREE.MeshLambertMaterial({ color: 0x33221a }));
-    staff.position.y = -0.2;
-    grp.add(rock, staff); this.mesh = grp;
-  }
-  fire(player) {
-    audio.explode(); this.game.fx.camera.punch(0.5);
-    const cx = player.position.x, cy = player.position.y;
-    for (let i = 0; i < 18; i++) {
-      const x = cx + rand(-13, 13);
-      const y = cy + rand(11, 24);   // staggered height → staggered landing
-      const m = new THREE.Mesh(new THREE.DodecahedronGeometry(0.3), new THREE.MeshLambertMaterial({ color: 0x5a2a1a, emissive: 0xff5500, emissiveIntensity: 0.8 }));
-      new Projectile(this.game, {
-        x, y, vx: rand(-2, 2), vy: rand(-14, -10),
-        damage: 24, owner: player, gravity: true, gravityScale: 1.4, life: 4, radius: 0.3,
-        mesh: m, explosive: true, explodeOnContact: true, explodeRadius: 2.4, explodeDamage: 30, tracerColor: 0xff6600,
-      });
-    }
-    player.weapon = null; this.destroy();
-  }
 }

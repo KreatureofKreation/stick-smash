@@ -18,6 +18,7 @@ import { Net } from './network/Net.js';
 import { rand, clamp, lerp } from './util/math.js';
 import { Projectile } from './weapons/Projectile.js';
 import * as spawnSolver from './levels/spawnSolver.js';
+import { killVerb } from './weapons/killVerbs.js';
 
 export class Game {
   constructor(options = {}) {
@@ -905,15 +906,7 @@ export class Game {
       }
     }
   }
-  _verb(w) {
-    return ({ sword: 'sliced', bat: 'launched', pistol: 'shot', shotgun: 'blasted', minigun: 'shredded', bow: 'pierced',
-              grenade: 'exploded', rpg: 'rocketed', chicken: 'chickened', boomerang: 'flung', fish: 'slapped',
-              fist: 'KO\'d', super: 'obliterated', gumgum: 'stretched', flame: 'burned', ice: 'froze',
-              lightning: 'shocked', nuke: 'NUKED', corpse: 'corpse-bashed', thrown: 'pelted',
-              saber: 'lightsabered', forcePush: 'force-pushed', forcePull: 'pulled', choke: 'choked',
-              longsword: 'cleaved', mace: 'maced', hammer: 'crushed', halberd: 'halberded',
-              explosion: 'blasted', lava: 'cooked', spike: 'spiked', saw: 'sawed', blade: 'guillotined', projectile: 'shot' })[w] || 'KO\'d';
-  }
+  _verb(w) { return killVerb(w); }
 
   _checkGameOver() {
     if (!this.localPlayers || this.localPlayers.length === 0) return;

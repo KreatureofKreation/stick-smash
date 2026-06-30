@@ -38,8 +38,8 @@ Move dependency-free math out of god-objects into tested modules.
 - ✅ **Spawn solver** → `src/levels/spawnSolver.js` (+ unit tests). Lifted the
   spawn-safety math out of `Game.js`; `Game.js` delegates via `_spawnWorld()`.
 - ✅ **Weighted spawn pick** → `src/weapons/spawnPick.js` (+ unit tests).
-- ⬜ **Kill-feed verb map** (`Game._verb`, `Game.js`) → data table next to the
-  weapons; trivially testable.
+- ✅ **Kill-feed verb map** → `src/weapons/killVerbs.js` (+ unit tests);
+  `Game._verb` delegates to `killVerb()`.
 
 ---
 
@@ -47,9 +47,8 @@ Move dependency-free math out of god-objects into tested modules.
 
 - ✅ `weapons.js` reduced from ~3550 lines to a ~100-line **barrel**. Classes
   live in `melee/ranged/fun/supers/pickups.js`; external imports unchanged.
-- 🔜 **Split `ranged.js` further** (~1490 lines): pull throwables/explosives
-  (`Grenade`, `RPG`, `StickyBomb`, plus `MeteorStorm` from supers) into
-  `throwables.js`. The barrel + integrity test already make this a safe move.
+- ✅ **Split throwables out** → `throwables.js` (`Grenade`, `RPG`, `StickyBomb`,
+  `MeteorStorm`). `ranged.js` ~1300 lines, `supers.js` ~865.
 - ⬜ Promote per-weapon stat blocks (damage, fireDelay, throwImpulse…) into a
   data table like `Stickman`'s `MOVE_TABLE`, so balance tuning is data, not code.
 

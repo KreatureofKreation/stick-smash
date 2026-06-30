@@ -4,13 +4,15 @@
 // registries from here exactly as before the split.
 import { pickWeighted } from './spawnPick.js';
 import { Sword, Bat, Longsword, Mace, WarHammer, Halberd, HulkHands } from './melee.js';
-import { Pistol, Shotgun, Minigun, SMG, AssaultRifle, Revolver, Crossbow, Flamethrower, DualPistols, Grenade, RPG, SniperRifle, Shurikens, StickyBomb, SpikeThrower, ShrinkRay, VacuumGun } from './ranged.js';
+import { Pistol, Shotgun, Minigun, SMG, AssaultRifle, Revolver, Crossbow, Flamethrower, DualPistols, SniperRifle, Shurikens, SpikeThrower, ShrinkRay, VacuumGun } from './ranged.js';
+import { Grenade, RPG, StickyBomb, MeteorStorm } from './throwables.js';
 import { RubberChicken, Boomerang, FishSlap, Snail, SnailDeployer } from './fun.js';
-import { Lightsaber, FlameSword, IceSword, Kamehameha, Nuke, LightningStaff, FlightPower, InvisibilityPower, TimeSlowPower, SuperPunchPower, GumGumFruit, ForcePushPower, ForcePullPower, ForceLightningPower, ForceChokePower, MeteorStorm } from './supers.js';
+import { Lightsaber, FlameSword, IceSword, Kamehameha, Nuke, LightningStaff, FlightPower, InvisibilityPower, TimeSlowPower, SuperPunchPower, GumGumFruit, ForcePushPower, ForcePullPower, ForceLightningPower, ForceChokePower } from './supers.js';
 import { HealthPack, SpeedBoost, ArmorPlate, Shield } from './pickups.js';
 
 export * from './melee.js';
 export * from './ranged.js';
+export * from './throwables.js';
 export * from './fun.js';
 export * from './supers.js';
 export * from './pickups.js';
