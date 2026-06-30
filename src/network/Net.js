@@ -21,6 +21,7 @@
 // jitter on retry minimizes simultaneous-claim races.
 import Peer from 'peerjs';
 import { rosterById } from '../characters/roster.js';
+import { sanitizeSnapshot, sanitizeInput } from './Snapshot.js';
 
 export const PUBLIC_ROOM = 'stick-smash-public';
 
@@ -183,9 +184,10 @@ export class Net {
       // Clear lobby state on match start.
       this._lobby = false;
       this.game.startAsClient({ levelId: data.level });
-      if (data.snap) this.game.applySnapshot(data.snap);
+      if (data.snap) { const clean = sanitizeSnapshot(data.snap); if (clean) this.game.applySnapshot(clean); }
     } else if (data.t === 'snap') {
-      this.game.applySnapshot(data.snap);
+      const clean = sanitizeSnapshot(data.snap);
+      if (clean) this.game.applySnapshot(clean);
     } else if (data.t === 'gameover') {
       this.game.running = false;
       setTimeout(() => this.game.menu?.show('over', data.text, data.sub), 800);
@@ -383,7 +385,7 @@ export class Net {
       slot.ready = !!data.ready;
       if (this._lobby) this._broadcastLobby();
     } else if (data.t === 'input') {
-      slot.lastInput = data.in;
+      slot.lastInput = sanitizeInput(data.in);
     } else if (data.t === 'ping') {
       try { conn.send({ t: 'pong', ts: data.ts }); } catch (_) {}
     }

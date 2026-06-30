@@ -140,3 +140,69 @@ export function applyCurved(level, players, snap) {
     }
   }
 }
+
+// ── Untrusted-input sanitizers ──────────────────────────────────────────────
+// The public room lets anyone join, so peer-supplied messages are untrusted.
+// These coerce incoming data to safe shapes BEFORE it reaches the sim, so a
+// malformed/malicious peer can't inject NaN positions (which corrupt physics +
+// rendering) or stray properties. Net.js calls them at the message boundary.
+
+// Generous bounds — legit gameplay never approaches these; the point is to
+// reject NaN/Infinity and absurd values, not to enforce game rules.
+const POS_BOUND = 1e6;
+
+const fin = (v, d = 0) => (Number.isFinite(v) ? clampTo(v, -POS_BOUND, POS_BOUND) : d);
+const clampTo = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const unit = (v, d) => (Number.isFinite(v) ? clampTo(v, -1, 1) : d);
+
+// Sanitize a per-frame input the host received from a client. Whitelists the
+// canonical input keys (matches Input.getSnapshotFor) and coerces types, so
+// Object.assign onto the stickman's input can't introduce junk. Returns null
+// for a non-object (caller ignores it).
+export function sanitizeInput(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  return {
+    moveX: unit(raw.moveX, 0), moveY: unit(raw.moveY, 0),
+    jump: !!raw.jump, attack: !!raw.attack, grab: !!raw.grab,
+    special: !!raw.special, throw: !!raw.throw,
+    aimX: unit(raw.aimX, 1), aimY: unit(raw.aimY, 0), aimActive: !!raw.aimActive,
+  };
+}
+
+// Sanitize a snapshot a client received from the host. Rejects structurally
+// invalid payloads (returns null) and coerces every numeric player field to a
+// finite value so decodePlayerInto can't write NaN into bodies. Pose flags are
+// left as-is — decodePlayerInto already coerces them (`| 0`, `!!`). Returns a
+// new object; does not mutate `raw`.
+const MAX_SNAPSHOT_PLAYERS = 16;
+export function sanitizeSnapshot(raw) {
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.players)) return null;
+  const out = {
+    players: raw.players.slice(0, MAX_SNAPSHOT_PLAYERS).map(sp => {
+      if (!sp || typeof sp !== 'object') return null;
+      return {
+        ...sp,
+        id: Number.isFinite(sp.id) ? sp.id : 0,
+        x: fin(sp.x), y: fin(sp.y), vx: fin(sp.vx), vy: fin(sp.vy),
+        ax: unit(sp.ax, 1), ay: unit(sp.ay, 0),
+        hp: Number.isFinite(sp.hp) ? clampTo(sp.hp, 0, POS_BOUND) : 0,
+        l: Number.isFinite(sp.l) ? Math.max(0, sp.l | 0) : 0,
+        sc: fin(sp.sc),
+        at: fin(sp.at),
+      };
+    }),
+    tiles: Array.isArray(raw.tiles)
+      ? raw.tiles.filter(t => Array.isArray(t) && t.length >= 3 && t.every(Number.isFinite))
+      : [],
+  };
+  // Curved-gravity extras: keep only well-formed entries; decode null-guards.
+  if (Array.isArray(raw.playersQ)) {
+    out.playersQ = raw.playersQ.map(q =>
+      (Array.isArray(q) && q.length === 4 && q.every(Number.isFinite)) ? q : null);
+  }
+  if (Array.isArray(raw.wedges)) {
+    out.wedges = raw.wedges.filter(w =>
+      Array.isArray(w) && w.length >= 4 && Number.isFinite(w[3]));
+  }
+  return out;
+}
