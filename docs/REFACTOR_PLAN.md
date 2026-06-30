@@ -96,12 +96,16 @@ Public room = anyone can join, so incoming peer data is untrusted.
 - ✅ **Match outcome** → `src/match/outcome.js`: `evaluateGameOver()` (pure +
   unit-tested) decides win/draw/ko; `Game._checkGameOver` keeps only the
   audio/menu/net presentation.
+- ✅ **Countdown** → `src/match/Countdown.js`: the 3-2-1 timer lifecycle with
+  the cancel-then-reschedule "double countdown" guard, unit-tested with an
+  injectable clock. `Game._startCountdown`/`_cleanup` delegate to it.
 
 `Game.js` (~1130 lines) owns rendering, physics, input, net, menu, HUD, the
 main loop, serialization, and game-over logic. Carve out cohesive units, each
 behind the smoke test:
 
-- ⬜ **MatchController** — `_startMatch` variants, countdown, restart, cleanup.
+- ⬜ **MatchController** — `_startMatch` variants, restart, cleanup (countdown
+  already carved out above).
 - ⬜ **Loop/stepper** — the `_update` step ordering (input → AI → physics →
   rig sync → pickups → respawn → spawn → game-over), with the mode branches
   (`net.role`) made explicit.

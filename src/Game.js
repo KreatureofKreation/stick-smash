@@ -21,6 +21,7 @@ import * as spawnSolver from './levels/spawnSolver.js';
 import { killVerb } from './weapons/killVerbs.js';
 import { encodeSnapshot, decodePlayerInto, applyTiles, applyCurved } from './network/Snapshot.js';
 import { evaluateGameOver } from './match/outcome.js';
+import { Countdown } from './match/Countdown.js';
 
 export class Game {
   constructor(options = {}) {
@@ -464,27 +465,22 @@ export class Game {
   }
 
   _startCountdown() {
-    // Cancel any pending countdown from the previous match. Without this,
-    // a fast PLAY AGAIN (or map rotation) restarts before the prior 3-2-1
-    // setTimeouts have fired — both queues then dump their messages on the
-    // HUD, producing the "double countdown" bug.
-    if (this._countdownTimers) for (const id of this._countdownTimers) clearTimeout(id);
-    this._countdownTimers = [];
-
+    // Countdown owns the cancel-then-reschedule of the 3-2-1 timers (guards
+    // the "double countdown" bug on fast PLAY AGAIN / map rotation).
     const lockMs = 3 * 700 + 200;
     const until = performance.now() + lockMs;
     for (const p of this.players) if (p) p._frozenUntil = until;
     audio.countdown?.(); this.hud.showCenter('3', '', 700);
-    this._countdownTimers.push(setTimeout(() => { audio.countdown?.(); this.hud.showCenter('2', '', 700); }, 700));
-    this._countdownTimers.push(setTimeout(() => { audio.countdown?.(); this.hud.showCenter('1', '', 700); }, 1400));
-    this._countdownTimers.push(setTimeout(() => { audio.go?.(); this.hud.showCenter('FIGHT', 'last one standing wins', 1200); }, 2100));
+    this._countdown ??= new Countdown();
+    this._countdown.start([
+      { delay: 700,  fn: () => { audio.countdown?.(); this.hud.showCenter('2', '', 700); } },
+      { delay: 1400, fn: () => { audio.countdown?.(); this.hud.showCenter('1', '', 700); } },
+      { delay: 2100, fn: () => { audio.go?.(); this.hud.showCenter('FIGHT', 'last one standing wins', 1200); } },
+    ]);
   }
 
   _cleanup() {
-    if (this._countdownTimers) {
-      for (const id of this._countdownTimers) clearTimeout(id);
-      this._countdownTimers = [];
-    }
+    this._countdown?.cancel();
     if (this.level) { this.level.destroy(); this.level = null; }
     for (const p of this.players) if (p) p.destroy();
     for (const w of this.weapons) w.destroy?.();
