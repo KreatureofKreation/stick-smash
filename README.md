@@ -22,6 +22,20 @@ python -m http.server 5173
 
 Open http://localhost:5173
 
+## Develop & test
+
+No build step. Two checks run in CI (`.github/workflows/ci.yml`) and should pass before pushing:
+
+```
+npm run check   # node --check on every src/**/*.js (catches syntax errors)
+npm test        # pure-logic unit tests (node --test, zero deps)
+```
+
+Unit tests live in `test/` and only cover dependency-free modules (no Three.js /
+cannon imports), e.g. the spawn-safety solver (`src/levels/spawnSolver.js`) and
+`src/util/math.js`. Gameplay still needs a manual browser pass — see the PR
+template checklist.
+
 ## Share with friends (no deploy)
 
 Three options that expose your local server to the internet via a free tunnel — anyone you send the link to can play with you over the public PeerJS broker:

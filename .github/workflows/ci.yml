@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # Mechanizes the PR-template "node --check passes on touched files" box:
+      # syntax-checks every src/**/*.js so a parse error can't reach a browser.
+      - name: Syntax check (node --check)
+        run: npm run check
+      # Pure-logic unit tests (spawn solver, math). No browser, no deps.
+      - name: Unit tests
+        run: npm test
+
+  smoke:
+    # Boots the real game in headless Chromium and runs an offline match.
+    # Needs outbound network for the CDN deps (Three/Rapier/PeerJS); if a
+    # CDN is unreachable the test skips itself rather than failing.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # Install the playwright package locally so the runner's `import
+      # 'playwright'` resolves, plus the Chromium browser binary.
+      - name: Install Playwright + Chromium
+        run: |
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Smoke test (headless boot + match)
+        run: npm run test:smoke
