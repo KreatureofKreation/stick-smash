@@ -108,11 +108,12 @@ async function main() {
       const g = window.game;
       return {
         matchTimer: g.matchTimer,
-        lastTickErr: g._lastTickErr ?? null,
+        // _tickErrs is the distinct-error ring buffer Game._tick fills on a throw.
+        tickErr: g._tickErrs?.[0] ?? null,
         overlay: !!document.getElementById('runtime-err'),
       };
     });
-    if (after.overlay || after.lastTickErr) fail(`main loop threw: ${after.lastTickErr ?? 'runtime-err overlay shown'}`);
+    if (after.overlay || after.tickErr) fail(`main loop threw: ${after.tickErr ?? 'runtime-err overlay shown'}`);
     if (!(after.matchTimer > t0)) fail(`matchTimer did not advance (${t0} -> ${after.matchTimer})`);
     console.log(`✓ ran ${(after.matchTimer - t0).toFixed(1)}s of match, loop clean`);
 
