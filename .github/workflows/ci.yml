@@ -13,6 +13,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Install dependencies
+        run: npm ci
       # Mechanizes the PR-template "node --check passes on touched files" box:
       # syntax-checks every src/**/*.js so a parse error can't reach a browser.
       - name: Syntax check (node --check)
@@ -31,11 +33,28 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      # Install the playwright package locally so the runner's `import
-      # 'playwright'` resolves, plus the Chromium browser binary.
-      - name: Install Playwright + Chromium
+      - name: Install dependencies
+        run: npm ci
+      # Install the Chromium browser binary for the Playwright version locked
+      # in package-lock.json. Keeping package + browser versions paired avoids
+      # "Executable doesn't exist" failures after Playwright upgrades.
+      - name: Install Playwright Chromium
         run: |
-          npm install --no-save playwright@1.56.1
           npx playwright install --with-deps chromium
       - name: Smoke test (headless boot + match)
         run: npm run test:smoke
+
+  browser:
+    # Exercises the level editor UI in headless Chromium.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Browser tests
+        run: npm run test:browser

@@ -62,10 +62,10 @@ test.describe('level editor', () => {
 
     const tile = await selectedTile(page);
     const handle = { x: tile.x + (tile.w ?? 1) / 2, y: tile.y - (tile.h ?? 1) / 2 };
-    expect(await hasHandlePixelNearWorld(page, handle)).toBeTruthy();
+    await waitForHandlePixel(page, handle, true);
 
     await page.locator('[data-tool="tile"]').click();
-    expect(await hasHandlePixelNearWorld(page, handle)).toBeFalsy();
+    await waitForHandlePixel(page, handle, false);
     expect(errors()).toEqual([]);
   });
 
@@ -207,6 +207,13 @@ async function ensureDetailsOpen(page, detail) {
   if (!await locator.evaluate(el => el.open)) {
     await locator.locator('summary').click();
   }
+}
+
+async function waitForHandlePixel(page, world, expected) {
+  await expect.poll(() => hasHandlePixelNearWorld(page, world), {
+    timeout: 3000,
+    message: expected ? 'resize handle should be visible' : 'resize handle should be hidden',
+  }).toBe(expected);
 }
 
 async function hasHandlePixelNearWorld(page, world) {
