@@ -89,6 +89,40 @@ export class InputManager {
     return { x: (this.mouseX / w) * 2 - 1, y: -(this.mouseY / h) * 2 + 1 };
   }
 
+  _readGamepadAim(gp) {
+    const axes = gp.axes || [];
+    const axis = (i) => Number.isFinite(axes[i]) ? axes[i] : 0;
+    const standard = gp.mapping === 'standard';
+    const pairs = standard
+      ? [[2, 3]]
+      : (axes.length > 4 ? [[3, 4], [2, 3], [2, 5], [4, 5]] : [[2, 3], [3, 4]]);
+
+    for (const [xIdx, yIdx] of pairs) {
+      if (xIdx >= axes.length || yIdx >= axes.length) continue;
+      const ax = axis(xIdx);
+      const ay = -axis(yIdx);
+
+      // Some non-standard Xbox mappings expose a trigger at axis 2 resting at
+      // +/-1, while the right stick is actually axes 3/4. Do not let that
+      // trigger masquerade as a permanently-held aim direction.
+      if (!standard && axes.length > 4 && xIdx === 2 && Math.abs(Math.abs(ax) - 1) < 0.05) {
+        continue;
+      }
+
+      if (Math.hypot(ax, ay) > 0.35) return { x: ax, y: ay };
+    }
+
+    return null;
+  }
+
+  _applyGamepadAim(out, gp) {
+    const aim = this._readGamepadAim(gp);
+    if (!aim) return;
+    out.aimX = aim.x;
+    out.aimY = aim.y;
+    out.aimActive = true;
+  }
+
   getGamepadSnapshot(idx) {
     const out = { moveX: 0, moveY: 0, jump: false, attack: false, grab: false, special: false, throw: false, aimX: 1, aimY: 0, aimActive: false };
     const gps = navigator.getGamepads?.() || [];
@@ -122,10 +156,7 @@ export class InputManager {
     // magnitude, then pass the FULL direction (both axes) through. A per-axis
     // deadzone would zero the minor axis on a shallow diagonal and snap the aim
     // to the nearest cardinal (the "can't aim between 90°s" bug).
-    const ax = axis(2), ay = -axis(3);
-    if (Math.hypot(ax, ay) > 0.35) {
-      out.aimX = ax; out.aimY = ay; out.aimActive = true;
-    }
+    this._applyGamepadAim(out, gp);
 
     // === ACTIONS ===
     // A = Jump   |   X = Grab   |   B = Throw   |   Y = Special / altfire
@@ -164,10 +195,7 @@ export class InputManager {
     out.moveY = my;
 
     // Radial deadzone (see getGamepadSnapshot) — preserve the full aim direction.
-    const ax = axis(2), ay = -axis(3);
-    if (Math.hypot(ax, ay) > 0.35) {
-      out.aimX = ax; out.aimY = ay; out.aimActive = true;
-    }
+    this._applyGamepadAim(out, gp);
 
     out.jump = btn(0);
     out.attack = btn(5) || trig(7) > 0.35;
